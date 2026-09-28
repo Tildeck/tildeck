@@ -1,0 +1,26 @@
+{
+  "name": "tildeck-panel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "nuxt generate",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@fontsource/heebo": "^5.3.0",
+    "@nuxtjs/color-mode": "^4.0.1",
+    "@nuxtjs/i18n": "^10.6.0",
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.40",
+    "vue-router": "^5.2.0"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.0.0",
+    "@nuxtjs/tailwindcss": "^6.12.2",
+    "eslint": "^10.10.0",
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.0.0"
+  }
+}

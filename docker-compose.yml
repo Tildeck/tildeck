@@ -1,0 +1,103 @@
+# Tildeck sync server: production deployment.
+#
+# Runs published images only. There is no build: anywhere in this file
+# (scripts/verify.sh and CI fail on it). Development uses the machine-local
+# docker-compose-dev.yml through scripts/local.sh, never this file.
+#
+# Usage, from the directory that holds this file and a filled-in .env:
+#   docker compose up -d
+#
+# Compose interpolation (${...}) is limited to values Compose itself needs
+# before the containers exist: the image tag, the published address, and the
+# database directory and credentials. Everything the server reads comes
+# through env_file. Each variable is documented in .env.example.
+#
+# The server speaks plain HTTP. Put a TLS-terminating reverse proxy in front
+# of it: Android clients refuse cleartext HTTP, and passwords must never
+# cross a network unencrypted. By default the port is published on the
+# loopback interface only, for a proxy running on the same host.
+#
+# Hardening on every service: no new privileges, all Linux capabilities
+# dropped (PostgreSQL gets back only what its entrypoint needs), memory and
+# CPU ceilings, and log rotation.
+
+services:
+  server:
+    image: ghcr.io/tildeck/tildeck-server:${TILDECK_VERSION:?set TILDECK_VERSION in .env to the release to deploy}
+    container_name: tildeck-server
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The image writes nothing outside /tmp at runtime.
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 512m
+    cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+    env_file:
+      - .env
+    # environment wins over env_file: a .env copied from the example with
+    # APP_ENV=development can never start production with the
+    # placeholder-configuration guard switched off.
+    environment:
+      APP_ENV: production
+    ports:
+      - "${TILDECK_BIND:-127.0.0.1}:${TILDECK_PORT:-8080}:8080"
+    networks:
+      - tildeck
+    # The image's HEALTHCHECK calls /api/health/ready, which includes the
+    # database.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+    container_name: tildeck-postgres
+    security_opt:
+      - no-new-privileges:true
+    # The official entrypoint starts as root, fixes the ownership of the data
+    # and socket directories, then drops to the postgres user. These five
+    # capabilities are exactly what that needs.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    mem_limit: 1g
+    cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      # A host directory, so the data is visible and survives any container
+      # or volume cleanup. PostgreSQL 18 images keep their data under
+      # /var/lib/postgresql (a versioned subdirectory), not .../data.
+      - ${POSTGRES_DATA_DIR:?set POSTGRES_DATA_DIR in .env}:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - tildeck
+
+networks:
+  tildeck:

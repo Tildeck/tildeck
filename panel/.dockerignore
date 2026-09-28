@@ -1,0 +1,8 @@
+node_modules/
+.nuxt/
+.output/
+.data/
+# Secrets never enter a build context: they would land in the image layers
+# and in the build cache.
+.env
+.env.*

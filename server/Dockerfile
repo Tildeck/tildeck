@@ -27,6 +27,9 @@ FROM ${UV_IMAGE} AS uv
 
 # --- Panel -------------------------------------------------------------------
 FROM ${NODE_IMAGE} AS panel-deps
+ENV NUXT_TELEMETRY_DISABLED=1 \
+    NPM_CONFIG_UPDATE_NOTIFIER=false \
+    NPM_CONFIG_FUND=false
 WORKDIR /panel
 COPY --from=panel package.json package-lock.json ./
 # --ignore-scripts: `nuxt prepare` (postinstall) needs the source tree, which

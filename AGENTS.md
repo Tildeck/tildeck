@@ -4,7 +4,7 @@
 
 Tildeck is a free, open source SSH client for Windows and Android (Flutter) with end-to-end encrypted sync through a self-hosted server (Python FastAPI, PostgreSQL, Docker Compose) and a web admin panel for operators (Nuxt, served by the server).
 
-**Stage: foundation implementation.** What exists today: the repository baseline and the server shell in `server/` (FastAPI, settings registry, activity log, Alembic, health endpoints, `server/openapi.json`, one `server/Dockerfile` that also builds the panel). The panel, the client, Compose files, workflow scripts, and CI do not exist yet.
+**Stage: foundation implementation.** What exists today: the repository baseline; the server shell in `server/` (FastAPI, settings registry, activity log, Alembic, health endpoints, `server/openapi.json`, one `server/Dockerfile` that also builds the panel); the admin panel shell in `panel/`; `docker-compose.yml`, `.env.example`, and the development Compose template; and `scripts/local.sh`. The client, the other workflow scripts, and CI do not exist yet.
 
 [docs/project-foundation.md](docs/project-foundation.md) is the desired state, not the current state. Do not assume that any file, directory, command, or script it describes exists. Check its status column and verify before relying on anything. Update the plan and this file as items become real.
 
@@ -34,6 +34,9 @@ Tildeck is a free, open source SSH client for Windows and Android (Flutter) with
 - Run Docker from WSL in a login shell (`bash -l`). Otherwise the Docker Desktop credential helper is not on `PATH` and pulls fail with "error getting credentials".
 - The repository path contains a space (`/mnt/c/Users/Shlomi Porush/...`). Quote every path in scripts.
 - `server/Dockerfile` builds the panel from a named build context: `docker build --build-context panel=./panel -f server/Dockerfile ./server`.
+- `docker-compose-dev.yml` is machine-local. Create it once with `cp docs/development/docker-compose-dev.example.yml docker-compose-dev.yml`, and `.env` with `cp .env.example .env`.
+- PostgreSQL 18 images keep data under `/var/lib/postgresql`, not `/var/lib/postgresql/data`.
+- A container's runtime UID is the UID of its PID 1. `docker exec ... id -u` reports the exec session's user instead.
 
 - Flutter cannot build the Windows desktop app from WSL or Linux. Use `scripts/windows.ps1` locally; CI builds it on a Windows runner.
 - Android blocks cleartext HTTP by default, so sync deployments need HTTPS.
@@ -42,7 +45,7 @@ Tildeck is a free, open source SSH client for Windows and Android (Flutter) with
 
 ## Docker
 
-Docker runs the sync server (which also serves the admin panel) and PostgreSQL. None of these files exist yet.
+Docker runs the sync server (which also serves the admin panel) and PostgreSQL. The development stack is `scripts/local.sh` on `http://localhost:8280`.
 
 - `docker-compose.yml` (tracked) is the production file and references published GHCR images. `docker-compose-dev.yml` (root, ignored, never committed) is the machine-local development file and references explicit `:dev` images such as `tildeck-server:dev`. Use it only through `scripts/local.sh`. If it is missing, `local.sh` must fail with a clear message and never fall back to the production file.
 - Neither Compose file may contain `build:`. Scripts build images explicitly. A CI guard enforces this.

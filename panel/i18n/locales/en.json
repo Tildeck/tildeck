@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "Tildeck"
+  },
+  "shell": {
+    "nativeName": "English",
+    "areas": "Areas",
+    "menu": "Menu",
+    "version": "Version",
+    "theme": {
+      "light": "Switch to light theme",
+      "dark": "Switch to dark theme"
+    }
+  },
+  "nav": {
+    "overview": "Overview"
+  },
+  "common": {
+    "loading": "Loading",
+    "loadFailed": "The server did not answer. Check that it is running, then try again.",
+    "retry": "Try again"
+  },
+  "overview": {
+    "title": "Server overview",
+    "intro": "This is the admin panel of your Tildeck sync server. It shows the state of the server; it never shows the contents of anyone's vault.",
+    "status": "Server status",
+    "version": "Server version",
+    "protocol": "Sync protocol",
+    "database": {
+      "label": "Database",
+      "up": "Connected",
+      "down": "Unavailable",
+      "ok": "The server can reach its database.",
+      "unknown": "The server did not report the state of its database."
+    },
+    "comingTitle": "More administration is on its way",
+    "comingBody": "First-run setup, users, devices, settings, and the activity log arrive in upcoming releases."
+  },
+  "errors": {
+    "database_unavailable": "The server cannot reach its database. Check the database container and the connection settings.",
+    "unsupported_protocol": "This app version cannot sync with this server. Update the app or the server."
+  }
+}

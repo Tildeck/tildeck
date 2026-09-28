@@ -1,0 +1,76 @@
+# Tildeck development stack: the template for the machine-local
+# docker-compose-dev.yml.
+#
+# Copy it to the repository root once per machine, then adjust it there if
+# this machine needs something different (for example another port):
+#   cp docs/development/docker-compose-dev.example.yml docker-compose-dev.yml
+#
+# The root copy is ignored by Git and used only through scripts/local.sh.
+# It runs the explicitly built development image tildeck-server:dev; there is
+# no build: here (scripts/verify.sh and CI fail on it).
+#
+# Differences from the production docker-compose.yml:
+# - The database lives in the named volume tildeck-db-data. PostgreSQL cannot
+#   initialize on a bind mount of a Windows drive, where this repository
+#   usually lives. `scripts/local.sh nuke` is the only way to delete it.
+# - APP_ENV is development, so placeholder values from .env.example work.
+# - The server is published on port 8280 of the loopback interface.
+
+name: tildeck-dev
+
+services:
+  server:
+    image: tildeck-server:dev
+    container_name: tildeck-server-dev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    env_file:
+      - .env
+    environment:
+      APP_ENV: development
+    ports:
+      - "127.0.0.1:8280:8080"
+    networks:
+      - tildeck
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+    container_name: tildeck-postgres-dev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - tildeck-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - tildeck
+
+networks:
+  tildeck:
+
+volumes:
+  tildeck-db-data:
+    name: tildeck-db-data

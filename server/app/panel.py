@@ -29,7 +29,7 @@ def mount(app: FastAPI, panel_dir: str) -> bool:
         logger.warning("Admin panel not found at %s; serving the API only", root)
         return False
 
-    @app.get("/{path:path}", include_in_schema=False)
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     async def panel(path: str) -> FileResponse:
         if path == "api" or path.startswith("api/"):
             raise HTTPException(status_code=404)

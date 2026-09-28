@@ -8,15 +8,17 @@ This document separates the repository's current state from the approved foundat
 
 Updated on 2026-09-28.
 
-- Local Git repository on branch `main`, no remote. The repository baseline and the server shell exist (see the implementation plan statuses). The panel, client, Docker Compose files, workflow scripts, and CI do not exist yet.
-- The server's Python toolchain runs in containers: `python:3.14-slim`, `uv` 0.12.9, and `postgres:18`, pinned by digest in `server/Dockerfile`.
+- Local Git repository on branch `main`, no remote. The repository baseline, the server shell, the admin panel shell, both Compose files, `.env.example`, and `scripts/local.sh` exist (see the implementation plan statuses). The client, the remaining workflow scripts, CI, and Dependabot do not exist yet.
+- The server and panel toolchains run in containers pinned by digest in `server/Dockerfile`: `python:3.14-slim`, `uv` 0.12.9, and `node:26-alpine`. PostgreSQL is `postgres:18`, pinned by digest in both Compose files.
 - Docker from WSL must run in a login shell (`bash -l`); outside it, the Docker Desktop credential helper is not on `PATH` and image pulls fail.
 - No GitHub repository or organization exists for the project. The GitHub CLI on the host is authenticated as `ShlomiPorush` with `repo` and `workflow` scopes.
 - The domain `tildeck.com` is registered by Shlomi at Cloudflare. No DNS records or services are configured for the project.
 - Host: Windows 10 Pro with WSL 2 distribution `Ubuntu-26.04` and Docker Desktop.
 - Tools on the Windows host: `git`, `docker`, `gh`. Not installed: `flutter`, `dart`, `node`.
 - Tools inside `Ubuntu-26.04`: `git`, `docker`. Not installed: `flutter`, `dart`, `node`, `java`, `shellcheck`, `shfmt`.
-- Verified on 2026-09-28 inside WSL with only Docker: the server test image builds, `ruff check` and `ruff format --check` pass, and 13 pytest tests pass against a throwaway PostgreSQL 18 container. The runtime image (which also builds the panel) has not been built yet.
+- Verified on 2026-09-28 inside WSL with only Docker: the server test image builds, `ruff check` and `ruff format --check` pass, and 19 pytest tests pass against a throwaway PostgreSQL 18 container. The panel passes `eslint` and `nuxt typecheck` in the `panel-check` stage. The runtime image builds with the panel.
+- Verified on 2026-09-28 with `scripts/local.sh`: it fails with a clear message when `docker-compose-dev.yml` is missing; `up -b -d` builds the image and brings both services to healthy; the server's PID 1 runs as UID 999 and runs the freshly built image; a row written before `down` is still there after `up`. The panel shell was screenshotted with Playwright (Chromium) in English LTR and Hebrew RTL, light and dark, at 1280x800 and 390x844, including the mobile menu and the language and theme toggles, with the Heebo font loaded and no console errors.
+- Verified on 2026-09-28: the production `docker-compose.yml` ran end to end from a temporary directory with a bind-mounted data directory, the development image tagged as a release, and a generated key. Both services became healthy, both PID 1 processes ran as UID 999 with a read-only server root filesystem, `APP_ENV` was forced to `production`, and with a placeholder key the server refused to start. Everything was removed afterwards.
 
 ## Product intent and boundaries
 
@@ -88,6 +90,7 @@ Updated on 2026-09-28.
 | Versioning | Provisional | One SemVer version for the whole product; single source of truth is a root `VERSION` file, as in Pay; the release workflow writes it into `app/pubspec.yaml`, and the server image and panel receive it at build time | Client, server, and panel ship together and share a contract. Three ecosystems need one neutral source. |
 | Development database storage | Approved | Named volume in development, bind mount in production | PostgreSQL's `initdb` cannot set the permissions it needs on a bind mount of a Windows drive, and the repository lives on `C:`. Pay and hub use the same exception. |
 | TLS termination | Deferred | Not decided | Needed before the sync phase. |
+| Brand colors and mark | Provisional | Deep teal ink desk band with a bright teal accent; the mark is a tilde stroke on a rounded tile (`panel/public/favicon.svg`, `panel/app/components/AppLogo.vue`) | Proposed during the panel shell; awaiting Shlomi's review of the screenshots. No purple. |
 
 ## Publication and language policy
 
@@ -106,13 +109,13 @@ A CI guard scans all tracked text files for Hebrew characters and excludes only 
 | Component | Responsibility | Expected path | Status | Dependencies or blockers |
 |---|---|---|---|---|
 | Client app | Flutter app for Windows and Android: UI, SSH, terminal, SFTP, local vault, sync client, key derivation, encryption | `app/` | Planned | Security model before vault and sync |
-| Sync server | FastAPI service: HTTP API for accounts, devices, and encrypted records; settings registry; email; serves the admin panel; CLI commands for operators | `server/` | Planned | None |
-| API contract | Committed OpenAPI document exported from the server, including the protocol version and stable error codes | `server/openapi.json` | Planned | Sync server |
+| Sync server | FastAPI service: HTTP API for accounts, devices, and encrypted records; settings registry; email; serves the admin panel; CLI commands for operators | `server/` | Shell exists | None |
+| API contract | Committed OpenAPI document exported from the server, including the protocol version and stable error codes | `server/openapi.json` | Exists | Sync server |
 | Generated API client | Dart API client generated from the OpenAPI document and used by the app | `app/lib/api/` (generated) | Planned | API contract; generator chosen during the foundation task |
-| Admin panel | Web UI for operators: first-run setup, users, devices, settings, activity log | `panel/` | Planned | Panel technology confirmation |
-| Database | PostgreSQL storing accounts, devices, encrypted records, settings, and the activity log | Container from the official image | Planned | Docker |
-| Database migrations | Versioned, forward-only Alembic migrations applied by the server | `server/migrations/` | Planned | Sync server |
-| Workflow scripts | Local, verify, try-PR, release, and the Windows client script | `scripts/` | Planned | Toolchain containers |
+| Admin panel | Web UI for operators: first-run setup, users, devices, settings, activity log | `panel/` | Shell exists | Admin sign-in approval before the screens |
+| Database | PostgreSQL storing accounts, devices, encrypted records, settings, and the activity log | Container from the official image | Exists (Compose) | Docker |
+| Database migrations | Versioned, forward-only Alembic migrations applied by the server | `server/app/migrations/` | Exists (initial migration) | Sync server |
+| Workflow scripts | Local, verify, try-PR, release, and the Windows client script | `scripts/` | In progress (`local.sh` exists) | Toolchain containers |
 | CI | Path-filtered GitHub Actions | `.github/workflows/` | Planned | GitHub repository |
 | Documentation | Foundation plan, security model, self-hosting guide | `docs/` | Foundation plan exists; others planned | None |
 
@@ -160,16 +163,16 @@ Adopted from Pay's settings ruling:
 
 | Root file | Git tracking policy | Why this exact root location is required | Status |
 |---|---|---|---|
-| `README.md` | Tracked | GitHub and contributor convention | Exists (preparation version) |
-| `AGENTS.md` | Tracked | Agent instruction discovery convention | Exists (preparation version) |
-| `LICENSE` | Tracked | GitHub license detection and Apache-2.0 convention | Planned |
-| `CHANGELOG.md` | Tracked | Release workflow and contributor convention | Planned |
-| `.gitignore` | Tracked | Git reads repository-wide rules from the root | Planned |
-| `.gitattributes` | Tracked | Git reads it from the root; enforces LF for scripts and text files | Planned |
-| `VERSION` | Tracked | The single product version shared by the client, server, and panel; read by the release workflow and the image builds. No single ecosystem directory owns it. | Planned |
-| `docker-compose.yml` | Tracked | Production deployment file, run by operators from the repository root | Planned |
-| `docker-compose-dev.yml` | Ignored (exact path in `.gitignore`) | Machine-local development Compose file required at the root by the Docker contract, used only by `scripts/local.sh` | Planned |
-| `.env.example` | Tracked | Environment contract next to `docker-compose.yml` | Planned |
+| `README.md` | Tracked | GitHub and contributor convention | Exists |
+| `AGENTS.md` | Tracked | Agent instruction discovery convention | Exists |
+| `LICENSE` | Tracked | GitHub license detection and Apache-2.0 convention | Exists |
+| `CHANGELOG.md` | Tracked | Release workflow and contributor convention | Exists |
+| `.gitignore` | Tracked | Git reads repository-wide rules from the root | Exists |
+| `.gitattributes` | Tracked | Git reads it from the root; enforces LF for scripts and text files | Exists |
+| `VERSION` | Tracked | The single product version shared by the client, server, and panel; read by the release workflow and the image builds. No single ecosystem directory owns it. | Exists |
+| `docker-compose.yml` | Tracked | Production deployment file, run by operators from the repository root | Exists |
+| `docker-compose-dev.yml` | Ignored (exact path in `.gitignore`) | Machine-local development Compose file required at the root by the Docker contract, used only by `scripts/local.sh` | Template exists at `docs/development/docker-compose-dev.example.yml`; the root copy is machine-local |
+| `.env.example` | Tracked | Environment contract next to `docker-compose.yml` | Exists |
 | `.env` | Ignored | Real operator values next to `docker-compose.yml`; never committed | Planned (machine-local) |
 
 Everything else lives in purpose-specific directories: `app/pubspec.yaml` and `app/pubspec.lock` in `app/`, `server/pyproject.toml` and `server/uv.lock` in `server/`, `panel/package.json` and `panel/package-lock.json` in `panel/`, `SECURITY.md` and `CONTRIBUTING.md` in `.github/`, workflows and Dependabot in `.github/`, and scripts in `scripts/`.
@@ -197,11 +200,11 @@ The foundation task builds infrastructure only. It includes minimal client, serv
 |---|---|---|---|---|
 | 1 | Repository baseline | Done, except `.env.example` which comes with deliverable 6 | `git init` with default branch `main`; `LICENSE` (Apache-2.0), `.gitignore`, `.gitattributes`, `CHANGELOG.md` with an `Unreleased` section, `VERSION`; root matches the table above | `git ls-files` matches the root inventory; `.env` and `docker-compose-dev.yml` are ignored and `.env.example` is tracked |
 | 2 | Toolchain containers | Planned | Pinned Flutter-with-Android-SDK, Node, and Python-with-`uv` toolchain images, referenced by digest, used by all Bash scripts | The server, panel, and an Android APK build inside WSL with only Docker installed |
-| 3 | Server shell and API contract | Done for the test image; runtime image and non-root check pending the panel (deliverable 4). Endpoints: `/api/health/live`, `/api/health/ready`, `/api/info` | FastAPI app in `server/` managed with `uv`; liveness and readiness endpoints; health check command; Alembic with an initial migration; the version from `VERSION`; settings registry and settings encryption adapted from Pay; exported `server/openapi.json` with the protocol version | pytest passes against a real PostgreSQL container; the image runs as non-root; the exported OpenAPI document matches the committed one |
-| 4 | Admin panel shell | Planned | Nuxt static app in `panel/` with English and Hebrew, RTL and LTR, light and dark themes, Heebo, and the Tildeck brand; served by the server | Lint and type checks pass; screenshots of the shell in English LTR and Hebrew RTL, light and dark, at desktop and mobile widths |
+| 3 | Server shell and API contract | Done. Endpoints: `/api/health/live`, `/api/health/ready`, `/api/info` | FastAPI app in `server/` managed with `uv`; liveness and readiness endpoints; health check command; Alembic with an initial migration; the version from `VERSION`; settings registry and settings encryption adapted from Pay; exported `server/openapi.json` with the protocol version | pytest passes against a real PostgreSQL container; the image runs as non-root; the exported OpenAPI document matches the committed one |
+| 4 | Admin panel shell | Done | Nuxt static app in `panel/` with English and Hebrew, RTL and LTR, light and dark themes, Heebo, and the Tildeck brand; served by the server | Lint and type checks pass; screenshots of the shell in English LTR and Hebrew RTL, light and dark, at desktop and mobile widths |
 | 5 | Client shell | Planned | Flutter app in `app/` for Windows and Android with application ID `com.tildeck.app`; English and Hebrew localization with RTL; light and dark themes; Dart API client generated from `server/openapi.json` and a call to the server's version endpoint | `flutter analyze` and tests pass; screenshots on Android in English LTR and Hebrew RTL, light and dark |
-| 6 | Docker definitions | Planned | Multi-stage server `Dockerfile` with a non-root final stage that includes the built panel; `docker-compose.yml`; a documented way to create `docker-compose-dev.yml` on a new machine; `.env.example` | Both services report healthy; the application process UID is not 0; no `build:` in either Compose file |
-| 7 | Local workflow | Planned | `scripts/local.sh` with `build`, `up`, `up -d`, `down`, `status`, and confirmed `nuke` | Stops on the first failed build; fails clearly when `docker-compose-dev.yml` is missing; `down` then `up` preserves database data; `status` shows healthy services and the running image identity |
+| 6 | Docker definitions | Done | Multi-stage server `Dockerfile` with a non-root final stage that includes the built panel; `docker-compose.yml`; a documented way to create `docker-compose-dev.yml` on a new machine; `.env.example` | Both services report healthy; the application process UID is not 0; no `build:` in either Compose file |
+| 7 | Local workflow | Done for the server stack; the debug APK build comes with the Flutter toolchain (deliverables 2 and 5) | `scripts/local.sh` with `build`, `up`, `up -d`, `down`, `status`, and confirmed `nuke` | Stops on the first failed build; fails clearly when `docker-compose-dev.yml` is missing; `down` then `up` preserves database data; `status` shows healthy services and the running image identity |
 | 8 | Windows client script | Planned | `scripts/windows.ps1` builds and runs the Windows desktop client using Flutter on Windows | Builds and launches the client shell on Windows; fails clearly when Flutter or Visual Studio build tools are missing |
 | 9 | Verify workflow | Planned | `scripts/verify.sh` with full and changed-area modes: shell lint and format; Python lint, format, and pytest against a real PostgreSQL container; Dart format, analyze, and tests; panel lint, type checks, and build; Android build; server image build; OpenAPI and generated-client drift check; Hebrew guard; Compose `build:` guard | A full run passes locally in WSL and in CI with the same commands; temporary containers are removed |
 | 10 | Try-PR workflow | Planned | `scripts/try-pr.sh <number>`, `status`, `restore`; disposable worktree; rebuilds only affected areas; restarts only the server container; snapshots the development database before applying PR migrations and restores it on `restore` | The running server image matches the fresh build; the checkout is untouched; the worktree and snapshot are cleaned up |
@@ -222,6 +225,23 @@ The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, an
 - **`scripts/verify.sh`** is the single entry point used locally, in CI, and by release. It supports a full sweep and a changed-area mode.
 - **`scripts/try-pr.sh`** tests a pull request in a disposable worktree. For server or panel changes it rebuilds and restarts only the server against the existing development database, after taking a database snapshot. For client changes it builds an APK and reports its path. It never merges, pushes, or edits the user's checkout.
 - **`scripts/release.sh`** prepares the release commit and immutable tag after a full verify run and requires an explicit target. Publication happens in the tagged CI run. Merge and release stay separate.
+
+## Implementation decisions
+
+Recorded during the foundation implementation, on 2026-09-28.
+
+- **One image builds the panel.** The panel has no Dockerfile of its own. `server/Dockerfile` builds it from a named build context (`--build-context panel=./panel`) in the stages `panel-deps`, `panel-source`, `panel-check` (lint and type checks), and `panel-build`; the `runtime` stage copies `/panel/.output/public` to `/app/panel`. The panel provides the npm scripts `lint`, `typecheck`, and `generate`, and a committed `package-lock.json`.
+- **Panel serving.** `server/app/panel.py` serves the static panel for GET and HEAD with a single-page-app fallback; `/api` and `/api/*` never fall back. Hashed assets under `/_nuxt/` are cached as immutable, everything else is revalidated.
+- **Health endpoints.** `/api/health/live`, `/api/health/ready` (the image health check; includes the database), and `/api/info` (name, version, protocol version).
+- **PostgreSQL 18.** `postgres:18`, digest resolved on 2026-09-28. PostgreSQL 18 images keep their data under `/var/lib/postgresql` (a versioned subdirectory), so both Compose files mount there, not at `/var/lib/postgresql/data`.
+- **Development Compose template.** `docs/development/docker-compose-dev.example.yml` is copied by each developer to the ignored root `docker-compose-dev.yml`. It publishes the server on `127.0.0.1:8280` (8280 keeps it clear of Pay's development ports) and keeps the database in the named volume `tildeck-db-data`.
+- **Production Compose.** No reverse proxy is bundled (TLS termination is still deferred). The server is published on `TILDECK_BIND:TILDECK_PORT`, defaulting to `127.0.0.1:8080` for a proxy on the same host. `APP_ENV` is forced to `production` in the file. The server runs with a read-only root filesystem and no capabilities; PostgreSQL gets back only the five capabilities its entrypoint needs.
+- **Runtime UID check.** `scripts/local.sh` checks the UID of the container's PID 1 (from `/proc/1/status`), not the user of a `docker exec` session, which is root in the PostgreSQL image even though the database runs as `postgres`.
+- **Panel lockfile.** The first `panel/package-lock.json` was seeded from Pay's lock (the same dependency set) because a fresh resolution on 2026-09-28 fails: vite 8.3 requires esbuild 0.27 or later as an optional peer, while `@intlify/bundle-utils` (through `@nuxtjs/i18n`) pins esbuild 0.25. Dependabot will hit the same conflict until `@nuxtjs/i18n` catches up.
+- **Panel language.** English is the default and the fallback; the browser language is detected once and stored in the `tildeck_lang` cookie. The language switch shows the other language's own name, read from that language's locale file, so Hebrew text stays inside the allowed locale files.
+- **Other pinned images, resolved for later deliverables:** `koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d`, `mvdan/shfmt:v3.12.0@sha256:307d265ffd25ce832899ae17c93ed5062fc3375c514bba8f52cbf52792735c4d`.
+- **CI runners.** The repository is public, so CI uses GitHub-hosted runners (`ubuntu-latest`, and `windows-latest` for the Windows client).
+- **Line endings.** The repository-local `core.autocrlf` is `false` and `core.eol` is `lf` (with `* text=auto`, the default native `core.eol` would still check files out as CRLF on Windows), so files on disk stay LF for Linux containers. `.gitattributes` forces CRLF only for `*.ps1`.
 
 ## Known unknowns and blockers
 

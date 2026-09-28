@@ -1,0 +1,95 @@
+@import '@fontsource/heebo/400.css';
+@import '@fontsource/heebo/500.css';
+@import '@fontsource/heebo/700.css';
+@import '@fontsource/heebo/800.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens. One name, a light and a dark value. Channels only (R G B)
+   so Tailwind can apply opacity. The Tildeck palette is a deep teal ink with
+   a bright teal accent: the colours of a terminal at rest. No purple. */
+@layer base {
+  :root {
+    --color-page: 239 244 244;
+    --color-surface: 255 255 255;
+    --color-line: 210 221 222;
+    --color-tint: 222 241 238;
+    --color-ink: 14 24 28;
+    --color-muted: 84 102 107;
+    /* Brand text and fills on the light page: teal 700 reads at 5.5:1 on
+       white. The bright tone is for marks and dots, never for text. */
+    --color-brand: 15 118 110;
+    --color-brand-bright: 20 184 166;
+    --color-brand-contrast: 255 255 255;
+    --color-success: 21 128 61;
+    --color-warning: 180 83 9;
+    --color-danger: 185 28 28;
+    /* The desk: the dark band that carries the brand and navigation. It
+       stays dark in both themes; only its depth shifts. */
+    --color-desk: 19 41 45;
+    --color-desk-ink: 231 244 242;
+    --color-desk-muted: 151 188 184;
+    --color-desk-bright: 94 234 212;
+  }
+
+  .dark {
+    --color-page: 8 16 19;
+    --color-surface: 16 28 32;
+    --color-line: 38 56 61;
+    --color-tint: 17 44 45;
+    --color-ink: 235 244 243;
+    --color-muted: 141 164 167;
+    --color-brand: 45 212 191;
+    --color-brand-bright: 94 234 212;
+    --color-brand-contrast: 6 26 26;
+    --color-success: 74 222 128;
+    --color-warning: 251 191 36;
+    --color-danger: 248 113 113;
+    --color-desk: 12 30 34;
+    --color-desk-ink: 231 244 242;
+    --color-desk-muted: 138 178 174;
+    --color-desk-bright: 94 234 212;
+  }
+
+  /* The app owns the frame: the browser itself never scrolls. Every layout
+     scrolls inside its own region instead of the document. */
+  html,
+  body {
+    @apply h-full overflow-hidden overscroll-none;
+  }
+
+  #__nuxt {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-page font-sans text-ink antialiased;
+  }
+}
+
+@layer components {
+  /* Numbers, versions, and identifiers never flip with the text direction. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  /* Each area scrolls inside itself. The thin scrollbar only shows while
+     the pointer is over the area or a control inside it has focus.
+     position: relative keeps visually hidden descendants inside the
+     scroller instead of stretching the document. */
+  .app-scroll {
+    position: relative;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .app-scroll:hover,
+  .app-scroll:focus-within {
+    scrollbar-color: rgb(var(--color-line)) transparent;
+  }
+}
