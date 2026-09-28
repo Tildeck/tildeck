@@ -1,0 +1,45 @@
+# Environment files: real values never enter Git. The example contract stays tracked.
+.env
+.env.*
+!.env.example
+
+# The machine-local development Compose file. Created from
+# docs/development/docker-compose-dev.example.yml, never committed.
+/docker-compose-dev.yml
+
+# Editors and OS noise.
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Server build and test artifacts.
+server/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Panel build artifacts and dependencies.
+panel/node_modules/
+panel/.nuxt/
+panel/.output/
+panel/.data/
+panel/dist/
+
+# Flutter and Dart build artifacts.
+app/.dart_tool/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/**/.dart_tool/
+app/**/build/
+app/android/.gradle/
+app/android/local.properties
+app/android/key.properties
+app/android/app/*.jks
+app/android/app/*.keystore
+app/windows/flutter/ephemeral/
+
+# Build output collected by the workflow scripts.
+/out/

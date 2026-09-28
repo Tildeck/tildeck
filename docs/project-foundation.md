@@ -1,0 +1,253 @@
+# Tildeck Project Foundation
+
+Status: Foundation implementation in progress
+
+This document separates the repository's current state from the approved foundation that a later implementation task must build. A planned item does not exist until its status and verification evidence say otherwise. Nothing described as planned in this document is implemented.
+
+## Current truth
+
+Updated on 2026-09-28.
+
+- Local Git repository on branch `main`, no remote. The repository baseline and the server shell exist (see the implementation plan statuses). The panel, client, Docker Compose files, workflow scripts, and CI do not exist yet.
+- The server's Python toolchain runs in containers: `python:3.14-slim`, `uv` 0.12.9, and `postgres:18`, pinned by digest in `server/Dockerfile`.
+- Docker from WSL must run in a login shell (`bash -l`); outside it, the Docker Desktop credential helper is not on `PATH` and image pulls fail.
+- No GitHub repository or organization exists for the project. The GitHub CLI on the host is authenticated as `ShlomiPorush` with `repo` and `workflow` scopes.
+- The domain `tildeck.com` is registered by Shlomi at Cloudflare. No DNS records or services are configured for the project.
+- Host: Windows 10 Pro with WSL 2 distribution `Ubuntu-26.04` and Docker Desktop.
+- Tools on the Windows host: `git`, `docker`, `gh`. Not installed: `flutter`, `dart`, `node`.
+- Tools inside `Ubuntu-26.04`: `git`, `docker`. Not installed: `flutter`, `dart`, `node`, `java`, `shellcheck`, `shfmt`.
+- Verified on 2026-09-28 inside WSL with only Docker: the server test image builds, `ruff check` and `ruff format --check` pass, and 13 pytest tests pass against a throwaway PostgreSQL 18 container. The runtime image (which also builds the panel) has not been built yet.
+
+## Product intent and boundaries
+
+**Problem.** Cross-device SSH clients that sync hosts, keys, and settings between desktop and mobile charge a subscription for sync. Tildeck is a free, open source SSH client with end-to-end encrypted sync through a server that users run themselves.
+
+**Intended users.**
+
+- End users: developers and operators who manage servers from a Windows computer and an Android phone.
+- Operators: whoever runs a Tildeck sync server, for themselves, a family, or a team. They manage it through a web admin panel.
+
+**Stage.** Pre-implementation. No product code exists.
+
+**First release scope (product, after the foundation):**
+
+- Client: host management with groups, SSH sessions in tabs, password and key authentication, host key verification, basic SFTP, a local encrypted vault, and end-to-end encrypted sync.
+- Accounts: registration, email verification, new-device approval, security notifications, and a recovery key. There is no password reset, by design.
+- Server: authentication, device management, and storage of opaque encrypted records.
+- Admin panel: first-run setup, users and devices, all server settings, and an activity log.
+
+**Later:** port forwarding, snippets, and other client features, each approved separately.
+
+**Non-goals for the first release:**
+
+- macOS, iOS, and Linux desktop clients.
+- A hosted public sync service, paid tiers, or billing.
+- Server-side or admin access to plaintext user data. Neither the server nor an administrator can read vault contents.
+- Telemetry or analytics.
+- Password reset. A lost master password without the recovery key means the synced data is lost. Shlomi accepted this.
+
+**Deployment shape.** Users install the client from GitHub Releases (Android APK, Windows package). Operators run the sync server with Docker Compose: one server container that also serves the admin panel, and one PostgreSQL container. Email is sent through an SMTP provider chosen by the operator.
+
+**Constraints that shape the architecture:**
+
+- Zero cost to use. No paid certificates, stores, or services are required to install or run the product.
+- Secrets never leave a device unencrypted. Encryption, decryption, and key derivation happen only in the client.
+- Android blocks cleartext HTTP by default, so a real sync deployment needs HTTPS in front of the server.
+
+## Preparation decisions
+
+| Decision | Status | Choice | Rationale or blocker |
+|---|---|---|---|
+| Project name | Approved | Tildeck | Chosen by Shlomi after availability checks on GitHub, pub.dev, Google Play, domains, and web search. |
+| Domain and identifiers | Approved | `tildeck.com`; Android application ID `com.tildeck.app` | Shlomi owns `tildeck.com`. The application ID cannot change after the first public release. |
+| Publication posture | Approved | Public-ready open source | Shlomi chose a public open source project. |
+| License | Approved | Apache-2.0 for all code | Simple, widely adopted, includes a patent grant. |
+| Repository language | Approved | English, with Hebrew only in the listed locale files | Follows from the public-ready posture. |
+| Client platforms | Approved | Windows and Android | Shlomi limited the first release to the platforms he uses. |
+| Client technology | Approved | Flutter (Dart) | One codebase for Windows and Android, native terminal rendering, good touch and keyboard handling on Android. |
+| SSH and terminal libraries | Provisional | `dartssh2` for SSH and SFTP, `xterm` (xterm.dart) for the terminal | Mature pure-Dart libraries. Confirm maintenance status and license during the foundation task. |
+| Sync model | Approved | Own sync server with end-to-end encryption | Shlomi chose this over syncing through third-party storage. |
+| Server technology | Approved | Python with FastAPI, SQLAlchemy (async), asyncpg, and Alembic, managed with `uv` | The same stack as Pay's backend, which Shlomi knows. Proven Pay code (settings registry, settings encryption, activity log, email, migrations) can be reused. |
+| Client and server contract | Approved | The server's OpenAPI document is the contract. The Dart client code for the API is generated from it, and CI fails when the committed OpenAPI document or the generated client is out of date. | Client and server are in different languages; generation plus a CI check keeps them from drifting apart. |
+| Database | Approved | PostgreSQL | Shlomi chose PostgreSQL over SQLite. Cost accepted: a second container, `pg_dump` backups, and major-version upgrade procedures. |
+| Admin panel | Approved | Web admin panel in the first release, with the look and feel of Shlomi's Pay admin panel | Shlomi's requirement. Management and oversight belong in an admin interface. |
+| Admin panel technology | Approved | Nuxt (Vue) with Tailwind, `@nuxtjs/i18n`, and `@nuxtjs/color-mode`, built as a static single-page app and served by the server | This is the stack of the Pay panel, which is the design reference. Flutter Web cannot reproduce that look without rebuilding it. A static build keeps one server container. |
+| Reuse of Pay code | Approved | Code from Pay (`MosesGroups/payments`) may be reused in Tildeck under Apache-2.0 | Shlomi confirmed the right to release it under this license. |
+| Settings model | Approved | Every operator setting is editable in the admin panel. A set environment variable wins and locks the field in the panel. | Shlomi's requirement, the same ruling as in Pay. See [Settings model](#settings-model). |
+| Email | Approved | SMTP to an operator-chosen provider, configured as ordinary settings | Shlomi handles provider selection. See [Accounts, authentication, and email](#accounts-authentication-and-email). |
+| Recovery | Approved | Recovery key issued at registration; no password reset | Shlomi accepted this. |
+| Docker | Approved | Docker Compose for the server and PostgreSQL, in production and development | The server ships as a container image and depends on PostgreSQL. |
+| Container registry | Provisional | GitHub Container Registry (GHCR) | Free for public images and integrated with GitHub Actions. |
+| Build toolchains | Approved | Pinned toolchain containers for Flutter with the Android SDK, for Node, and for Python with `uv`, invoked by the workflow scripts | Shlomi chose containers. WSL needs only Docker, and local, CI, and release builds are identical. |
+| Windows client builds | Approved | CI builds on a Windows runner; a PowerShell script for local Windows builds and runs | Flutter cannot build Windows desktop apps from WSL. Shlomi explicitly requested the PowerShell script. |
+| Workflow scripts | Approved | WSL Bash `.sh` files under `scripts/`, plus the requested Windows script | Repository baseline, with the documented Windows exception. |
+| Root layout | Approved | Minimal root with every file justified | Repository baseline. See [Planned repository root](#planned-repository-root). |
+| Cryptography design | Provisional | Argon2id from the master password; separate derived encryption key and authentication key; per-record XChaCha20-Poly1305 via libsodium | Established primitives with an audited library. Must be written up in `docs/security-model.md` and approved before the vault or sync is implemented. |
+| Admin panel sign-in | Provisional | Separate administrator accounts with a password and mandatory TOTP, created in first-run setup | The panel manages the server, not vaults, so it does not need vault keys. Pay's Entra sign-in does not fit a public self-hosted product. Needs Shlomi's approval before the panel phase. |
+| Release artifacts | Provisional | Android APK, Windows package, server image in GHCR, all from one tagged release | Windows package format (zip, MSIX, or installer) is deferred. |
+| Versioning | Provisional | One SemVer version for the whole product; single source of truth is a root `VERSION` file, as in Pay; the release workflow writes it into `app/pubspec.yaml`, and the server image and panel receive it at build time | Client, server, and panel ship together and share a contract. Three ecosystems need one neutral source. |
+| Development database storage | Approved | Named volume in development, bind mount in production | PostgreSQL's `initdb` cannot set the permissions it needs on a bind mount of a Windows drive, and the repository lives on `C:`. Pay and hub use the same exception. |
+| TLS termination | Deferred | Not decided | Needed before the sync phase. |
+
+## Publication and language policy
+
+Tildeck is public-ready. Repository documentation, `AGENTS.md`, code, comments, identifiers, fixtures, tests, commit messages, Issues, pull requests, and review discussion are in English.
+
+Hebrew text is allowed only in these locale files, whose exact paths are finalized when they are created:
+
+- `app/lib/l10n/app_he.arb` (client)
+- `panel/i18n/locales/he.json` (admin panel)
+- The Hebrew locale file for server email templates under `server/`
+
+A CI guard scans all tracked text files for Hebrew characters and excludes only those exact paths. Tests that need Hebrew samples load them from the locale files.
+
+## Planned architecture
+
+| Component | Responsibility | Expected path | Status | Dependencies or blockers |
+|---|---|---|---|---|
+| Client app | Flutter app for Windows and Android: UI, SSH, terminal, SFTP, local vault, sync client, key derivation, encryption | `app/` | Planned | Security model before vault and sync |
+| Sync server | FastAPI service: HTTP API for accounts, devices, and encrypted records; settings registry; email; serves the admin panel; CLI commands for operators | `server/` | Planned | None |
+| API contract | Committed OpenAPI document exported from the server, including the protocol version and stable error codes | `server/openapi.json` | Planned | Sync server |
+| Generated API client | Dart API client generated from the OpenAPI document and used by the app | `app/lib/api/` (generated) | Planned | API contract; generator chosen during the foundation task |
+| Admin panel | Web UI for operators: first-run setup, users, devices, settings, activity log | `panel/` | Planned | Panel technology confirmation |
+| Database | PostgreSQL storing accounts, devices, encrypted records, settings, and the activity log | Container from the official image | Planned | Docker |
+| Database migrations | Versioned, forward-only Alembic migrations applied by the server | `server/migrations/` | Planned | Sync server |
+| Workflow scripts | Local, verify, try-PR, release, and the Windows client script | `scripts/` | Planned | Toolchain containers |
+| CI | Path-filtered GitHub Actions | `.github/workflows/` | Planned | GitHub repository |
+| Documentation | Foundation plan, security model, self-hosting guide | `docs/` | Foundation plan exists; others planned | None |
+
+**Load-bearing boundaries:**
+
+- Plaintext user secrets exist only in the client. The server API accepts and returns ciphertext and metadata only (record ID, revision, deletion marker, timestamps).
+- Conflicts resolve per record: the highest revision wins, and deletions are kept as tombstones so they propagate to every device.
+- The sync protocol is versioned. The server rejects an unsupported client with a stable error code, and the client shows a localized message.
+- The admin panel talks only to the server's admin API. It never sees vault contents, and an administrator cannot read or decrypt user data.
+- Terminal content is always rendered left-to-right, even when the surrounding UI is right-to-left.
+
+## Settings model
+
+Adopted from Pay's settings ruling:
+
+- Every operator setting is declared once in a server-side registry with its key, environment variable, type, default, whether it is secret, and a description.
+- Every registered setting is editable in the admin panel.
+- A set environment variable wins over the stored value and locks the field. The panel shows that the value comes from the environment and does not allow editing it. The admin API reports the lock and refuses writes to a locked setting.
+- Stored values are encrypted at rest.
+- Sensitive values (passwords, keys, tokens, connection strings with credentials) are never returned by any API and never displayed in the panel, not even read-only and not when they come from the environment. The panel shows only their state: not configured, configured, or set by the environment.
+- Every change is recorded in the activity log with the administrator, the time, and the setting key, never the value of a sensitive setting.
+
+**Bootstrap exception.** A small set of values must exist before the server can reach its database or decrypt stored settings: the database connection and the settings encryption key. These are environment-only by necessity. The panel shows only that they are set, never their values. The list is kept minimal and documented in `.env.example`.
+
+**Settings known so far:** SMTP host, port, security mode, username, password, and sender address; public server URL; registration mode (for example closed, invite-only, or open); session and token lifetimes; and sign-in rate limits. The final list is set in the sync and panel phases.
+
+## Accounts, authentication, and email
+
+- The client derives two keys from the master password with Argon2id: an encryption key that never leaves the device, and an authentication key that is sent to the server. The server stores only a salted hash of the authentication key.
+- Sign-in issues a token per device. Each device can be revoked on its own.
+- Registration issues a recovery key that the user stores. There is no password reset.
+- The server sends email through SMTP: address verification at registration, approval of a new device, and security notifications (device added, device revoked, master password changed, recovery key used). It never sends a password reset.
+- Without SMTP configured, the server stays safe: open registration is unavailable, users are created by an administrator, new devices are approved from an already signed-in device, and the panel shows that email notifications are off.
+- Email content is localized in English and Hebrew using the user's language, through the localization system.
+- Sign-in attempts are rate-limited, and security events are recorded in the activity log.
+
+## Admin panel
+
+- The look and feel follow the Pay admin panel: layout, typography (Heebo), component patterns, light and dark themes, and Hebrew RTL and English LTR.
+- Tildeck has its own brand mark and colors, not purple. Pay's brand is not reused.
+- Pay's design and code may be reused. Shlomi confirmed that Pay code may be released under Apache-2.0. Reused code is adapted to Tildeck's brand and domain, and Pay-specific parts (Cardcom, CRM, Entra) are not carried over.
+- Screens for the first release: first-run setup, dashboard, users, devices, settings, and activity log.
+
+## Planned repository root
+
+| Root file | Git tracking policy | Why this exact root location is required | Status |
+|---|---|---|---|
+| `README.md` | Tracked | GitHub and contributor convention | Exists (preparation version) |
+| `AGENTS.md` | Tracked | Agent instruction discovery convention | Exists (preparation version) |
+| `LICENSE` | Tracked | GitHub license detection and Apache-2.0 convention | Planned |
+| `CHANGELOG.md` | Tracked | Release workflow and contributor convention | Planned |
+| `.gitignore` | Tracked | Git reads repository-wide rules from the root | Planned |
+| `.gitattributes` | Tracked | Git reads it from the root; enforces LF for scripts and text files | Planned |
+| `VERSION` | Tracked | The single product version shared by the client, server, and panel; read by the release workflow and the image builds. No single ecosystem directory owns it. | Planned |
+| `docker-compose.yml` | Tracked | Production deployment file, run by operators from the repository root | Planned |
+| `docker-compose-dev.yml` | Ignored (exact path in `.gitignore`) | Machine-local development Compose file required at the root by the Docker contract, used only by `scripts/local.sh` | Planned |
+| `.env.example` | Tracked | Environment contract next to `docker-compose.yml` | Planned |
+| `.env` | Ignored | Real operator values next to `docker-compose.yml`; never committed | Planned (machine-local) |
+
+Everything else lives in purpose-specific directories: `app/pubspec.yaml` and `app/pubspec.lock` in `app/`, `server/pyproject.toml` and `server/uv.lock` in `server/`, `panel/package.json` and `panel/package-lock.json` in `panel/`, `SECURITY.md` and `CONTRIBUTING.md` in `.github/`, workflows and Dependabot in `.github/`, and scripts in `scripts/`.
+
+## Containers
+
+| Service | Runtime user | Health check | Persistent state | Bind-mounted host directory | Named-volume exception | Backup lifecycle |
+|---|---|---|---|---|---|---|
+| `server` (API and static admin panel) | Dedicated non-root user declared in the final image | A health check command in the image that calls the readiness endpoint, which checks database connectivity | None | None | None | Not applicable |
+| `postgres` | `postgres` (the official image drops root before starting the database) | `pg_isready` against the application database | Database files, including settings and the activity log | Production: host directory set by an operator variable, writable by the container's `postgres` UID | Development only: a named volume, because `initdb` cannot set the required permissions on a bind mount of a Windows drive | `pg_dump` to a host directory; restore with `pg_restore` into a fresh database. Ordinary `down` keeps the data. Only the confirmed `nuke` operation removes it. |
+
+**Docker rules that apply:**
+
+- `docker-compose.yml` references published GHCR images. `docker-compose-dev.yml` references explicit development images such as `tildeck-server:dev`. Neither file contains `build:`, and a CI guard enforces this.
+- Container runtime variables come from `.env` through `env_file`. Compose interpolation is limited to values Compose itself needs, such as the image tag and the host data directory.
+- `.env.example` lists the bootstrap variables and the optional setting overrides, with placeholder values only.
+- Logs go to stdout and stderr.
+- The self-hosting guide documents PostgreSQL major upgrades with dump and restore before the first release.
+
+## Foundation implementation plan
+
+The foundation task builds infrastructure only. It includes minimal client, server, and panel shells because the workflows and CI need real artifacts to build and verify. It does not include product features.
+
+| Order | Deliverable | Status | Acceptance criteria | Required verification |
+|---|---|---|---|---|
+| 1 | Repository baseline | Done, except `.env.example` which comes with deliverable 6 | `git init` with default branch `main`; `LICENSE` (Apache-2.0), `.gitignore`, `.gitattributes`, `CHANGELOG.md` with an `Unreleased` section, `VERSION`; root matches the table above | `git ls-files` matches the root inventory; `.env` and `docker-compose-dev.yml` are ignored and `.env.example` is tracked |
+| 2 | Toolchain containers | Planned | Pinned Flutter-with-Android-SDK, Node, and Python-with-`uv` toolchain images, referenced by digest, used by all Bash scripts | The server, panel, and an Android APK build inside WSL with only Docker installed |
+| 3 | Server shell and API contract | Done for the test image; runtime image and non-root check pending the panel (deliverable 4). Endpoints: `/api/health/live`, `/api/health/ready`, `/api/info` | FastAPI app in `server/` managed with `uv`; liveness and readiness endpoints; health check command; Alembic with an initial migration; the version from `VERSION`; settings registry and settings encryption adapted from Pay; exported `server/openapi.json` with the protocol version | pytest passes against a real PostgreSQL container; the image runs as non-root; the exported OpenAPI document matches the committed one |
+| 4 | Admin panel shell | Planned | Nuxt static app in `panel/` with English and Hebrew, RTL and LTR, light and dark themes, Heebo, and the Tildeck brand; served by the server | Lint and type checks pass; screenshots of the shell in English LTR and Hebrew RTL, light and dark, at desktop and mobile widths |
+| 5 | Client shell | Planned | Flutter app in `app/` for Windows and Android with application ID `com.tildeck.app`; English and Hebrew localization with RTL; light and dark themes; Dart API client generated from `server/openapi.json` and a call to the server's version endpoint | `flutter analyze` and tests pass; screenshots on Android in English LTR and Hebrew RTL, light and dark |
+| 6 | Docker definitions | Planned | Multi-stage server `Dockerfile` with a non-root final stage that includes the built panel; `docker-compose.yml`; a documented way to create `docker-compose-dev.yml` on a new machine; `.env.example` | Both services report healthy; the application process UID is not 0; no `build:` in either Compose file |
+| 7 | Local workflow | Planned | `scripts/local.sh` with `build`, `up`, `up -d`, `down`, `status`, and confirmed `nuke` | Stops on the first failed build; fails clearly when `docker-compose-dev.yml` is missing; `down` then `up` preserves database data; `status` shows healthy services and the running image identity |
+| 8 | Windows client script | Planned | `scripts/windows.ps1` builds and runs the Windows desktop client using Flutter on Windows | Builds and launches the client shell on Windows; fails clearly when Flutter or Visual Studio build tools are missing |
+| 9 | Verify workflow | Planned | `scripts/verify.sh` with full and changed-area modes: shell lint and format; Python lint, format, and pytest against a real PostgreSQL container; Dart format, analyze, and tests; panel lint, type checks, and build; Android build; server image build; OpenAPI and generated-client drift check; Hebrew guard; Compose `build:` guard | A full run passes locally in WSL and in CI with the same commands; temporary containers are removed |
+| 10 | Try-PR workflow | Planned | `scripts/try-pr.sh <number>`, `status`, `restore`; disposable worktree; rebuilds only affected areas; restarts only the server container; snapshots the development database before applying PR migrations and restores it on `restore` | The running server image matches the fresh build; the checkout is untouched; the worktree and snapshot are cleaned up |
+| 11 | Release workflow | Planned | `scripts/release.sh` with a dry run and an explicit target; preflight, clean synchronized `main`, full verify, version bump, closed changelog, immutable tag; CI builds and publishes the APK, Windows package, and server image | The dry run changes nothing; no secrets printed; no tag force-push; no overwrite of a published version |
+| 12 | Path-filtered CI | Planned | Change-detection job; area jobs for app, Windows build, server, panel, scripts, and guards; summary job; cancel superseded PR runs only; manual full run; weekly scheduled full sweep; least-privilege permissions; actions pinned by commit SHA | A docs-only PR skips build jobs and the summary job passes; a panel-only change skips app jobs |
+| 13 | Dependency management | Planned | Committed `app/pubspec.lock`, `server/uv.lock`, and `panel/package-lock.json`; installs use them; weekly Dependabot for pub, uv, npm, GitHub Actions, and Docker, with minor and patch updates grouped | Dependabot configuration validates; CI fails on an out-of-date lockfile |
+| 14 | GitHub configuration | Planned, requires separate authorization | Organization `tildeck` created by Shlomi; repository with the approved visibility; default branch `main`; focused labels; issue templates; `SECURITY.md`; branch rules requiring the CI summary check; Dependabot and secret scanning enabled; Actions default token read-only | Settings reviewed with `gh` after creation |
+
+Later product phases, each separately approved: security model document, local vault, SSH sessions, accounts and email, sync API, admin panel screens, SFTP.
+
+## Required workflow contracts
+
+The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
+
+**Windows exception.** Flutter can build the Windows desktop client only on Windows. At Shlomi's request, `scripts/windows.ps1` builds and runs it locally, and CI builds it on a Windows runner. This is the only non-Bash script.
+
+- **`scripts/local.sh`** manages the development stack (`server` and `postgres`) through `docker-compose-dev.yml` only. It builds the panel and the server development image explicitly before changing the running stack, and can build a debug Android APK. It removes development data only through the confirmed `nuke` operation.
+- **`scripts/verify.sh`** is the single entry point used locally, in CI, and by release. It supports a full sweep and a changed-area mode.
+- **`scripts/try-pr.sh`** tests a pull request in a disposable worktree. For server or panel changes it rebuilds and restarts only the server against the existing development database, after taking a database snapshot. For client changes it builds an APK and reports its path. It never merges, pushes, or edits the user's checkout.
+- **`scripts/release.sh`** prepares the release commit and immutable tag after a full verify run and requires an explicit target. Publication happens in the tagged CI run. Merge and release stay separate.
+
+## Known unknowns and blockers
+
+| Question or blocker | Why it matters | Evidence or decision needed | Owner |
+|---|---|---|---|
+| Dart OpenAPI generator | Quality of the generated client | Choose and verify a maintained generator that handles the contract | Foundation task |
+| GitHub organization `tildeck` | Reserves the name; hosts the repository | Shlomi is creating it in the GitHub web interface (organizations cannot be created through the CLI); confirm it exists before deliverable 14 | Shlomi |
+| Admin panel sign-in | Security of server management | Approval of password plus mandatory TOTP administrator accounts | Shlomi, before the panel phase |
+| Windows package format | Release artifacts and install experience | Zip, MSIX, or installer; unsigned in every case | Shlomi, before the release workflow |
+| Android release signing | A release APK must be signed with a stable key forever | Where the keystore lives (outside the repository, provided to CI as a secret) and who holds the backup | Shlomi, before the release workflow |
+| GitHub visibility at creation | Baseline defaults to private | Private until the first release, or public immediately | Shlomi |
+| TLS termination | Android requires HTTPS for real deployments | Reverse proxy guidance or a proxy container in Compose | Shlomi, before the sync phase |
+| `dartssh2` and `xterm` suitability | Core client capabilities | Maintenance activity, license, and key type support | Foundation task |
+
+## Ready-for-implementation criteria
+
+- Shlomi approves this plan.
+- Local `git init` and local commits are approved as part of starting the foundation task.
+- Any GitHub action (repository creation, settings, first push) is authorized separately.
+
+## Handoff to foundation implementation
+
+**First task:** implement deliverables 1 through 13 in order, locally.
+
+**Permitted scope:** repository baseline, toolchain containers, the minimal server, API contract, panel, and client shells described above, Docker definitions, the workflow scripts, CI workflows, and Dependabot configuration. Update `README.md`, `AGENTS.md`, and this document as items become real, with their verification evidence.
+
+**Out of scope:** any product feature (vault, SSH, terminal, accounts, email, sync API, panel screens beyond the shell, SFTP), the cryptography implementation, GitHub organization or repository creation, pushing, and releasing.
+
+**Stopping point:** `scripts/verify.sh` passes a full run in WSL; `scripts/local.sh up` brings both containers to healthy with non-root runtime identities and serves the panel shell; `scripts/windows.ps1` launches the client shell; the panel and Android screenshots are inspected; CI workflows are written and validated locally where possible. Then stop and report before deliverable 14, which needs Shlomi's authorization.

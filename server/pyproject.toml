@@ -1,0 +1,52 @@
+[project]
+name = "tildeck-server"
+# The runtime version is NOT this value. It comes from the repo-root VERSION
+# file (in a checkout) or from the APP_VERSION build argument baked into the
+# Docker image. This project is never built or installed as a package: the
+# code is served from /app/app and dependencies come from uv.lock.
+version = "0.0.0"
+description = "Tildeck sync server: accounts, devices, encrypted records, and the admin panel"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.120",
+    "uvicorn[standard]>=0.34",
+    "sqlalchemy[asyncio]>=2.0.40",
+    "asyncpg>=0.30",
+    "alembic>=1.15",
+    "pydantic-settings>=2.8",
+    "cryptography>=44",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "httpx>=0.28",
+    "ruff>=0.9",
+]
+
+[tool.uv]
+# Virtual project: dependencies only, the app itself is never packaged.
+package = false
+# Dependency cooldown: never resolve a package version published in the last
+# 7 days, so a freshly hijacked or broken release cannot enter a lock update
+# before the ecosystem notices. Installs from uv.lock are unaffected.
+exclude-newer = "7 days"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+
+[tool.ruff.lint]
+# E4/E7/E9: import and statement errors. F: pyflakes (real defects).
+# I: import ordering.
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+# One event loop for the whole session: the async engine's pooled connections
+# are loop-bound and break under per-test loops.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"

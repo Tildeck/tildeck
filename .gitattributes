@@ -1,0 +1,30 @@
+# Normalize line endings in the repository to LF. Windows checkouts may convert
+# text files to CRLF on checkout, except where a rule below forces LF.
+* text=auto
+
+# Shell scripts run inside WSL and Linux containers. A CRLF ending breaks them
+# at the shebang line, so they stay LF on every platform.
+*.sh text eol=lf
+scripts/*.sh text eol=lf
+scripts/*.py text eol=lf
+
+# The Windows client script runs in PowerShell on Windows.
+*.ps1 text eol=crlf
+
+# Docker and Compose files are consumed by Linux tooling.
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Lockfiles and generated contracts are generated artifacts. Keep them stable.
+uv.lock text eol=lf
+package-lock.json text eol=lf
+pubspec.lock text eol=lf
+server/openapi.json text eol=lf
+
+# Binary assets. A line-ending conversion would corrupt them.
+*.png binary
+*.ico binary
+*.ttf binary
+*.woff2 binary
+*.jar binary
