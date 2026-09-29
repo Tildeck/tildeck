@@ -166,7 +166,7 @@ open(path, "w", encoding="utf-8", newline="\n").write(text)
 
 path = "CHANGELOG.md"
 text = open(path, encoding="utf-8").read()
-text, n = re.subn(r"^## Unreleased\s*$", f"## Unreleased\n\n## {version} ({today})", text, count=1, flags=re.M)
+text, n = re.subn(r"^## Unreleased[ \t]*$", f"## Unreleased\n\n## {version} ({today})", text, count=1, flags=re.M)
 if n != 1:
     sys.exit("CHANGELOG.md has no Unreleased heading")
 open(path, "w", encoding="utf-8", newline="\n").write(text)
