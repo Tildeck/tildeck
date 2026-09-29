@@ -7,6 +7,8 @@
 #   scripts/local.sh down           stop and remove the containers, keep the data
 #   scripts/local.sh status         containers, health, running image, runtime UID
 #   scripts/local.sh nuke           down, then DELETE the database volume (asks first)
+#   scripts/local.sh apk            build a debug Android APK into out/
+#   scripts/local.sh contract       re-export server/openapi.json, regenerate the Dart client
 #
 # Drives ONLY the machine-local docker-compose-dev.yml at the repository root
 # and never falls back to the production docker-compose.yml. Compose never
@@ -15,7 +17,8 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib/common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 cd "$ROOT"
 
 COMPOSE_FILE="docker-compose-dev.yml"
@@ -28,12 +31,8 @@ DB_CONTAINER="tildeck-postgres-dev"
 DB_VOLUME="tildeck-db-data"
 HEALTH_TIMEOUT=120
 
-log() { printf '\033[36m%s\033[0m\n' "$*"; }
-warn() { printf '\033[33m%s\033[0m\n' "$*"; }
-err() { printf '\033[31m%s\033[0m\n' "$*" >&2; }
-
 usage() {
-  sed -n '3,10p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -52,10 +51,6 @@ require_files() {
 
 compose() {
   docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
-}
-
-version() {
-  tr -d '[:space:]' <VERSION
 }
 
 cmd_build() {
@@ -211,6 +206,31 @@ cmd_nuke() {
   log "Deleted $DB_VOLUME. The next start creates a fresh database."
 }
 
+# A debug APK of the client, for a phone or an emulator. Debug builds are
+# signed with the SDK's debug key; release signing lives in CI only.
+cmd_apk() {
+  log "Building the debug APK (version $(version)) ..."
+  flutter_run "flutter pub get >/dev/null && flutter build apk --debug --build-name=$(version)"
+  mkdir -p out
+  cp app/build/app/outputs/flutter-apk/app-debug.apk out/tildeck-debug.apk
+  log "Built out/tildeck-debug.apk"
+}
+
+# The client and server contract: the committed OpenAPI document is exported
+# from the server code, and the Dart client is generated from it. Commit
+# server/openapi.json and app/packages/tildeck_api together with the server
+# change. scripts/verify.sh fails when either is out of date.
+cmd_contract() {
+  local spec
+  log "Exporting server/openapi.json ..."
+  spec="$(export_openapi)"
+  printf '%s\n' "$spec" >server/openapi.json
+  log "Generating app/packages/tildeck_api ..."
+  generate_api_client server/openapi.json app/packages/tildeck_api
+  git status --short -- server/openapi.json app/packages/tildeck_api
+  log "Contract regenerated. Commit the changes above together with the server change."
+}
+
 COMMAND="${1:-}"
 [[ -n "$COMMAND" ]] && shift
 case "$COMMAND" in
@@ -219,6 +239,8 @@ case "$COMMAND" in
   down) cmd_down ;;
   status) cmd_status ;;
   nuke) cmd_nuke ;;
+  apk) cmd_apk ;;
+  contract) cmd_contract ;;
   "" | -h | --help | help) usage ;;
   *)
     err "Unknown command: $COMMAND"

@@ -1,0 +1,21 @@
+{
+  "@@locale": "he",
+  "appName": "Tildeck",
+  "nativeLanguageName": "עברית",
+  "switchToLight": "מעבר לתצוגה בהירה",
+  "switchToDark": "מעבר לתצוגה כהה",
+  "connectTitle": "חיבור לשרת הסנכרון שלך",
+  "connectIntro": "Tildeck מסנכרן את השרתים והמפתחות שלך דרך שרת שאתה מפעיל בעצמך. הכל מוצפן במכשיר הזה לפני שהוא יוצא ממנו.",
+  "serverAddressLabel": "כתובת השרת",
+  "serverAddressHint": "https://sync.example.com",
+  "checkServer": "בדיקת השרת",
+  "checking": "בודק",
+  "serverReady": "השרת מוכן",
+  "serverVersion": "גרסת השרת {version}",
+  "protocolVersion": "פרוטוקול סנכרון {version}",
+  "errorInvalidAddress": "צריך להזין את הכתובת המלאה של השרת, שמתחילה ב-https://.",
+  "errorUnreachable": "השרת לא ענה. כדאי לבדוק את הכתובת ולוודא שהשרת פועל.",
+  "errorNotTildeck": "הכתובת ענתה, אבל זה לא שרת Tildeck.",
+  "errorUnsupportedProtocol": "גרסת האפליקציה הזו לא יכולה להסתנכרן עם השרת. צריך לעדכן את האפליקציה או את השרת.",
+  "errorDatabaseUnavailable": "השרת לא מגיע למסד הנתונים שלו. כדאי לבקש ממי שמפעיל את השרת לבדוק."
+}

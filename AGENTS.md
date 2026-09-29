@@ -4,7 +4,7 @@
 
 Tildeck is a free, open source SSH client for Windows and Android (Flutter) with end-to-end encrypted sync through a self-hosted server (Python FastAPI, PostgreSQL, Docker Compose) and a web admin panel for operators (Nuxt, served by the server).
 
-**Stage: foundation implementation.** What exists today: the repository baseline; the server shell in `server/` (FastAPI, settings registry, activity log, Alembic, health endpoints, `server/openapi.json`, one `server/Dockerfile` that also builds the panel); the admin panel shell in `panel/`; `docker-compose.yml`, `.env.example`, and the development Compose template; and `scripts/local.sh`. The client, the other workflow scripts, and CI do not exist yet.
+**Stage: foundation implementation.** What exists today: the repository baseline; the server shell in `server/` (FastAPI, settings registry, activity log, Alembic, health endpoints, `server/openapi.json`, one `server/Dockerfile` that also builds the panel); the admin panel shell in `panel/`; the client shell in `app/` with the generated API client in `app/packages/tildeck_api`; `docker-compose.yml`, `.env.example`, and the development Compose template; `scripts/local.sh` with `scripts/lib/common.sh` and the toolchain pins in `scripts/toolchain/Dockerfile`. The other workflow scripts and CI do not exist yet.
 
 [docs/project-foundation.md](docs/project-foundation.md) is the desired state, not the current state. Do not assume that any file, directory, command, or script it describes exists. Check its status column and verify before relying on anything. Update the plan and this file as items become real.
 
@@ -27,7 +27,7 @@ Tildeck is a free, open source SSH client for Windows and Android (Flutter) with
 - Settings: every operator setting is declared once in the server's settings registry and is editable in the admin panel. A set environment variable wins and locks the field; the admin API refuses writes to locked settings. Stored values are encrypted at rest and every change is written to the activity log. Sensitive values (passwords, keys, tokens, credentials) are never returned by any API or displayed in the panel, not even read-only or when set by the environment; the panel shows only their state. Only bootstrap values (database connection, settings encryption key) are environment-only.
 - User-facing strings, including email content, go through the localization system in English and Hebrew from the start. UIs support RTL and LTR and light and dark themes. Terminal content is always LTR.
 - The server returns stable error codes. Clients map them to localized messages.
-- The server's committed OpenAPI document is the client and server contract. The app's Dart API client is generated from it; never edit generated code by hand. Change the server, re-export the document, regenerate the client, and commit all three together.
+- The server's committed OpenAPI document is the client and server contract. The app's Dart API client (`app/packages/tildeck_api`) is generated from it; never edit generated code by hand. Change the server, run `scripts/local.sh contract` (re-exports the document and regenerates the client), and commit all three together.
 
 ## Known traps
 
@@ -36,6 +36,8 @@ Tildeck is a free, open source SSH client for Windows and Android (Flutter) with
 - `server/Dockerfile` builds the panel from a named build context: `docker build --build-context panel=./panel -f server/Dockerfile ./server`.
 - `docker-compose-dev.yml` is machine-local. Create it once with `cp docs/development/docker-compose-dev.example.yml docker-compose-dev.yml`, and `.env` with `cp .env.example .env`.
 - PostgreSQL 18 images keep data under `/var/lib/postgresql`, not `/var/lib/postgresql/data`.
+- Flutter, Dart, and the OpenAPI generator run only in the toolchain containers (`flutter_run` in `scripts/lib/common.sh`). Client golden images are platform-specific: regenerate them in the container (`flutter test --update-goldens`), never on Windows.
+- `app/lib/l10n/app_localizations*.dart` is generated and not committed; `flutter pub get` creates it.
 - A container's runtime UID is the UID of its PID 1. `docker exec ... id -u` reports the exec session's user instead.
 
 - Flutter cannot build the Windows desktop app from WSL or Linux. Use `scripts/windows.ps1` locally; CI builds it on a Windows runner.

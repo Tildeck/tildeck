@@ -1,0 +1,11 @@
+include: package:flutter_lints/flutter.yaml
+
+formatter:
+  page_width: 120
+
+analyzer:
+  exclude:
+    # Generated: from server/openapi.json (scripts/local.sh contract) and
+    # from the ARB files (flutter gen-l10n).
+    - packages/tildeck_api/**
+    - lib/l10n/app_localizations*.dart

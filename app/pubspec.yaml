@@ -1,0 +1,45 @@
+name: tildeck
+description: "Tildeck: a free, open source SSH client with end-to-end encrypted sync."
+publish_to: 'none'
+
+# The product version comes from the repo-root VERSION file; the release
+# workflow writes it here. Pull requests never change it.
+version: 0.0.0+1
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  http: ^1.4.0
+  intl: any
+  # Generated from server/openapi.json by `scripts/local.sh contract`.
+  tildeck_api:
+    path: packages/tildeck_api
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  # Generates lib/l10n/app_localizations*.dart from the ARB files on every
+  # pub get and build. The generated files are not committed.
+  generate: true
+  fonts:
+    # Heebo, SIL Open Font License 1.1 (assets/fonts/OFL.txt). Bundled so
+    # Hebrew and English render the same on every device and in golden tests.
+    - family: Heebo
+      fonts:
+        - asset: assets/fonts/Heebo-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Heebo-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Heebo-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Heebo-ExtraBold.ttf
+          weight: 800
