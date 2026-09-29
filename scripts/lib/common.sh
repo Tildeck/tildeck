@@ -60,7 +60,9 @@ version() {
 # source tree $FLUTTER_SRC (default: this checkout). Caches survive between
 # runs in named volumes: pub packages, Gradle, and the NDK and CMake that the
 # Android build installs into the SDK on first use. The image runs as root,
-# so whatever it wrote under app/ is handed back to the calling user.
+# so whatever it wrote under app/ is handed back to the calling user. The
+# release signing variables pass through when set (the publish workflow
+# only; app/android/app/build.gradle.kts reads them).
 flutter_run() {
   local image src="${FLUTTER_SRC:-$ROOT}"
   image="$(toolchain_image flutter)"
@@ -71,6 +73,7 @@ flutter_run() {
     -v tildeck-android-ndk:/opt/android-sdk-linux/ndk \
     -v tildeck-android-cmake:/opt/android-sdk-linux/cmake \
     -e PUB_CACHE=/root/.pub-cache \
+    -e TILDECK_KEYSTORE_FILE -e TILDECK_KEYSTORE_PASSWORD -e TILDECK_KEY_ALIAS -e TILDECK_KEY_PASSWORD \
     "$image" bash -c "trap 'chown -R $(id -u):$(id -g) /work/app' EXIT
       flutter config --no-analytics >/dev/null 2>&1; set -e; $1"
 }

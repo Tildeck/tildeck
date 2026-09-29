@@ -64,13 +64,14 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-# --frozen: the lockfile is the contract; a stale lock fails the build.
-RUN uv sync --frozen --no-dev
+# --locked: uv.lock is the contract. The build fails when it no longer
+# matches pyproject.toml (--frozen would install it without checking).
+RUN uv sync --locked --no-dev
 
 
 FROM deps AS test
 
-RUN uv sync --frozen
+RUN uv sync --locked
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1

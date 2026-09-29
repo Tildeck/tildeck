@@ -149,7 +149,7 @@ cmd_preview() {
   fi
   if ((app > 0)); then
     log "Building the debug APK of $label ..."
-    FLUTTER_SRC="$WT_DIR" flutter_run "flutter pub get >/dev/null && flutter build apk --debug"
+    FLUTTER_SRC="$WT_DIR" flutter_run "flutter pub get --enforce-lockfile >/dev/null && flutter build apk --debug"
     cp "$WT_DIR/app/build/app/outputs/flutter-apk/app-debug.apk" "$STATE_DIR/tildeck-preview-debug.apk"
     log "APK: $STATE_DIR/tildeck-preview-debug.apk"
   fi

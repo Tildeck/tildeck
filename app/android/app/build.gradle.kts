@@ -15,21 +15,35 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // Cannot change after the first public release: Android treats a new
+        // ID as a different app.
         applicationId = "com.tildeck.app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    // The release key exists only in CI (the publish workflow decodes it from
+    // repository secrets into a temporary file). Without it, a release build
+    // falls back to the debug key, so local release builds still work but can
+    // never be mistaken for a published APK: Android refuses to update one
+    // with the other.
+    val releaseKeystore = System.getenv("TILDECK_KEYSTORE_FILE")
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("TILDECK_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("TILDECK_KEY_ALIAS")
+                keyPassword = System.getenv("TILDECK_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
         }
     }
 }

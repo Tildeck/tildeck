@@ -1,0 +1,36 @@
+name: Verify area
+
+# Reusable job: one scripts/verify.sh area on a GitHub-hosted Linux runner
+# with Docker. Called by ci.yml (changed areas, or all of them) and by
+# publish.yml (the release gate), so the definition lives in one place.
+on:
+  workflow_call:
+    inputs:
+      area:
+        description: server, panel, image, app, contract, or guards
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: ${{ inputs.area }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The guards list tracked files and --changed compares with main.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify ${{ inputs.area }}
+        # The area reaches the shell through the environment, never by
+        # interpolating ${{ }} into the script: inputs are data, and
+        # interpolation would let a crafted value run as shell code.
+        env:
+          AREA: ${{ inputs.area }}
+        run: bash scripts/verify.sh --area "$AREA"

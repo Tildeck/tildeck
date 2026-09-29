@@ -1,0 +1,123 @@
+name: CI
+
+# Pull requests verify only the areas they touch; the guards always run. A
+# weekly sweep and a manual run verify everything, and also audit the locked
+# dependencies for published advisories. Every verification job calls
+# scripts/verify.sh, so CI, developer machines, and the release run exactly
+# the same commands. The "summary" job is the single required status check.
+on:
+  pull_request:
+  schedule:
+    # Mondays 03:17 UTC.
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its superseded run. Scheduled and
+# manual runs are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      areas: ${{ steps.areas.outputs.areas }}
+      windows: ${{ steps.areas.outputs.windows }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The mapping from paths to areas lives in scripts/verify.sh only.
+      - name: Select areas
+        id: areas
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            areas="$(bash scripts/verify.sh --changed --print-areas)"
+          else
+            areas="$(bash scripts/verify.sh --print-areas)"
+          fi
+          echo "areas=$areas" >> "$GITHUB_OUTPUT"
+          # The Windows desktop build follows the app area.
+          if echo "$areas" | grep -q '"app"'; then windows=true; else windows=false; fi
+          echo "windows=$windows" >> "$GITHUB_OUTPUT"
+          echo "areas: $areas, windows: $windows"
+
+  verify:
+    needs: changes
+    strategy:
+      fail-fast: false
+      matrix:
+        area: ${{ fromJSON(needs.changes.outputs.areas) }}
+    uses: ./.github/workflows/verify-area.yml
+    with:
+      area: ${{ matrix.area }}
+
+  windows:
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    uses: ./.github/workflows/windows-build.yml
+
+  # Weekly and manual only. Security posture is time-based: a dependency
+  # that was clean last week can have an advisory today without any commit.
+  # Both audits run in the same pinned images the product is built on.
+  dependency-audit:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # pip-audit reads requirements, not uv.lock, so uv exports the locked
+      # production set first; --frozen makes it uv.lock as committed.
+      - name: Python dependencies (server/uv.lock)
+        run: |
+          python_image="$(awk '$1 == "ARG" && $2 ~ /^PYTHON_IMAGE=/ { sub(/^PYTHON_IMAGE=/, "", $2); print $2 }' server/Dockerfile)"
+          docker run --rm -e UV_CACHE_DIR=/tmp/uv-cache -v "$PWD/server:/src:ro" -w /src "$python_image" sh -c '
+            pip install --quiet --disable-pip-version-check --root-user-action=ignore uv pip-audit &&
+            uv export --frozen --no-dev --no-emit-project --format requirements-txt >/tmp/requirements.txt &&
+            pip-audit --requirement /tmp/requirements.txt'
+
+      # --omit=dev: the image ships only the built panel, so dev-only
+      # advisories are not shipped vulnerabilities. High and critical fail.
+      - name: Panel dependencies (panel/package-lock.json)
+        if: ${{ !cancelled() }}
+        run: |
+          node_image="$(awk '$1 == "ARG" && $2 ~ /^NODE_IMAGE=/ { sub(/^NODE_IMAGE=/, "", $2); print $2 }' server/Dockerfile)"
+          docker run --rm -v "$PWD/panel:/src:ro" -w /work "$node_image" sh -c '
+            cp /src/package.json /src/package-lock.json /work/ &&
+            npm ci --ignore-scripts --no-audit --no-fund &&
+            npm audit --omit=dev --audit-level=high'
+
+  # The single required status check. Succeeds when every job passed or was
+  # skipped as unaffected; fails on any failure or cancellation.
+  summary:
+    needs: [changes, verify, windows, dependency-audit]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          failed=0
+          for job in changes verify windows dependency-audit; do
+            result="$(echo "$RESULTS" | jq -r --arg j "$job" '.[$j].result')"
+            echo "$job: $result"
+            case "$result" in
+              success | skipped) ;;
+              *) failed=1 ;;
+            esac
+          done
+          exit "$failed"

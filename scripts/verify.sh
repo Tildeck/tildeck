@@ -6,6 +6,7 @@
 #   scripts/verify.sh                  full run: every area
 #   scripts/verify.sh --changed        only the areas changed against main (guards always run)
 #   scripts/verify.sh --area <name>    one area: server | panel | image | app | contract | guards
+#   scripts/verify.sh --changed --print-areas   print the changed areas as JSON, run nothing (CI)
 #
 # Areas:
 #   server    ruff, and pytest against a throwaway PostgreSQL
@@ -167,7 +168,8 @@ verify_app() {
   # command substitution runs inside the container, not here.
   # shellcheck disable=SC2016
   flutter_run '
-    flutter pub get >/dev/null
+    echo "-- flutter pub get (the committed pubspec.lock must be current)"
+    flutter pub get --enforce-lockfile
     echo "-- dart format"
     dart format --output none --set-exit-if-changed $(find lib test -name "*.dart" ! -name "app_localizations*")
     echo "-- flutter analyze"
@@ -257,6 +259,11 @@ verify_guards() {
     fi
   done < <(git ls-files -s -- ':(glob)scripts/*.sh' ':(glob)scripts/*.py' | awk '{ print $1, $4 }')
 
+  section "guards: GitHub Actions workflows"
+  if [[ -d .github/workflows ]]; then
+    docker run --rm -v "$ROOT:/repo:ro" -w /repo "$(toolchain_image actionlint)" -color || ok=1
+  fi
+
   section "guards: shellcheck and shfmt"
   # Paths are resolved here and passed one by one: a glob would expand on
   # the host, not in the container.
@@ -275,16 +282,18 @@ verify_guards() {
 
 MODE="full"
 AREA=""
+PRINT_ONLY=false
 while (($# > 0)); do
   case "$1" in
     --changed) MODE="changed" ;;
+    --print-areas) PRINT_ONLY=true ;;
     --area)
       MODE="area"
       AREA="${2:-}"
       shift
       ;;
     -h | --help)
-      sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '3,23p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -296,6 +305,15 @@ while (($# > 0)); do
 done
 
 AREAS="$(select_areas "$MODE" "$AREA")"
+
+# CI asks which areas a change touches, so the path-to-area mapping lives
+# only here. Printed as a JSON array for a job matrix; nothing runs.
+if [[ "$PRINT_ONLY" == true ]]; then
+  # shellcheck disable=SC2086
+  printf '%s\n' $AREAS | awk 'BEGIN { printf "[" } { printf "%s\"%s\"", (NR > 1 ? "," : ""), $0 } END { print "]" }'
+  exit 0
+fi
+
 log "verify: mode=$MODE areas=[${AREAS# }]"
 
 PASSED=()

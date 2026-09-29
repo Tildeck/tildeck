@@ -1,0 +1,76 @@
+# Dependabot: weekly dependency pull requests. Nothing merges by itself.
+#
+# Minor and patch updates of one ecosystem arrive grouped in a single pull
+# request; major updates open separately so a breaking change is never
+# hidden among routine bumps. A seven-day cooldown keeps a freshly published
+# (possibly hijacked or broken) release out until the ecosystem has noticed.
+# Security updates are enabled on the repository and open as soon as an
+# advisory matches. Every pull request runs the normal CI, which fails on an
+# out-of-date lockfile.
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/server"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
+    groups:
+      server-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/panel"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
+    groups:
+      panel-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "pub"
+    directory: "/app"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
+    groups:
+      app-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+
+  # The images the server is built on (Node, Python, uv).
+  - package-ecosystem: "docker"
+    directory: "/server"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
+    groups:
+      server-images:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # The toolchain pins used by the workflow scripts and CI (Flutter, the
+  # OpenAPI generator, linters, Python, PostgreSQL).
+  - package-ecosystem: "docker"
+    directory: "/scripts/toolchain"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
+    groups:
+      toolchain-images:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # PostgreSQL in the production and development Compose files.
+  - package-ecosystem: "docker-compose"
+    directories: ["/", "/docs/development"]
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

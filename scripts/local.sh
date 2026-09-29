@@ -124,7 +124,7 @@ cmd_nuke() {
 # signed with the SDK's debug key; release signing lives in CI only.
 cmd_apk() {
   log "Building the debug APK (version $(version)) ..."
-  flutter_run "flutter pub get >/dev/null && flutter build apk --debug --build-name=$(version)"
+  flutter_run "flutter pub get --enforce-lockfile >/dev/null && flutter build apk --debug --build-name=$(version)"
   mkdir -p out
   cp app/build/app/outputs/flutter-apk/app-debug.apk out/tildeck-debug.apk
   log "Built out/tildeck-debug.apk"

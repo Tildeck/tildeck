@@ -1,0 +1,69 @@
+name: Windows build
+
+# Reusable job: the Windows desktop client, built by scripts/windows.ps1 on a
+# GitHub-hosted Windows runner (which ships Visual Studio with the C++
+# desktop tools). Flutter is installed at the exact version pinned in
+# scripts/toolchain/Dockerfile. Called by ci.yml and publish.yml; publish
+# asks for the zipped release package.
+on:
+  workflow_call:
+    inputs:
+      package:
+        description: Zip the release build into out/ and upload it as an artifact
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      artifact:
+        description: The name of the uploaded package artifact, when packaged
+        value: ${{ jobs.build.outputs.artifact }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    outputs:
+      artifact: ${{ steps.package.outputs.artifact }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned Flutter
+        shell: pwsh
+        run: |
+          $pin = Select-String -Path scripts/toolchain/Dockerfile -Pattern '^FROM ghcr\.io/cirruslabs/flutter:([0-9.]+)@\S+ AS flutter$'
+          if (-not $pin) { throw 'No Flutter pin in scripts/toolchain/Dockerfile.' }
+          $version = $pin.Matches[0].Groups[1].Value
+          $dir = Join-Path $env:RUNNER_TEMP 'flutter'
+          git clone --quiet --depth 1 --branch $version https://github.com/flutter/flutter.git $dir
+          if ($LASTEXITCODE -ne 0) { throw "Could not fetch Flutter $version." }
+          Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $dir 'bin')
+          & (Join-Path $dir 'bin/flutter.bat') config --no-analytics
+
+      - name: Build the Windows client
+        shell: pwsh
+        run: ./scripts/windows.ps1 build
+
+      - name: Package
+        id: package
+        if: inputs.package
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          $name = "tildeck-$version-windows-x64"
+          Compress-Archive -Path out/windows/* -DestinationPath "out/$name.zip"
+          "artifact=$name" >> $env:GITHUB_OUTPUT
+
+      - name: Keep the package for the release job
+        if: inputs.package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.package.outputs.artifact }}
+          path: out/${{ steps.package.outputs.artifact }}.zip
+          if-no-files-found: error
+          retention-days: 3
