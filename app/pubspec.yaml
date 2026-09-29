@@ -15,7 +15,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   http: ^1.4.0
-  intl: any
+  intl: 0.20.3
   # Generated from server/openapi.json by `scripts/local.sh contract`.
   tildeck_api:
     path: packages/tildeck_api
