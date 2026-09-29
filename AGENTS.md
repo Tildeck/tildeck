@@ -4,7 +4,7 @@
 
 Tildeck is a free, open source SSH client for Windows and Android (Flutter) with end-to-end encrypted sync through a self-hosted server (Python FastAPI, PostgreSQL, Docker Compose) and a web admin panel for operators (Nuxt, served by the server).
 
-**Stage: foundation implementation.** What exists today: the repository baseline; the server shell in `server/` (FastAPI, settings registry, activity log, Alembic, health endpoints, `server/openapi.json`, one `server/Dockerfile` that also builds the panel); the admin panel shell in `panel/`; the client shell in `app/` with the generated API client in `app/packages/tildeck_api`; `docker-compose.yml`, `.env.example`, and the development Compose template; `scripts/local.sh` and `scripts/verify.sh` with `scripts/lib/common.sh` and the toolchain pins in `scripts/toolchain/Dockerfile`. `scripts/windows.ps1` builds and runs the Windows client on Windows; `scripts/try-pr.sh` previews a pull request; `scripts/release.sh` cuts a release. CI (`.github/workflows/`) and Dependabot are written but have not run: the GitHub repository does not exist yet.
+**Stage: foundation implementation.** What exists today: the repository baseline; the server shell in `server/` (FastAPI, settings registry, activity log, Alembic, health endpoints, `server/openapi.json`, one `server/Dockerfile` that also builds the panel); the admin panel shell in `panel/`; the client shell in `app/` with the generated API client in `app/packages/tildeck_api`; `docker-compose.yml`, `.env.example`, and the development Compose template; `scripts/local.sh` and `scripts/verify.sh` with `scripts/lib/common.sh` and the toolchain pins in `scripts/toolchain/Dockerfile`. `scripts/windows.ps1` builds and runs the Windows client on Windows; `scripts/try-pr.sh` previews a pull request; `scripts/release.sh` cuts a release. CI (`.github/workflows/`) and Dependabot run on the private GitHub repository `Tildeck/tildeck`.
 
 Before reporting work as done, run `scripts/verify.sh --changed` (or `--area <name>`) in WSL; it needs only Docker.
 
@@ -41,6 +41,7 @@ Before reporting work as done, run `scripts/verify.sh --changed` (or `--area <na
 - Flutter, Dart, and the OpenAPI generator run only in the toolchain containers (`flutter_run` in `scripts/lib/common.sh`). Client golden images are platform-specific: regenerate them in the container (`flutter test --update-goldens`), never on Windows.
 - `app/lib/l10n/app_localizations*.dart` is generated and not committed; `flutter pub get` creates it.
 - Pin every GitHub Action by full commit SHA with the version in a comment, and never interpolate `${{ }}` into `run:` scripts; pass values through `env:`.
+- Commit with the repository-local noreply email (`git config user.email` in this checkout). The GitHub account rejects pushes whose commits carry a private email.
 - A container's runtime UID is the UID of its PID 1. `docker exec ... id -u` reports the exec session's user instead.
 
 - Flutter cannot build the Windows desktop app from WSL or Linux. Use `scripts/windows.ps1` locally; CI builds it on a Windows runner.
