@@ -76,5 +76,5 @@ generate_api_client() {
   # On a Windows drive under WSL, replacing a directory tree that a
   # container just wrote leaves this shell's working directory handle stale
   # ("Unable to read current working directory"). Re-enter it by path.
-  cd "$ROOT"
+  cd "$ROOT" || return 1
 }

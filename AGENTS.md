@@ -4,7 +4,9 @@
 
 Tildeck is a free, open source SSH client for Windows and Android (Flutter) with end-to-end encrypted sync through a self-hosted server (Python FastAPI, PostgreSQL, Docker Compose) and a web admin panel for operators (Nuxt, served by the server).
 
-**Stage: foundation implementation.** What exists today: the repository baseline; the server shell in `server/` (FastAPI, settings registry, activity log, Alembic, health endpoints, `server/openapi.json`, one `server/Dockerfile` that also builds the panel); the admin panel shell in `panel/`; the client shell in `app/` with the generated API client in `app/packages/tildeck_api`; `docker-compose.yml`, `.env.example`, and the development Compose template; `scripts/local.sh` with `scripts/lib/common.sh` and the toolchain pins in `scripts/toolchain/Dockerfile`. The other workflow scripts and CI do not exist yet.
+**Stage: foundation implementation.** What exists today: the repository baseline; the server shell in `server/` (FastAPI, settings registry, activity log, Alembic, health endpoints, `server/openapi.json`, one `server/Dockerfile` that also builds the panel); the admin panel shell in `panel/`; the client shell in `app/` with the generated API client in `app/packages/tildeck_api`; `docker-compose.yml`, `.env.example`, and the development Compose template; `scripts/local.sh` and `scripts/verify.sh` with `scripts/lib/common.sh` and the toolchain pins in `scripts/toolchain/Dockerfile`. `scripts/windows.ps1`, `scripts/try-pr.sh`, `scripts/release.sh`, and CI do not exist yet.
+
+Before reporting work as done, run `scripts/verify.sh --changed` (or `--area <name>`) in WSL; it needs only Docker.
 
 [docs/project-foundation.md](docs/project-foundation.md) is the desired state, not the current state. Do not assume that any file, directory, command, or script it describes exists. Check its status column and verify before relying on anything. Update the plan and this file as items become real.
 
