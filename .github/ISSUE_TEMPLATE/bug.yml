@@ -1,0 +1,24 @@
+name: Bug
+description: Something does not work as it should
+labels: ["nature:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: A security problem? Do not open an issue; follow SECURITY.md instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce
+      placeholder: "1. ...\n2. ...\n3. ..."
+  - type: input
+    id: version
+    attributes:
+      label: Versions and platform
+      placeholder: "App 0.1.0 on Android 15, server 0.1.0"

@@ -91,7 +91,8 @@ if ($Command -eq 'check') { exit 0 }
 $Version = (Get-Content (Join-Path $Root 'VERSION') -Raw).Trim()
 Push-Location $App
 try {
-    Invoke-Flutter @('pub', 'get')
+    # The committed pubspec.lock must be current, as in every other build.
+    Invoke-Flutter @('pub', 'get', '--enforce-lockfile')
     switch ($Command) {
         'run' {
             Write-Step "Running the Windows client (version $Version, debug) ..."

@@ -1,0 +1,20 @@
+name: Feature or change
+description: A new capability, or a change to existing behavior
+labels: ["nature:feature"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: The need
+      description: Who needs this, why, and what happens today without it.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could work. It is fine to leave this open.
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
