@@ -6,16 +6,18 @@ import '../server_check.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
 import '../theme.dart';
-import 'connect_form.dart';
+import '../vault/vault.dart';
 import 'host_key_dialog.dart';
+import 'hosts_page.dart';
 import 'sync_server_page.dart';
 import 'terminal_panel.dart';
 
-/// The main screen: open SSH sessions in tabs, and a tab for a new
-/// connection. Terminals stay alive while another tab is shown.
+/// The main screen: saved hosts, and open SSH sessions in tabs. Terminals
+/// stay alive while another tab is shown.
 class SessionsPage extends StatefulWidget {
   const SessionsPage({
     super.key,
+    required this.vault,
     required this.connector,
     required this.checker,
     required this.showKeyBar,
@@ -23,6 +25,7 @@ class SessionsPage extends StatefulWidget {
     required this.onToggleTheme,
   });
 
+  final Vault vault;
   final SshConnector connector;
   final ServerChecker checker;
   final bool showKeyBar;
@@ -36,7 +39,7 @@ class SessionsPage extends StatefulWidget {
 class _SessionsPageState extends State<SessionsPage> {
   final _sessions = <TerminalSession>[];
 
-  /// -1 is the new connection tab.
+  /// -1 is the hosts tab.
   int _selected = -1;
 
   @override
@@ -98,6 +101,13 @@ class _SessionsPageState extends State<SessionsPage> {
         ),
         actions: [
           IconButton(
+            key: const ValueKey('lockVault'),
+            tooltip: t.lockNow,
+            color: c.deskMuted,
+            icon: const Icon(Icons.lock_outline),
+            onPressed: widget.vault.lock,
+          ),
+          IconButton(
             tooltip: t.syncServerTitle,
             color: c.deskMuted,
             icon: const Icon(Icons.cloud_sync_outlined),
@@ -132,7 +142,7 @@ class _SessionsPageState extends State<SessionsPage> {
               child: IndexedStack(
                 index: _selected + 1,
                 children: [
-                  ConnectForm(onConnect: _open),
+                  HostsPage(vault: widget.vault, onConnect: _open),
                   for (final (i, session) in _sessions.indexed)
                     TerminalPanel(
                       key: ObjectKey(session),
@@ -238,16 +248,16 @@ class _TabStrip extends StatelessWidget {
               ),
             ),
           tab(
-            key: const ValueKey('newConnectionTab'),
+            key: const ValueKey('hostsTab'),
             on: selected == -1,
             onTap: () => onSelect(-1),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.add, size: 18, color: c.brand),
+                Icon(Icons.dns_outlined, size: 18, color: c.brand),
                 const SizedBox(width: 6),
                 Text(
-                  t.newConnection,
+                  t.hostsTitle,
                   style: TextStyle(color: c.brand, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(width: 6),

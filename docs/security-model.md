@@ -1,6 +1,6 @@
 # Tildeck Security Model
 
-Status: Proposed, 2026-09-30. Vault and sync code may be merged only after Shlomi approves this document; the approval is recorded in `docs/project-foundation.md`.
+Status: Approved by Shlomi on 2026-09-30. A change to this document needs his approval again before code that depends on it merges.
 
 This document defines how Tildeck protects users' SSH hosts, keys, and credentials: what is encrypted, with which keys, where each key lives, what the sync server and its operator can and cannot learn, and how accounts, devices, recovery, and sync work. It uses only established primitives through an audited library. Nothing here is a new cryptographic construction.
 
@@ -78,7 +78,7 @@ Changing the master password re-wraps the same vault key; records are never re-e
 
 ## Records
 
-Everything the user stores is a record: a host, a group, a private key, a known host key, or a synced setting. A record is:
+Everything the user stores is a record: a host (with its group name), a private key, a known host key, or a synced setting. A record is:
 
 | Field | Visible to the server | Notes |
 |---|---|---|

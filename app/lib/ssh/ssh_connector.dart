@@ -64,7 +64,7 @@ typedef HostKeyPrompt =
 class SshConnector {
   SshConnector({required this.knownHosts, this.timeout = const Duration(seconds: 15)});
 
-  final KnownHostsStore knownHosts;
+  final KnownHosts knownHosts;
   final Duration timeout;
 
   Future<SSHClient> connect(ConnectionTarget target, {required HostKeyPrompt promptHostKey}) async {

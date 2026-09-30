@@ -67,7 +67,7 @@ void main() {
     );
 
     test('password sign-in asks to trust a new host once, then remembers it', () async {
-      final connector = SshConnector(knownHosts: KnownHostsStore.memory());
+      final connector = SshConnector(knownHosts: MemoryKnownHosts());
       final prompts = PromptLog();
 
       final first = await connector.connect(target(pass: password), promptHostKey: prompts.call);
@@ -81,7 +81,7 @@ void main() {
     });
 
     test('a wrong password is an authentication failure', () async {
-      final connector = SshConnector(knownHosts: KnownHostsStore.memory());
+      final connector = SshConnector(knownHosts: MemoryKnownHosts());
       expect(
         await problemOf(connector.connect(target(pass: 'not-the-password'), promptHostKey: PromptLog().call)),
         ConnectProblem.authFailed,
@@ -89,14 +89,14 @@ void main() {
     });
 
     test('private key sign-in', () async {
-      final connector = SshConnector(knownHosts: KnownHostsStore.memory());
+      final connector = SshConnector(knownHosts: MemoryKnownHosts());
       final client = await connector.connect(target(privateKey: key), promptHostKey: PromptLog().call);
       expect(utf8.decode(await client.run('whoami')).trim(), user);
       client.close();
     });
 
     test('an encrypted key needs its passphrase, and the right one', () async {
-      final connector = SshConnector(knownHosts: KnownHostsStore.memory());
+      final connector = SshConnector(knownHosts: MemoryKnownHosts());
       expect(
         await problemOf(connector.connect(target(privateKey: encryptedKey), promptHostKey: PromptLog().call)),
         ConnectProblem.keyPassphraseRequired,
@@ -118,7 +118,7 @@ void main() {
     });
 
     test('a changed host key is never accepted silently, and refusing it cancels the connection', () async {
-      final store = KnownHostsStore.memory();
+      final store = MemoryKnownHosts();
       await store.trust(
         host!,
         port,
@@ -139,7 +139,7 @@ void main() {
     });
 
     test('a closed port is unreachable', () async {
-      final connector = SshConnector(knownHosts: KnownHostsStore.memory(), timeout: const Duration(seconds: 5));
+      final connector = SshConnector(knownHosts: MemoryKnownHosts(), timeout: const Duration(seconds: 5));
       final closed = ConnectionTarget(host: host!, port: 1, username: user, password: password);
       expect(
         await problemOf(connector.connect(closed, promptHostKey: PromptLog().call)),
@@ -151,7 +151,7 @@ void main() {
       final session = TerminalSession(target(pass: password));
       addTearDown(session.dispose);
       session.terminal.resize(100, 30);
-      unawaited(session.start(SshConnector(knownHosts: KnownHostsStore.memory()), PromptLog().call));
+      unawaited(session.start(SshConnector(knownHosts: MemoryKnownHosts()), PromptLog().call));
 
       await _until(() => session.state == SessionState.connected);
       session.terminal.textInput('echo "tildeck-$port-shell"\r');

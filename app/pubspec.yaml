@@ -19,6 +19,7 @@ dependencies:
   intl: any
   # Generated from server/openapi.json by `scripts/local.sh contract`.
   path_provider: ^2.1.5
+  sodium: ^4.0.4
   tildeck_api:
     path: packages/tildeck_api
   # A patched copy of xterm 4.0.0: see third_party/xterm/PATCHES.md.
@@ -35,6 +36,9 @@ flutter:
   # Generates lib/l10n/app_localizations*.dart from the ARB files on every
   # pub get and build. The generated files are not committed.
   generate: true
+  assets:
+    # Common passwords refused as master passwords (lib/vault/password_rules.dart).
+    - assets/security/common-passwords.txt
   fonts:
     # Heebo, SIL Open Font License 1.1 (assets/fonts/OFL.txt). Bundled so
     # Hebrew and English render the same on every device and in golden tests.

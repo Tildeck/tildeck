@@ -1,0 +1,304 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../l10n/app_localizations.dart';
+import '../logo.dart';
+import '../theme.dart';
+import '../vault/password_rules.dart';
+import '../vault/vault.dart';
+
+/// Shows the vault's creation or unlock screen until it is open, then
+/// [unlocked]. Once built, [unlocked] stays alive (offstage) while the vault
+/// is locked again, so open sessions survive a lock; it is never shown or
+/// focusable while locked.
+class VaultGate extends StatefulWidget {
+  const VaultGate({
+    super.key,
+    required this.vault,
+    required this.commonPasswords,
+    required this.unlocked,
+    this.autoLock = const Duration(minutes: 15),
+  });
+
+  final Vault vault;
+  final CommonPasswords commonPasswords;
+  final WidgetBuilder unlocked;
+
+  /// Locks the vault after this long without a key press or a touch.
+  final Duration autoLock;
+
+  @override
+  State<VaultGate> createState() => _VaultGateState();
+}
+
+class _VaultGateState extends State<VaultGate> {
+  Widget? _content;
+  Timer? _idle;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.vault.addListener(_changed);
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  @override
+  void dispose() {
+    widget.vault.removeListener(_changed);
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    _idle?.cancel();
+    super.dispose();
+  }
+
+  void _changed() {
+    if (widget.vault.status == VaultStatus.unlocked) _touch();
+    setState(() {});
+  }
+
+  bool _onKey(KeyEvent _) {
+    _touch();
+    return false;
+  }
+
+  void _touch() {
+    _idle?.cancel();
+    if (widget.vault.status != VaultStatus.unlocked) return;
+    _idle = Timer(widget.autoLock, widget.vault.lock);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = widget.vault.status;
+    if (status == VaultStatus.unlocked) _content ??= Builder(builder: widget.unlocked);
+    final locked = status != VaultStatus.unlocked;
+
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _touch(),
+      child: Stack(
+        children: [
+          if (_content != null)
+            Offstage(
+              offstage: locked,
+              child: ExcludeFocus(
+                excluding: locked,
+                child: TickerMode(enabled: !locked, child: _content!),
+              ),
+            ),
+          if (locked)
+            switch (status) {
+              VaultStatus.loading => const Scaffold(body: Center(child: CircularProgressIndicator())),
+              VaultStatus.missing => CreateVaultPage(vault: widget.vault, commonPasswords: widget.commonPasswords),
+              _ => UnlockPage(vault: widget.vault),
+            },
+        ],
+      ),
+    );
+  }
+}
+
+/// The shared frame of the create and unlock screens.
+class _VaultScreen extends StatelessWidget {
+  const _VaultScreen({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(28),
+              children: [
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TildeckLogo(tile: c.brand, stroke: c.brandContrast, size: 48),
+                ),
+                const SizedBox(height: 20),
+                ...children,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class CreateVaultPage extends StatefulWidget {
+  const CreateVaultPage({super.key, required this.vault, required this.commonPasswords});
+
+  final Vault vault;
+  final CommonPasswords commonPasswords;
+
+  @override
+  State<CreateVaultPage> createState() => _CreateVaultPageState();
+}
+
+class _CreateVaultPageState extends State<CreateVaultPage> {
+  final _form = GlobalKey<FormState>();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _create() async {
+    if (!_form.currentState!.validate()) return;
+    setState(() => _busy = true);
+    final password = _password.text;
+    _password.clear();
+    _confirm.clear();
+    await widget.vault.create(password);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    final text = Theme.of(context).textTheme;
+
+    return _VaultScreen(
+      children: [
+        Text(t.createVaultTitle, style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Text(t.createVaultIntro, style: text.bodyLarge?.copyWith(color: c.muted, height: 1.5)),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: c.danger.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: c.danger.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.warning_amber_rounded, color: c.danger),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(t.noResetWarning, style: TextStyle(color: c.ink, height: 1.4)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Form(
+          key: _form,
+          child: Column(
+            children: [
+              TextFormField(
+                key: const ValueKey('masterPassword'),
+                controller: _password,
+                obscureText: true,
+                autofocus: true,
+                textDirection: TextDirection.ltr,
+                enabled: !_busy,
+                decoration: InputDecoration(labelText: t.masterPasswordLabel, helperText: t.pwTooShort),
+                validator: (v) => switch (checkMasterPassword(v ?? '', widget.commonPasswords)) {
+                  PasswordProblem.tooShort => t.pwTooShort,
+                  PasswordProblem.common => t.pwCommon,
+                  null => null,
+                },
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                key: const ValueKey('confirmPassword'),
+                controller: _confirm,
+                obscureText: true,
+                textDirection: TextDirection.ltr,
+                enabled: !_busy,
+                onFieldSubmitted: (_) => _create(),
+                decoration: InputDecoration(labelText: t.confirmPasswordLabel),
+                validator: (v) => v == _password.text ? null : t.pwMismatch,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        FilledButton(
+          key: const ValueKey('createVault'),
+          onPressed: _busy ? null : _create,
+          child: Text(_busy ? t.working : t.createVaultButton),
+        ),
+      ],
+    );
+  }
+}
+
+class UnlockPage extends StatefulWidget {
+  const UnlockPage({super.key, required this.vault});
+
+  final Vault vault;
+
+  @override
+  State<UnlockPage> createState() => _UnlockPageState();
+}
+
+class _UnlockPageState extends State<UnlockPage> {
+  final _password = TextEditingController();
+  bool _busy = false;
+  bool _wrong = false;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _unlock() async {
+    if (_password.text.isEmpty || _busy) return;
+    setState(() {
+      _busy = true;
+      _wrong = false;
+    });
+    final ok = await widget.vault.unlock(_password.text);
+    if (!mounted) return;
+    _password.clear();
+    setState(() {
+      _busy = false;
+      _wrong = !ok;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final text = Theme.of(context).textTheme;
+
+    return _VaultScreen(
+      children: [
+        Text(t.unlockTitle, style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 20),
+        TextField(
+          key: const ValueKey('unlockPassword'),
+          controller: _password,
+          obscureText: true,
+          autofocus: true,
+          enabled: !_busy,
+          textDirection: TextDirection.ltr,
+          onSubmitted: (_) => _unlock(),
+          decoration: InputDecoration(labelText: t.masterPasswordLabel, errorText: _wrong ? t.wrongPassword : null),
+        ),
+        const SizedBox(height: 20),
+        FilledButton(
+          key: const ValueKey('unlock'),
+          onPressed: _busy ? null : _unlock,
+          child: Text(_busy ? t.working : t.unlockButton),
+        ),
+      ],
+    );
+  }
+}
