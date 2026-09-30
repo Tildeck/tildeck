@@ -61,15 +61,20 @@ class _SessionsPageState extends State<SessionsPage> {
     });
     session.start(
       widget.connector,
-      ({required target, required presented, required status, previous}) =>
-          showHostKeyDialog(context, target: target, presented: presented, status: status, previous: previous),
+      // The prompt arrives after network round trips; if the page is gone
+      // by then, the key is simply not trusted.
+      ({required target, required presented, required status, previous}) async => mounted
+          ? showHostKeyDialog(context, target: target, presented: presented, status: status, previous: previous)
+          : false,
     );
   }
 
   void _close(int index) {
     setState(() {
       _sessions.removeAt(index).dispose();
-      if (_selected >= _sessions.length) _selected = _sessions.length - 1;
+      // Keep showing the same session when a tab before it closes; when the
+      // shown tab closes, show its left neighbour (or the new connection tab).
+      if (index <= _selected) _selected--;
     });
   }
 
