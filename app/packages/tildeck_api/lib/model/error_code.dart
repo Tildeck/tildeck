@@ -32,6 +32,12 @@ enum ErrorCode {
   invalidRequest._(r'invalid_request'),
   emailUnavailable._(r'email_unavailable'),
   emailNotVerified._(r'email_not_verified'),
+  setupNotNeeded._(r'setup_not_needed'),
+  invalidSetupToken._(r'invalid_setup_token'),
+  invalidTotp._(r'invalid_totp'),
+  csrfFailed._(r'csrf_failed'),
+  settingLocked._(r'setting_locked'),
+  notFound._(r'not_found'),
   ;
 
   /// Instantiate a new enum with the provided value.
@@ -111,6 +117,12 @@ class ErrorCodeTypeTransformer {
         case r'invalid_request': return ErrorCode.invalidRequest;
         case r'email_unavailable': return ErrorCode.emailUnavailable;
         case r'email_not_verified': return ErrorCode.emailNotVerified;
+        case r'setup_not_needed': return ErrorCode.setupNotNeeded;
+        case r'invalid_setup_token': return ErrorCode.invalidSetupToken;
+        case r'invalid_totp': return ErrorCode.invalidTotp;
+        case r'csrf_failed': return ErrorCode.csrfFailed;
+        case r'setting_locked': return ErrorCode.settingLocked;
+        case r'not_found': return ErrorCode.notFound;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');

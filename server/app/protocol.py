@@ -39,6 +39,13 @@ class ErrorCode(StrEnum):
     # Email.
     email_unavailable = "email_unavailable"
     email_not_verified = "email_not_verified"
+    # Admin panel.
+    setup_not_needed = "setup_not_needed"
+    invalid_setup_token = "invalid_setup_token"
+    invalid_totp = "invalid_totp"
+    csrf_failed = "csrf_failed"
+    setting_locked = "setting_locked"
+    not_found = "not_found"
 
 
 class ErrorBody(BaseModel):

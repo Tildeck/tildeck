@@ -540,23 +540,33 @@ async def revoke(
     """Revokes a device (the current one signs out). Its token stops working
     immediately."""
     device = await _own_device(session, caller, device_id)
-    if device.status != "revoked":
-        device.status = "revoked"
-        device.revoked_at = clock.now()
-        device.token_hash = None
-        device.claim_token_hash = None
-        audit.record(
-            session,
-            actor=caller.account.email,
-            source="user",
-            action="device_revoked",
-            entity="device",
-            entity_id=device.id,
-            new_value=device.name,
-        )
-        await session.commit()
-        await _mail(request, session, caller.account, "device_revoked", device=device.name)
+    await revoke_device(request, session, caller.account, device, actor=caller.account.email, source="user")
     return Response(status_code=204)
+
+
+async def revoke_device(
+    request: Request, session: AsyncSession, account: Account, device: Device, *, actor: str, source: str
+) -> None:
+    """Revokes a device: its token stops working at once, the change is
+    logged, and the account is told by email. Used by the account's own
+    devices and by administrators."""
+    if device.status == "revoked":
+        return
+    device.status = "revoked"
+    device.revoked_at = clock.now()
+    device.token_hash = None
+    device.claim_token_hash = None
+    audit.record(
+        session,
+        actor=actor,
+        source=source,
+        action="device_revoked",
+        entity="device",
+        entity_id=device.id,
+        new_value=device.name,
+    )
+    await session.commit()
+    await _mail(request, session, account, "device_revoked", device=device.name)
 
 
 @router.post(
