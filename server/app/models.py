@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -63,6 +63,8 @@ class Account(Base):
     recovery_auth_hash: Mapped[str] = mapped_column(Text)
     wrap_pw: Mapped[str] = mapped_column(Text)
     wrap_rk: Mapped[str] = mapped_column(Text)
+    # The last revision assigned to one of this account's records.
+    revision: Mapped[int] = mapped_column(BigInteger, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -97,3 +99,22 @@ class EmailToken(Base):
     device_id: Mapped[str | None] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Record(Base):
+    """One encrypted vault record. The server sees only its id, its version
+    (set by the client and enforced here), the account-wide revision it was
+    stored at (the pull cursor), a tombstone flag, and opaque ciphertext."""
+
+    __tablename__ = "records"
+    __table_args__ = (Index("ix_records_account_revision", "account_id", "revision"),)
+
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"), primary_key=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer)
+    revision: Mapped[int] = mapped_column(BigInteger)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    nonce: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ct: Mapped[str | None] = mapped_column(Text, nullable=True)
+    device_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

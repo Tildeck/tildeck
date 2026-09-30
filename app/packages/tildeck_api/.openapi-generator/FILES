@@ -3,6 +3,7 @@ analysis_options.yaml
 lib/api.dart
 lib/api/account_api.dart
 lib/api/health_api.dart
+lib/api/sync_api.dart
 lib/api_client.dart
 lib/api_exception.dart
 lib/api_helper.dart
@@ -11,8 +12,10 @@ lib/auth/authentication.dart
 lib/auth/http_basic_auth.dart
 lib/auth/http_bearer_auth.dart
 lib/auth/oauth.dart
+lib/model/accepted.dart
 lib/model/account_view.dart
 lib/model/claim_request.dart
+lib/model/conflict.dart
 lib/model/device_info.dart
 lib/model/device_view.dart
 lib/model/error_body.dart
@@ -24,6 +27,9 @@ lib/model/new_password.dart
 lib/model/password_change.dart
 lib/model/prelogin_request.dart
 lib/model/prelogin_response.dart
+lib/model/pull_response.dart
+lib/model/push_request.dart
+lib/model/push_response.dart
 lib/model/readiness.dart
 lib/model/recovery_complete.dart
 lib/model/recovery_start.dart
@@ -33,5 +39,7 @@ lib/model/server_info.dart
 lib/model/signed_in.dart
 lib/model/signin_request.dart
 lib/model/signin_result.dart
+lib/model/stored_record.dart
+lib/model/sync_record.dart
 lib/model/vault_keys.dart
 pubspec.yaml

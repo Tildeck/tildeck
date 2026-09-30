@@ -30,9 +30,12 @@ part 'auth/http_bearer_auth.dart';
 
 part 'api/account_api.dart';
 part 'api/health_api.dart';
+part 'api/sync_api.dart';
 
+part 'model/accepted.dart';
 part 'model/account_view.dart';
 part 'model/claim_request.dart';
+part 'model/conflict.dart';
 part 'model/device_info.dart';
 part 'model/device_view.dart';
 part 'model/error_body.dart';
@@ -44,6 +47,9 @@ part 'model/new_password.dart';
 part 'model/password_change.dart';
 part 'model/prelogin_request.dart';
 part 'model/prelogin_response.dart';
+part 'model/pull_response.dart';
+part 'model/push_request.dart';
+part 'model/push_response.dart';
 part 'model/readiness.dart';
 part 'model/recovery_complete.dart';
 part 'model/recovery_start.dart';
@@ -53,6 +59,8 @@ part 'model/server_info.dart';
 part 'model/signed_in.dart';
 part 'model/signin_request.dart';
 part 'model/signin_result.dart';
+part 'model/stored_record.dart';
+part 'model/sync_record.dart';
 part 'model/vault_keys.dart';
 
 

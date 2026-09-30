@@ -13,7 +13,7 @@ from app.config import get_app_version, get_settings
 from app.db import async_session
 from app.mailer import SmtpMailer
 from app.protocol import ApiError, ErrorCode
-from app.routers import account, health, links
+from app.routers import account, health, links, sync
 
 # Uvicorn configures only its own loggers. Without this every app log line
 # below WARNING is dropped.
@@ -85,6 +85,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(account.router)
+    app.include_router(sync.router)
     app.include_router(links.router)
     # Last: the panel's catch-all route must not shadow any API route.
     panel.mount(app, get_settings().PANEL_DIR)
