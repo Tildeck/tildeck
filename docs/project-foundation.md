@@ -1,6 +1,6 @@
 # Tildeck Project Foundation
 
-Status: Foundation implementation in progress
+Status: Foundation implemented; product implementation in progress (see [Product implementation plan](#product-implementation-plan))
 
 This document separates the repository's current state from the approved foundation that a later implementation task must build. A planned item does not exist until its status and verification evidence say otherwise. Nothing described as planned in this document is implemented.
 
@@ -73,7 +73,7 @@ Updated on 2026-09-28.
 | Repository language | Approved | English, with Hebrew only in the listed locale files | Follows from the public-ready posture. |
 | Client platforms | Approved | Windows and Android | Shlomi limited the first release to the platforms he uses. |
 | Client technology | Approved | Flutter (Dart) | One codebase for Windows and Android, native terminal rendering, good touch and keyboard handling on Android. |
-| SSH and terminal libraries | Provisional | `dartssh2` for SSH and SFTP, `xterm` (xterm.dart) for the terminal | Mature pure-Dart libraries. Confirm maintenance status and license during the foundation task. |
+| SSH and terminal libraries | Provisional | `dartssh2` for SSH and SFTP, `xterm` (xterm.dart) for the terminal | Checked 2026-09-30: `dartssh2` 4.1.0 (MIT) is maintained by vicajilau, released 2026-09-04, one open issue. `xterm` 4.0.0 (MIT) was last released 2024-02 and last committed 2025-06 with 108 open issues: a maintenance risk, judged in practice in product step 2. |
 | Sync model | Approved | Own sync server with end-to-end encryption | Shlomi chose this over syncing through third-party storage. |
 | Server technology | Approved | Python with FastAPI, SQLAlchemy (async), asyncpg, and Alembic, managed with `uv` | The same stack as Pay's backend, which Shlomi knows. Proven Pay code (settings registry, settings encryption, activity log, email, migrations) can be reused. |
 | Client and server contract | Approved | The server's OpenAPI document is the contract. The Dart client code for the API is generated from it, and CI fails when the committed OpenAPI document or the generated client is out of date. | Client and server are in different languages; generation plus a CI check keeps them from drifting apart. |
@@ -90,12 +90,14 @@ Updated on 2026-09-28.
 | Windows client builds | Approved | CI builds on a Windows runner; a PowerShell script for local Windows builds and runs | Flutter cannot build Windows desktop apps from WSL. Shlomi explicitly requested the PowerShell script. |
 | Workflow scripts | Approved | WSL Bash `.sh` files under `scripts/`, plus the requested Windows script | Repository baseline, with the documented Windows exception. |
 | Root layout | Approved | Minimal root with every file justified | Repository baseline. See [Planned repository root](#planned-repository-root). |
-| Cryptography design | Provisional | Argon2id from the master password; separate derived encryption key and authentication key; per-record XChaCha20-Poly1305 via libsodium | Established primitives with an audited library. Must be written up in `docs/security-model.md` and approved before the vault or sync is implemented. |
-| Admin panel sign-in | Provisional | Separate administrator accounts with a password and mandatory TOTP, created in first-run setup | The panel manages the server, not vaults, so it does not need vault keys. Pay's Entra sign-in does not fit a public self-hosted product. Needs Shlomi's approval before the panel phase. |
+| Cryptography design | Proposed in [docs/security-model.md](security-model.md), awaiting Shlomi's review | Argon2id from the master password; separate derived key-encryption key and authentication key; a random vault key wrapped by the password and by the recovery key; per-record XChaCha20-Poly1305 via libsodium | Established primitives with an audited library. Vault and sync code merge only after the document is approved. |
+| Admin panel sign-in | Approved (2026-09-30) | Separate administrator accounts with a password and mandatory TOTP, the first one created in first-run setup with a one-time setup token from the server log | The panel manages the server, not vaults, so it does not need vault keys. Pay's Entra sign-in does not fit a public self-hosted product. |
 | Release artifacts | Provisional | Android APK, Windows package, server image in GHCR, all from one tagged release | Windows package format (zip, MSIX, or installer) is deferred. |
 | Versioning | Provisional | One SemVer version for the whole product; single source of truth is a root `VERSION` file, as in Pay; the release workflow writes it into `app/pubspec.yaml`, and the server image and panel receive it at build time | Client, server, and panel ship together and share a contract. Three ecosystems need one neutral source. |
 | Development database storage | Approved | Named volume in development, bind mount in production | PostgreSQL's `initdb` cannot set the permissions it needs on a bind mount of a Windows drive, and the repository lives on `C:`. Pay and hub use the same exception. |
-| TLS termination | Deferred | Not decided | Needed before the sync phase. |
+| TLS termination | Approved | The operator's own TLS reverse proxy; Tildeck does not bundle one. Development and phone testing go through Shlomi's existing HTTPS proxy | Shlomi has a proxy ready (2026-09-30). |
+| Client cryptography library | Provisional | `sodium` 4.0.4 (libsodium, bundled through build hooks) | The last release that supports Dart 3.12 in the pinned Flutter 3.44; 4.1 needs Dart 3.13. `sodium_libs` is discontinued, and `flutter_sodium` is unmaintained. |
+| Product scope of the working version | Approved (2026-09-30) | The full first-release scope, built in the order of the product implementation plan | Shlomi: the proof of concept is a product that works. |
 | Brand colors and mark | Provisional | Deep teal ink desk band with a bright teal accent; the mark is a tilde stroke on a rounded tile (`panel/public/favicon.svg`, `panel/app/components/AppLogo.vue`) | Proposed during the panel shell; awaiting Shlomi's review of the screenshots. No purple. |
 
 ## Publication and language policy
@@ -221,6 +223,20 @@ The foundation task builds infrastructure only. It includes minimal client, serv
 
 Later product phases, each separately approved: security model document, local vault, SSH sessions, accounts and email, sync API, admin panel screens, SFTP.
 
+## Product implementation plan
+
+Approved by Shlomi on 2026-09-30: the working version is the full first-release scope. Each step is its own pull request with a green CI `summary` check, and ends with an APK and a Windows build for Shlomi to try; he judges the Android and Windows experience, which no automated check here can see.
+
+| Order | Step | Status | Acceptance criteria | Required verification |
+|---|---|---|---|---|
+| 1 | Security model | Proposed, awaiting approval | `docs/security-model.md` defines keys, wrapping, records, accounts, devices, recovery, sync, and the admin panel's boundaries | Shlomi approves it |
+| 2 | SSH sessions and terminal | Planned | Connect with password or private key; sessions in tabs; host key verification with a clear changed-key warning; terminal always LTR; Android key bar (Esc, Tab, Ctrl, arrows); copy and paste | Tests against a pinned OpenSSH container; APK and Windows build tried by Shlomi |
+| 3 | Local vault and hosts | Planned; needs step 1 approved | Master password; hosts in groups; private keys and known host keys stored as encrypted records; auto-lock | Tests that no plaintext reaches storage; APK and Windows build |
+| 4 | Accounts and email | Planned; needs step 1 approved | Registration by mode, email verification, pre-login, sign-in, new-device approval, recovery, security emails, rate limits, stable error codes | Server tests against PostgreSQL and an SMTP stub |
+| 5 | End-to-end sync | Planned; needs steps 3 and 4 | Pull and push with versions, conflicts, and tombstones; protocol check | Two clients converge in tests; Shlomi syncs his phone and Windows through his HTTPS proxy |
+| 6 | Admin panel screens | Planned | First-run setup with a one-time token, administrator TOTP, users, devices, settings with environment locks, activity log | Panel screenshots in both languages and themes |
+| 7 | SFTP | Planned | Browse, upload, and download over an open session | Tests against the OpenSSH container |
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
@@ -264,11 +280,10 @@ Recorded during the foundation implementation, on 2026-09-28.
 | Question or blocker | Why it matters | Evidence or decision needed | Owner |
 |---|---|---|---|
 | Public release of the repository | Branch rules, secret scanning, and private vulnerability reporting need a public repository on the free plan | Shlomi decides when; then enable those three and require the `summary` check on `main` | Shlomi |
-| Admin panel sign-in | Security of server management | Approval of password plus mandatory TOTP administrator accounts | Shlomi, before the panel phase |
 | Windows package format | Release artifacts and install experience | Zip, MSIX, or installer; unsigned in every case. The publish workflow ships a zip until this is decided | Shlomi, before the first release |
 | Android release signing | A release APK must be signed with a stable key forever | Create the keystore and keep its backup outside the repository; store it in the `release` environment secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. The publish workflow fails clearly without them | Shlomi, before the first release |
-| TLS termination | Android requires HTTPS for real deployments | Reverse proxy guidance or a proxy container in Compose | Shlomi, before the sync phase |
-| `dartssh2` and `xterm` suitability | Core client capabilities | Maintenance activity, license, and key type support | Foundation task |
+| `xterm` maintenance | The terminal is the core of the client | Judge rendering, input, and Android keyboard behavior in product step 2; fork or replace if it falls short | Product step 2 |
+| Security model approval | Gates the vault and sync code | Shlomi reads and approves `docs/security-model.md` | Shlomi |
 
 ## Ready-for-implementation criteria
 
