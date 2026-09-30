@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
 
-import 'l10n/app_localizations.dart';
-import 'logo.dart';
-import 'server_check.dart';
-import 'theme.dart';
+import '../l10n/app_localizations.dart';
+import '../server_check.dart';
+import '../theme.dart';
 
-/// The foundation shell: connect to a sync server and confirm it is one this
-/// app can sync with. Hosts, sessions, and the vault arrive in later phases.
-class HomePage extends StatefulWidget {
-  const HomePage({super.key, required this.checker, required this.onToggleLocale, required this.onToggleTheme});
+/// Check a sync server: that it is a Tildeck server this app can sync with.
+/// Accounts and sync itself arrive in later product steps.
+class SyncServerPage extends StatefulWidget {
+  const SyncServerPage({super.key, required this.checker});
 
   final ServerChecker checker;
-  final VoidCallback onToggleLocale;
-  final VoidCallback onToggleTheme;
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<SyncServerPage> createState() => _SyncServerPageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _SyncServerPageState extends State<SyncServerPage> {
   final _address = TextEditingController();
   bool _checking = false;
   ServerCheckResult? _result;
@@ -46,35 +43,13 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final c = context.colors;
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final text = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: c.desk,
         foregroundColor: c.deskInk,
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            TildeckLogo(tile: c.deskBright, stroke: c.desk, size: 26),
-            const SizedBox(width: 10),
-            Text(t.appName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: widget.onToggleLocale,
-            style: TextButton.styleFrom(foregroundColor: c.deskMuted),
-            child: Text(_otherLanguageName(context)),
-          ),
-          IconButton(
-            onPressed: widget.onToggleTheme,
-            tooltip: dark ? t.switchToLight : t.switchToDark,
-            color: c.deskMuted,
-            icon: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
-          ),
-          const SizedBox(width: 8),
-        ],
+        title: Text(t.syncServerTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: SafeArea(
         child: Center(
@@ -107,12 +82,6 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
-  }
-
-  /// The other language, named in its own language.
-  String _otherLanguageName(BuildContext context) {
-    final other = Localizations.localeOf(context).languageCode == 'he' ? const Locale('en') : const Locale('he');
-    return lookupAppLocalizations(other).nativeLanguageName;
   }
 }
 

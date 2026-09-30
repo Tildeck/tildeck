@@ -63,10 +63,14 @@ version() {
 # so whatever it wrote under app/ is handed back to the calling user. The
 # release signing variables pass through when set (the publish workflow
 # only; app/android/app/build.gradle.kts reads them).
+#
+# FLUTTER_DOCKER_ARGS, an array, adds docker run options (a network, test
+# environment variables) for one call.
+FLUTTER_DOCKER_ARGS=()
 flutter_run() {
   local image src="${FLUTTER_SRC:-$ROOT}"
   image="$(toolchain_image flutter)"
-  docker run --rm \
+  docker run --rm "${FLUTTER_DOCKER_ARGS[@]}" \
     -v "$src:/work" -w /work/app \
     -v tildeck-pub-cache:/root/.pub-cache \
     -v tildeck-gradle-cache:/root/.gradle \

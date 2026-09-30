@@ -2,7 +2,9 @@
   "@@locale": "en",
   "appName": "Tildeck",
   "nativeLanguageName": "English",
-  "@nativeLanguageName": { "description": "This language's own name, shown on the button that switches to it." },
+  "@nativeLanguageName": {
+    "description": "This language's own name, shown on the button that switches to it."
+  },
   "switchToLight": "Switch to light theme",
   "switchToDark": "Switch to dark theme",
   "connectTitle": "Connect to your sync server",
@@ -13,12 +15,85 @@
   "checking": "Checking",
   "serverReady": "Server is ready",
   "serverVersion": "Server version {version}",
-  "@serverVersion": { "placeholders": { "version": { "type": "String" } } },
+  "@serverVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "protocolVersion": "Sync protocol {version}",
-  "@protocolVersion": { "placeholders": { "version": { "type": "int" } } },
+  "@protocolVersion": {
+    "placeholders": {
+      "version": {
+        "type": "int"
+      }
+    }
+  },
   "errorInvalidAddress": "Enter the full address of your server, starting with https://.",
   "errorUnreachable": "The server did not answer. Check the address and that the server is running.",
   "errorNotTildeck": "This address answered, but it is not a Tildeck server.",
   "errorUnsupportedProtocol": "This app version cannot sync with this server. Update the app or the server.",
-  "errorDatabaseUnavailable": "The server cannot reach its database. Ask the server operator to check it."
+  "errorDatabaseUnavailable": "The server cannot reach its database. Ask the server operator to check it.",
+  "syncServerTitle": "Sync server",
+  "newConnection": "New connection",
+  "newConnectionIntro": "Connect to a server over SSH. Saved hosts arrive with the vault in a later version.",
+  "hostLabel": "Host",
+  "hostHint": "server.example.com",
+  "portLabel": "Port",
+  "usernameLabel": "Username",
+  "authPassword": "Password",
+  "authPrivateKey": "Private key",
+  "passwordLabel": "Password",
+  "privateKeyLabel": "Private key",
+  "privateKeyHint": "Paste the whole key, including the BEGIN and END lines",
+  "passphraseLabel": "Key passphrase, if it has one",
+  "connectButton": "Connect",
+  "fieldRequired": "Required",
+  "portInvalid": "A number from 1 to 65535",
+  "connectingTo": "Connecting to {target}",
+  "@connectingTo": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "disconnected": "Disconnected",
+  "reconnect": "Reconnect",
+  "closeSession": "Close",
+  "copy": "Copy",
+  "paste": "Paste",
+  "copied": "Copied",
+  "errConnUnreachable": "Could not reach the server. Check the address, the port, and your network.",
+  "errConnTimeout": "The server did not answer in time. Check the address and your network, then try again.",
+  "errConnAuthFailed": "The server rejected the username or the credentials.",
+  "errConnHostKeyRejected": "The connection was cancelled because the server's key was not trusted.",
+  "errConnKeyInvalid": "The private key could not be read. Paste the whole key, including the BEGIN and END lines.",
+  "errConnKeyPassphraseRequired": "This key is protected by a passphrase. Enter it and connect again.",
+  "errConnKeyPassphraseWrong": "The key passphrase is wrong.",
+  "errConnDisconnected": "The connection closed unexpectedly.",
+  "hostKeyNewTitle": "Trust this server?",
+  "hostKeyNewBody": "This is the first connection to {host}. Make sure the fingerprint matches the server's key before you trust it.",
+  "@hostKeyNewBody": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "hostKeyChangedTitle": "The server's key changed",
+  "hostKeyChangedBody": "{host} presented a different key than the one you trusted before. Someone may be intercepting the connection, or the server was reinstalled. Connect only if you know why the key changed.",
+  "@hostKeyChangedBody": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "hostKeyFingerprint": "Fingerprint",
+  "hostKeyPrevious": "Previously trusted",
+  "trustAndConnect": "Trust and connect",
+  "replaceAndConnect": "Replace the saved key and connect",
+  "cancel": "Cancel"
 }
