@@ -17,13 +17,18 @@ import 'package:http/testing.dart';
 import 'package:tildeck/app.dart';
 import 'package:tildeck/l10n/app_localizations.dart';
 import 'package:tildeck/server_check.dart';
+import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/ssh/terminal_session.dart';
 import 'package:tildeck/theme.dart';
+import 'package:tildeck/ui/connect_form.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/sync_server_page.dart';
 import 'package:tildeck/ui/terminal_panel.dart';
+import 'package:tildeck/vault/models.dart';
+import 'package:tildeck/vault/vault.dart';
+import 'package:tildeck/vault/vault_crypto.dart';
 import 'package:xterm/xterm.dart' show TerminalView;
 
 Future<void> loadFonts() async {
@@ -97,29 +102,81 @@ TerminalSession sampleSession() {
   return session;
 }
 
+/// A vault with sample hosts in two groups, unlocked or locked.
+Future<Vault> sampleVault({required bool unlocked}) async {
+  final dir = await Directory.systemTemp.createTemp('tildeck-golden');
+  final vault = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
+  await vault.load();
+  await vault.create('orange-kettle-winter-42');
+  const key = KeyEntry(id: 'k1', name: 'Laptop Ed25519', privateKey: 'x');
+  await vault.put(key);
+  for (final h in const [
+    HostEntry(
+      id: 'h1',
+      name: 'Web 01',
+      group: 'Production',
+      host: 'prod-web-01.example.com',
+      username: 'deploy',
+      auth: HostAuth.key,
+      keyId: 'k1',
+    ),
+    HostEntry(
+      id: 'h2',
+      name: 'Database',
+      group: 'Production',
+      host: 'db.internal.example.com',
+      port: 2222,
+      username: 'postgres',
+    ),
+    HostEntry(id: 'h3', name: 'Home server', group: 'Home', host: '192.168.1.20', username: 'shlomi'),
+    HostEntry(id: 'h4', name: 'Build box', host: 'ci.example.com', username: 'runner'),
+  ]) {
+    await vault.put(h);
+  }
+  if (!unlocked) vault.lock();
+  return vault;
+}
+
+Widget app(Vault vault, String locale, ThemeMode mode) => TildeckApp(
+  vault: vault,
+  commonPasswords: CommonPasswords({'1q2w3e4r5t6y'}),
+  checker: ServerChecker(client: readyServer),
+  connector: SshConnector(knownHosts: MemoryKnownHosts()),
+  showKeyBar: false,
+  initialLocale: Locale(locale),
+  initialThemeMode: mode,
+);
+
+/// Lets asset loading and the first frames finish.
+Future<void> settle(WidgetTester tester) async {
+  for (var i = 0; i < 5; i++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester.pumpAndSettle();
+  }
+}
+
 void main() {
   setUpAll(loadFonts);
 
   for (final locale in ['en', 'he']) {
     for (final mode in [ThemeMode.light, ThemeMode.dark]) {
-      testWidgets('connect form $locale ${mode.name}', (tester) async {
+      testWidgets('hosts $locale ${mode.name}', (tester) async {
         phone(tester);
-        await tester.pumpWidget(
-          TildeckApp(
-            checker: ServerChecker(client: readyServer),
-            connector: SshConnector(knownHosts: KnownHostsStore.memory()),
-            showKeyBar: false,
-            initialLocale: Locale(locale),
-            initialThemeMode: mode,
-          ),
-        );
+        final vault = (await tester.runAsync(() => sampleVault(unlocked: true)))!;
+        await tester.pumpWidget(app(vault, locale, mode));
+        await settle(tester);
+        final dir = tester.widget<Directionality>(find.byType(Directionality).first).textDirection;
+        expect(dir, locale == 'he' ? TextDirection.rtl : TextDirection.ltr);
+        await expectLater(find.byType(TildeckApp), matchesGoldenFile('goldens/hosts_${locale}_${mode.name}.png'));
+      });
+
+      testWidgets('quick connect form $locale ${mode.name}', (tester) async {
+        phone(tester);
+        await tester.pumpWidget(screen(locale, mode, Scaffold(body: ConnectForm(onConnect: (_) {}))));
         await tester.pumpAndSettle();
         await tester.enterText(find.byKey(const ValueKey('host')), sampleTarget.host);
         await tester.enterText(find.byKey(const ValueKey('username')), sampleTarget.username);
         await tester.pumpAndSettle();
-
-        final dir = tester.widget<Directionality>(find.byType(Directionality).first).textDirection;
-        expect(dir, locale == 'he' ? TextDirection.rtl : TextDirection.ltr);
         // Hosts and usernames stay LTR in both languages.
         expect(
           tester
@@ -129,9 +186,32 @@ void main() {
               .textDirection,
           TextDirection.ltr,
         );
-        await expectLater(find.byType(TildeckApp), matchesGoldenFile('goldens/connect_${locale}_${mode.name}.png'));
+        await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/connect_${locale}_${mode.name}.png'));
       });
     }
+  }
+
+  for (final (locale, mode, name) in [
+    ('en', ThemeMode.light, 'create'),
+    ('he', ThemeMode.dark, 'create'),
+    ('en', ThemeMode.dark, 'unlock'),
+    ('he', ThemeMode.light, 'unlock'),
+  ]) {
+    testWidgets('$name vault $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() async {
+        if (name == 'unlock') return sampleVault(unlocked: false);
+        final v = Vault(
+          crypto: VaultCrypto.load(),
+          resolveFile: () async => File('${Directory.systemTemp.createTempSync('tildeck-golden').path}/vault.json'),
+        );
+        await v.load();
+        return v;
+      }))!;
+      await tester.pumpWidget(app(vault, locale, mode));
+      await settle(tester);
+      await expectLater(find.byType(TildeckApp), matchesGoldenFile('goldens/${name}_vault_${locale}_${mode.name}.png'));
+    });
   }
 
   for (final (locale, mode) in [('en', ThemeMode.light), ('he', ThemeMode.dark)]) {

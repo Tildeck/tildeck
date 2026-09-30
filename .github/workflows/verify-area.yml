@@ -27,6 +27,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # The app area needs the Flutter image, the Android NDK, and libsodium
+      # built for three Android ABIs, which outgrows the runner's free disk.
+      # Everything removed here is preinstalled runner tooling this
+      # repository never uses: all builds run in the pinned containers.
+      - name: Free disk space
+        if: inputs.area == 'app'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
       - name: Verify ${{ inputs.area }}
         # The area reaches the shell through the environment, never by
         # interpolating ${{ }} into the script: inputs are data, and
