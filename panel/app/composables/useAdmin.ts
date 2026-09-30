@@ -12,7 +12,7 @@ export interface AdminSession {
 
 /** A refusal with the server's stable error code. */
 export class AdminApiError extends Error {
-  constructor(public status: number, public code: string | null) {
+  constructor(public status: number, public code: string | null, public key: string | null = null) {
     super(code ?? `HTTP ${status}`)
   }
 }
@@ -29,13 +29,13 @@ export function useAdmin() {
       return await $fetch<T>(`/api/admin${path}`, { method: method as 'GET', body: options.body as Record<string, unknown>, headers, credentials: 'same-origin' })
     }
     catch (e: unknown) {
-      const err = e as { status?: number, statusCode?: number, data?: { error?: string } }
+      const err = e as { status?: number, statusCode?: number, data?: { error?: string, key?: string } }
       const status = err.status ?? err.statusCode ?? 0
       if (status === 401 && session.value && !path.startsWith('/session')) {
         session.value = null
         await navigateTo('/signin')
       }
-      throw new AdminApiError(status, err.data?.error ?? null)
+      throw new AdminApiError(status, err.data?.error ?? null, err.data?.key ?? null)
     }
   }
 

@@ -9,6 +9,7 @@ import hmac
 from datetime import datetime
 
 from fastapi import APIRouter, Cookie, Depends, Header, Query, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -414,8 +415,8 @@ class SettingRow(BaseModel):
     value: str | None = None
 
 
-class SettingChange(BaseModel):
-    value: str = Field(max_length=2000)
+class SettingsChange(BaseModel):
+    values: dict[str, str] = Field(max_length=50)
 
 
 @router.get("/settings", response_model=list[SettingRow])
@@ -427,18 +428,27 @@ async def list_settings(
     return [SettingRow(**row) for row in await settings_store.describe_all(session)]
 
 
-@router.put("/settings/{key}", status_code=204)
-async def change_setting(
-    key: str, body: SettingChange, caller: Caller = Depends(current_admin), session: AsyncSession = Depends(get_db)
+@router.put("/settings", status_code=204)
+async def change_settings(
+    body: SettingsChange, caller: Caller = Depends(current_admin), session: AsyncSession = Depends(get_db)
 ) -> Response:
-    try:
-        await settings_store.set_value(session, key, body.value, actor=caller.name, source="admin")
-    except settings_store.UnknownSetting:
-        raise ApiError(404, ErrorCode.not_found) from None
-    except settings_store.SettingLocked:
-        raise ApiError(409, ErrorCode.setting_locked) from None
-    except settings_store.InvalidSettingValue:
-        raise ApiError(422, ErrorCode.invalid_request) from None
+    """Saves every changed setting of the page together: all of them or none.
+    A refusal names the setting it is about, so the panel shows it under
+    that field."""
+    refusals = {
+        settings_store.UnknownSetting: (404, ErrorCode.not_found),
+        settings_store.SettingLocked: (409, ErrorCode.setting_locked),
+        settings_store.InvalidSettingValue: (422, ErrorCode.invalid_request),
+    }
+    for key, value in body.values.items():
+        try:
+            if len(value) > 2000:
+                raise settings_store.InvalidSettingValue(key)
+            await settings_store.set_value(session, key, value, actor=caller.name, source="admin")
+        except tuple(refusals) as e:
+            await session.rollback()
+            status, code = refusals[type(e)]
+            return JSONResponse({"error": code.value, "key": key}, status_code=status)
     await session.commit()
     return Response(status_code=204)
 

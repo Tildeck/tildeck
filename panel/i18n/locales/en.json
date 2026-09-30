@@ -25,7 +25,6 @@
     "retry": "Try again",
     "working": "One moment",
     "cancel": "Cancel",
-    "save": "Save",
     "never": "Never"
   },
   "auth": {
@@ -119,7 +118,7 @@
   "settings": {
     "title": "Settings",
     "intro": "How this server runs. A value set in the server's environment wins and cannot be changed here; secret values are never shown.",
-    "saved": "Saved.",
+    "saved": "All changes saved.",
     "secretSet": "A value is set. Type a new one to replace it.",
     "lockedHelp": "Set in the server's environment. Change it there and restart the server.",
     "origin": {
@@ -190,7 +189,11 @@
         "tls": "TLS",
         "none": "None (local relay only)"
       }
-    }
+    },
+    "changed": "Changed",
+    "unsaved": "One unsaved change | {n} unsaved changes",
+    "discard": "Discard changes",
+    "save": "Save changes"
   },
   "activity": {
     "title": "Activity",
