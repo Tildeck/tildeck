@@ -244,6 +244,7 @@ Approved by Shlomi on 2026-09-30: the working version is the full first-release 
 - The terminal is always LTR, uses the bundled JetBrains Mono (SIL Open Font License), copies and pastes with Ctrl+Shift+C and Ctrl+Shift+V or a right click on desktop, and on Android shows a key bar (Esc, Tab, Ctrl latch, arrows, common symbols, copy, paste).
 - Verification: `scripts/verify.sh --area app` starts a throwaway OpenSSH server (`openssh` in `scripts/toolchain/Dockerfile`), generates a password and two Ed25519 keys for the run, and runs integration tests against it: password and key sign-in, a wrong password, a key that needs its passphrase and a wrong passphrase, a changed host key refused, a closed port, and an interactive shell through the terminal. The same tests pass natively on Windows against the same server. Golden images cover the connect form (both languages and themes), the terminal with the key bar, the changed host key warning, and the sync server page.
 - Found and fixed while testing: a refused changed host key was reported as an authentication failure, because the library surfaces the closed transport as an authentication abort.
+- Found by Shlomi on Windows: the terminal connected but accepted no typing. xterm 4.0.0 opens its keyboard connection without a view id, which Flutter's Windows embedder rejects since 3.44 (upstream pull requests #224, #228, #231, none merged). Fixed in the vendored copy; `app/test/terminal_input_test.dart` fails without the fix. The test binding accepts the call either way, which is why the earlier end-to-end typing test could not catch it.
 
 ## Required workflow contracts
 
@@ -290,7 +291,7 @@ Recorded during the foundation implementation, on 2026-09-28.
 | Public release of the repository | Branch rules, secret scanning, and private vulnerability reporting need a public repository on the free plan | Shlomi decides when; then enable those three and require the `summary` check on `main` | Shlomi |
 | Windows package format | Release artifacts and install experience | Zip, MSIX, or installer; unsigned in every case. The publish workflow ships a zip until this is decided | Shlomi, before the first release |
 | Android release signing | A release APK must be signed with a stable key forever | Create the keystore and keep its backup outside the repository; store it in the `release` environment secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. The publish workflow fails clearly without them | Shlomi, before the first release |
-| `xterm` maintenance | The terminal is the core of the client | Rendering and input work in tests and on Linux and Windows; Android keyboard behavior is judged by Shlomi on his phone. Fork or replace if it falls short | Shlomi's feedback on step 2 |
+| `xterm` maintenance | The terminal is the core of the client | The risk materialized on 2026-09-30: typing did nothing on Windows, a known xterm 4.0.0 bug with Flutter 3.44 whose fixes upstream never merged. The app now uses a patched copy in `app/third_party/xterm` (see its `PATCHES.md`). Return to the published package when upstream releases the fix, or keep maintaining the copy | Ongoing |
 | Security model approval | Gates the vault and sync code | Shlomi reads and approves `docs/security-model.md` | Shlomi |
 
 ## Ready-for-implementation criteria
