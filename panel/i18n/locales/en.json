@@ -7,18 +7,52 @@
     "areas": "Areas",
     "menu": "Menu",
     "version": "Version",
+    "signOut": "Sign out",
     "theme": {
       "light": "Switch to light theme",
       "dark": "Switch to dark theme"
     }
   },
   "nav": {
-    "overview": "Overview"
+    "overview": "Overview",
+    "users": "Users",
+    "settings": "Settings",
+    "activity": "Activity"
   },
   "common": {
     "loading": "Loading",
     "loadFailed": "The server did not answer. Check that it is running, then try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "working": "One moment",
+    "cancel": "Cancel",
+    "save": "Save",
+    "never": "Never"
+  },
+  "auth": {
+    "username": "Username",
+    "password": "Password",
+    "code": "Code from your authenticator app"
+  },
+  "setup": {
+    "title": "Set up this server",
+    "intro": "Create the first administrator. The server printed a one-time setup token to its log when it started.",
+    "token": "Setup token",
+    "tokenHelp": "Find it in the server log, for example with: docker compose logs server",
+    "usernameRule": "3 to 100 letters, digits, dots, dashes, underscores, or {'@'}",
+    "passwordRule": "At least 12 characters.",
+    "passwordShort": "The password needs at least 12 characters.",
+    "confirm": "Repeat the password",
+    "mismatch": "The two passwords are different.",
+    "continue": "Continue",
+    "totpIntro": "Scan the code with an authenticator app, or type the key into it, then enter the code the app shows. You will need a code at every sign-in.",
+    "qr": "QR code for your authenticator app",
+    "secret": "Key for manual entry",
+    "finish": "Create administrator"
+  },
+  "signin": {
+    "title": "Sign in",
+    "intro": "Administrators sign in with a password and a code from their authenticator app.",
+    "submit": "Sign in"
   },
   "overview": {
     "title": "Server overview",
@@ -33,11 +67,175 @@
       "ok": "The server can reach its database.",
       "unknown": "The server did not report the state of its database."
     },
-    "comingTitle": "More administration is on its way",
-    "comingBody": "First-run setup, users, devices, settings, and the activity log arrive in upcoming releases."
+    "areas": {
+      "users": "Accounts, their devices, and the storage they use.",
+      "settings": "Address, registration, email, and limits.",
+      "activity": "Every sign-in, change, and administrative action."
+    }
+  },
+  "users": {
+    "title": "Users",
+    "intro": "Everyone with an account on this server. Vaults are encrypted on the users' devices: you see how much they store, never what.",
+    "search": "Search by email",
+    "empty": "No accounts yet.",
+    "noMatch": "No account matches this search.",
+    "email": "Email",
+    "status": "Status",
+    "devices": "Devices",
+    "records": "Items",
+    "storage": "Storage",
+    "lastSeen": "Last seen",
+    "created": "Created {date}",
+    "active": "Active",
+    "unconfirmed": "Email not confirmed",
+    "disabled": "Disabled",
+    "deviceCount": "{n} device | {n} devices",
+    "itemCount": "{n} item | {n} items"
+  },
+  "user": {
+    "back": "All users",
+    "summary": "Account summary",
+    "disable": "Disable",
+    "enable": "Enable",
+    "delete": "Delete account",
+    "disableTitle": "Disable {email}?",
+    "disableBody": "Every device of this account stops syncing at once. Nothing is deleted, and you can enable the account again.",
+    "enableTitle": "Enable {email}?",
+    "enableBody": "The account's devices can sync again.",
+    "deleteTitle": "Delete {email}?",
+    "deleteBody": "The account, its devices, and every synced item are deleted from this server for good. Vaults already on the user's devices stay there, locked with the master password.",
+    "devicesTitle": "Devices",
+    "noDevices": "This account has no devices.",
+    "deviceSeen": "Added {created}, last seen {seen}",
+    "revoke": "Remove",
+    "revokeTitle": "Remove {device}?",
+    "revokeBody": "The device stops syncing at once, and the account owner gets an email about it.",
+    "deviceStatus": {
+      "active": "Active",
+      "pending": "Waiting for approval",
+      "revoked": "Removed"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "intro": "How this server runs. A value set in the server's environment wins and cannot be changed here; secret values are never shown.",
+    "saved": "Saved.",
+    "secretSet": "A value is set. Type a new one to replace it.",
+    "lockedHelp": "Set in the server's environment. Change it there and restart the server.",
+    "origin": {
+      "env": "From the environment",
+      "database": "Set here",
+      "default": "Default",
+      "unset": "Not set"
+    },
+    "groups": {
+      "general": "General",
+      "email": "Email",
+      "security": "Devices and limits"
+    },
+    "keys": {
+      "public_url": {
+        "label": "Public address",
+        "help": "The https address apps and emails use to reach this server."
+      },
+      "registration_mode": {
+        "label": "Registration",
+        "help": "Who may create an account. Open registration needs email."
+      },
+      "smtp_host": {
+        "label": "SMTP server",
+        "help": "The host name of the mail server."
+      },
+      "smtp_port": {
+        "label": "SMTP port",
+        "help": "Usually 587 with STARTTLS, or 465 with TLS."
+      },
+      "smtp_security": {
+        "label": "Connection security",
+        "help": "How the connection to the mail server is encrypted."
+      },
+      "smtp_username": {
+        "label": "SMTP username",
+        "help": "Leave empty if the mail server needs no sign-in."
+      },
+      "smtp_password": {
+        "label": "SMTP password",
+        "help": "Stored encrypted and never shown again."
+      },
+      "smtp_from": {
+        "label": "Sender address",
+        "help": "The address every email comes from."
+      },
+      "device_idle_days": {
+        "label": "Device idle limit",
+        "help": "Days a device may stay unused before it must sign in again."
+      },
+      "signin_limit_per_account": {
+        "label": "Failed sign-ins per account",
+        "help": "Allowed in 15 minutes before the account is paused."
+      },
+      "signin_limit_per_address": {
+        "label": "Requests per address",
+        "help": "Account requests allowed from one address in 15 minutes."
+      }
+    },
+    "choices": {
+      "registration_mode": {
+        "closed": "Closed: nobody",
+        "invite": "By invitation",
+        "open": "Open: anyone"
+      },
+      "smtp_security": {
+        "starttls": "STARTTLS",
+        "tls": "TLS",
+        "none": "None (local relay only)"
+      }
+    }
+  },
+  "activity": {
+    "title": "Activity",
+    "intro": "Everything that happened on this server, newest first. Entries cannot be changed or deleted.",
+    "refresh": "Refresh",
+    "empty": "Nothing has happened yet.",
+    "more": "Show older",
+    "settingChange": "{name}: {value}",
+    "sources": {
+      "user": "User",
+      "admin": "Administrator",
+      "system": "System"
+    },
+    "actions": {
+      "admin_created": "Administrator created",
+      "admin_signin": "Administrator signed in",
+      "admin_signin_failed": "Administrator sign-in failed",
+      "setting_changed": "Setting changed",
+      "account_registered": "Account created",
+      "account_disabled": "Account disabled",
+      "account_enabled": "Account enabled",
+      "account_deleted": "Account deleted",
+      "email_verified": "Email confirmed",
+      "signin_failed": "Sign-in failed",
+      "device_pending": "Device waiting for approval",
+      "device_approved": "Device approved",
+      "device_revoked": "Device removed",
+      "password_changed": "Master password changed",
+      "recovery_used": "Recovery key used",
+      "recovery_failed": "Recovery key attempt failed"
+    }
   },
   "errors": {
     "database_unavailable": "The server cannot reach its database. Check the database container and the connection settings.",
-    "unsupported_protocol": "This app version cannot sync with this server. Update the app or the server."
+    "unsupported_protocol": "This app version cannot sync with this server. Update the app or the server.",
+    "invalid_setup_token": "That setup token is not right. Copy it again from the server log; it changes at every restart.",
+    "setup_not_needed": "This server already has an administrator. Sign in instead.",
+    "invalid_totp": "That code is not right. Check the time on your phone and enter the current code.",
+    "invalid_credentials": "The username, password, or code is not right.",
+    "rate_limited": "Too many attempts. Wait a few minutes and try again.",
+    "csrf_failed": "The page lost its session token. Reload the page and try again.",
+    "setting_locked": "This value is set in the server's environment and cannot be changed here.",
+    "invalid_request": "That value is not valid here.",
+    "not_found": "This item no longer exists.",
+    "unauthorized": "Your session ended. Sign in again.",
+    "unknown": "Something went wrong. Try again."
   }
 }

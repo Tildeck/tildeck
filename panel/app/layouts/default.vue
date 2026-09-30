@@ -1,14 +1,20 @@
 <script setup lang="ts">
 // The desk: one dark band across the top carries the brand, the areas, and
-// the operator controls. Everything below is the work surface of the current
-// area, full width. Later phases add areas (users, devices, settings,
-// activity) and the signed-in administrator.
+// the operator controls, with the signed-in administrator. Everything below
+// is the work surface of the current area, full width. Before sign-in the
+// band carries only the brand and the language and theme controls.
 const { t } = useI18n()
 const route = useRoute()
+const { session, signOut } = useAdmin()
 
-const areas = computed(() => [
-  { to: '/', label: t('nav.overview'), on: route.path === '/' },
-])
+const areas = computed(() => session.value
+  ? [
+      { to: '/', label: t('nav.overview'), on: route.path === '/' },
+      { to: '/users', label: t('nav.users'), on: route.path.startsWith('/users') },
+      { to: '/settings', label: t('nav.settings'), on: route.path === '/settings' },
+      { to: '/activity', label: t('nav.activity'), on: route.path === '/activity' },
+    ]
+  : [])
 
 // Which build is running. Quiet, at the bottom, but there: after an upgrade
 // it is the fastest way to see that the new version is really up.
@@ -56,6 +62,19 @@ const control = 'rounded-md border border-desk-ink/25 px-2 py-0.5 text-xs text-d
       <div class="ms-auto hidden items-center gap-2 lg:flex">
         <LocaleToggle :class="control" />
         <ThemeToggle :class="control + ' p-1'" />
+        <template v-if="session">
+          <span
+            class="ms-2 max-w-[10rem] truncate text-sm text-desk-muted"
+            dir="ltr"
+          >{{ session.username }}</span>
+          <button
+            type="button"
+            :class="control"
+            @click="signOut"
+          >
+            {{ t('shell.signOut') }}
+          </button>
+        </template>
       </div>
 
       <button
@@ -109,8 +128,21 @@ const control = 'rounded-md border border-desk-ink/25 px-2 py-0.5 text-xs text-d
         </NuxtLink>
       </nav>
       <div class="mt-3 flex items-center justify-end gap-1.5 px-3">
+        <span
+          v-if="session"
+          class="me-auto truncate text-sm text-desk-muted"
+          dir="ltr"
+        >{{ session.username }}</span>
         <LocaleToggle :class="control" />
         <ThemeToggle :class="control + ' p-1'" />
+        <button
+          v-if="session"
+          type="button"
+          :class="control"
+          @click="signOut"
+        >
+          {{ t('shell.signOut') }}
+        </button>
       </div>
     </div>
 

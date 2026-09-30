@@ -75,19 +75,19 @@ function retry() {
       </div>
     </section>
 
-    <section class="flex items-start gap-4 rounded-2xl bg-tint p-5">
-      <AppLogo
-        :size="32"
-        class="shrink-0"
-      />
-      <div class="flex flex-col gap-1">
-        <h2 class="font-bold">
-          {{ t('overview.comingTitle') }}
-        </h2>
-        <p class="text-sm text-muted">
-          {{ t('overview.comingBody') }}
-        </p>
-      </div>
-    </section>
+    <nav
+      class="grid gap-4 sm:grid-cols-3"
+      :aria-label="t('shell.areas')"
+    >
+      <NuxtLink
+        v-for="area in ['users', 'settings', 'activity']"
+        :key="area"
+        :to="`/${area}`"
+        class="card group flex flex-col gap-1 p-5 transition-colors hover:border-brand"
+      >
+        <span class="font-bold group-hover:text-brand">{{ t(`nav.${area}`) }}</span>
+        <span class="text-sm text-muted">{{ t(`overview.areas.${area}`) }}</span>
+      </NuxtLink>
+    </nav>
   </div>
 </template>
