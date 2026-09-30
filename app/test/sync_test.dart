@@ -287,6 +287,27 @@ void main() {
     expect(b.vault.hosts.single.name, 'v2');
   });
 
+  test('a server restored from a backup still takes the next change', () async {
+    final a = await firstDevice();
+    final id = a.vault.newId();
+    for (final name in ['v1', 'v2', 'v3']) {
+      a.clock.tick();
+      await a.vault.put(host(id, name));
+      await a.sync();
+    }
+    final older = {...server.records[id]!, 'version': 1};
+    // The restored server knows only version 1, from before the backup.
+    server.records[id] = older;
+    a.clock.tick();
+    await a.vault.put(host(id, 'after restore'));
+    await a.sync();
+    expect(a.vault.dirtyRecords, isEmpty);
+    expect(server.records[id]!['version'], 2);
+    final b = await secondDevice(a);
+    await b.sync();
+    expect(b.vault.hosts.single.name, 'after restore');
+  });
+
   test('a large vault pulls in pages', () async {
     final a = await firstDevice();
     for (var i = 0; i < 7; i++) {

@@ -95,7 +95,11 @@ class _AccountPageState extends State<AccountPage> {
               content = PendingDeviceView(
                 pending: _pending!,
                 deviceName: _pending!.deviceName,
-                onDone: () => setState(() => _pending = null),
+                onDone: () {
+                  setState(() => _pending = null);
+                  // Approved: sync now rather than at the next interval.
+                  if (s.vault.account != null) s.engine.sync();
+                },
               );
             } else if (s.vault.account == null) {
               content = AccountForm(
@@ -186,7 +190,6 @@ class _AccountFormState extends State<AccountForm> {
     final password = _password.text;
     final deviceName = _deviceName.text.trim();
     final onRegistered = widget.onRegistered, onPending = widget.onPending, onSignedIn = widget.onSignedIn;
-    _password.clear();
     try {
       final check = await s.checker.check(input);
       if (check is ServerFailed) throw check;
@@ -199,6 +202,7 @@ class _AccountFormState extends State<AccountForm> {
           locale: locale == 'he' ? 'he' : 'en',
           deviceName: deviceName,
         );
+        if (mounted) _password.clear();
         onRegistered?.call(key);
         s.engine.sync();
       } else {
@@ -208,6 +212,7 @@ class _AccountFormState extends State<AccountForm> {
           password: password,
           deviceName: deviceName,
         );
+        if (mounted) _password.clear();
         if (pending != null) {
           onPending(pending);
         } else {

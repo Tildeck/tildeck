@@ -188,7 +188,7 @@ void main() {
       () => vault.account?.deviceId == fresh['id'] && shown(find.byKey(const ValueKey('syncNow'))),
       'the new sign-in',
     );
-    await tap(tester, 'syncNow');
+    // Approval alone starts a sync; nobody presses "Sync now".
     await waitFor(tester, () => shown(find.textContaining('Last synced')), 'a sync');
   });
 

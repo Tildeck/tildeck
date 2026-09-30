@@ -417,6 +417,10 @@ class Vault extends ChangeNotifier {
         // The server has never had this record: it starts at version 1
         // there, whatever its local history, and is re-encrypted for it.
         if (local.version != 1) _records[id] = _reencrypt(local, 1);
+      } else if (current.version + 1 < local.version) {
+        // The server is behind this device (restored from a backup): the
+        // local change becomes the server's next version.
+        _records[id] = _reencrypt(local, current.version + 1);
       } else {
         _merge(current);
       }
