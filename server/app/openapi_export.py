@@ -21,14 +21,16 @@ def contract() -> dict:
     # so an export runs anywhere, without a database or a real key.
     os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://export@localhost:5432/export")
     os.environ.setdefault("CONFIG_ENCRYPTION_KEY", "openapi-export-only")
-    from app.main import app
+    from app.main import _stable_validation_errors, app
 
-    return get_openapi(
+    schema = get_openapi(
         title="Tildeck",
         version=f"protocol-{PROTOCOL_VERSION}",
         description="The Tildeck sync server API.",
         routes=app.routes,
     )
+    _stable_validation_errors(schema)
+    return schema
 
 
 def render() -> str:

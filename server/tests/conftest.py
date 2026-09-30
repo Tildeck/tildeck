@@ -30,6 +30,9 @@ for _var in (
     "SMTP_USERNAME",
     "SMTP_PASSWORD",
     "SMTP_FROM",
+    "DEVICE_IDLE_DAYS",
+    "SIGNIN_LIMIT_PER_ACCOUNT",
+    "SIGNIN_LIMIT_PER_ADDRESS",
 ):
     os.environ.pop(_var, None)
 

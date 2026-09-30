@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Index, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -41,3 +41,59 @@ class AuditEntry(Base):
     entity_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class Account(Base):
+    """A user account. The server holds only what docs/security-model.md
+    allows: hashes of the authentication and recovery keys, the wrapped vault
+    key (twice), and the KDF parameters. Nothing here decrypts a vault."""
+
+    __tablename__ = "accounts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    locale: Mapped[str] = mapped_column(String(8))
+    vault_id: Mapped[str] = mapped_column(String(36))
+    kdf_ops: Mapped[int] = mapped_column(Integer)
+    kdf_mem: Mapped[int] = mapped_column(Integer)
+    kdf_salt: Mapped[str] = mapped_column(String(64))
+    auth_key_hash: Mapped[str] = mapped_column(Text)
+    recovery_auth_hash: Mapped[str] = mapped_column(Text)
+    wrap_pw: Mapped[str] = mapped_column(Text)
+    wrap_rk: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Device(Base):
+    """One device of an account. Its bearer token and its one-time claim token
+    are stored as SHA-256 hashes only."""
+
+    __tablename__ = "devices"
+    __table_args__ = (Index("ix_devices_account", "account_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(100))
+    status: Mapped[str] = mapped_column(String(10))  # pending | active | revoked
+    token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    claim_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EmailToken(Base):
+    """A one-time link sent by email: address verification, or approval of a
+    pending device. Stored as a SHA-256 hash; single use; expires."""
+
+    __tablename__ = "email_tokens"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    purpose: Mapped[str] = mapped_column(String(10))  # verify | approve
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"))
+    device_id: Mapped[str | None] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

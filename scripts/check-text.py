@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 LOCALE_PAIRS = [
     ("panel/i18n/locales/en.json", "panel/i18n/locales/he.json"),
     ("app/lib/l10n/app_en.arb", "app/lib/l10n/app_he.arb"),
+    ("server/app/locales/en.json", "server/app/locales/he.json"),
 ]
 HEBREW_ALLOWED = {he for _, he in LOCALE_PAIRS}
 

@@ -183,14 +183,52 @@ class ApiClient {
           return valueString == 'true' || valueString == '1';
         case 'DateTime':
           return value is DateTime ? value : DateTime.tryParse(value);
+        case 'AccountView':
+          return AccountView.fromJson(value);
+        case 'ClaimRequest':
+          return ClaimRequest.fromJson(value);
+        case 'DeviceInfo':
+          return DeviceInfo.fromJson(value);
+        case 'DeviceView':
+          return DeviceView.fromJson(value);
+        case 'ErrorBody':
+          return ErrorBody.fromJson(value);
         case 'ErrorCode':
           return ErrorCodeTypeTransformer().decode(value);
+        case 'KdfParams':
+          return KdfParams.fromJson(value);
         case 'Liveness':
           return Liveness.fromJson(value);
+        case 'ModelSealed':
+          return ModelSealed.fromJson(value);
+        case 'NewPassword':
+          return NewPassword.fromJson(value);
+        case 'PasswordChange':
+          return PasswordChange.fromJson(value);
+        case 'PreloginRequest':
+          return PreloginRequest.fromJson(value);
+        case 'PreloginResponse':
+          return PreloginResponse.fromJson(value);
         case 'Readiness':
           return Readiness.fromJson(value);
+        case 'RecoveryComplete':
+          return RecoveryComplete.fromJson(value);
+        case 'RecoveryStart':
+          return RecoveryStart.fromJson(value);
+        case 'RecoveryWrap':
+          return RecoveryWrap.fromJson(value);
+        case 'RegisterRequest':
+          return RegisterRequest.fromJson(value);
         case 'ServerInfo':
           return ServerInfo.fromJson(value);
+        case 'SignedIn':
+          return SignedIn.fromJson(value);
+        case 'SigninRequest':
+          return SigninRequest.fromJson(value);
+        case 'SigninResult':
+          return SigninResult.fromJson(value);
+        case 'VaultKeys':
+          return VaultKeys.fromJson(value);
         default:
           dynamic match;
           if (value is List && (match = _regList.firstMatch(targetType)?.group(1)) != null) {

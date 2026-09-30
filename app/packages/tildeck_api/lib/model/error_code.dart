@@ -14,6 +14,24 @@ part of openapi.api;
 enum ErrorCode {
   databaseUnavailable._(r'database_unavailable'),
   unsupportedProtocol._(r'unsupported_protocol'),
+  registrationClosed._(r'registration_closed'),
+  registrationNeedsEmail._(r'registration_needs_email'),
+  registrationInviteRequired._(r'registration_invite_required'),
+  emailTaken._(r'email_taken'),
+  invalidEmail._(r'invalid_email'),
+  invalidCredentials._(r'invalid_credentials'),
+  accountDisabled._(r'account_disabled'),
+  unauthorized._(r'unauthorized'),
+  devicePending._(r'device_pending'),
+  deviceRevoked._(r'device_revoked'),
+  deviceNotFound._(r'device_not_found'),
+  invalidToken._(r'invalid_token'),
+  tokenExpired._(r'token_expired'),
+  recoveryFailed._(r'recovery_failed'),
+  rateLimited._(r'rate_limited'),
+  invalidRequest._(r'invalid_request'),
+  emailUnavailable._(r'email_unavailable'),
+  emailNotVerified._(r'email_not_verified'),
   ;
 
   /// Instantiate a new enum with the provided value.
@@ -75,6 +93,24 @@ class ErrorCodeTypeTransformer {
       switch (data) {
         case r'database_unavailable': return ErrorCode.databaseUnavailable;
         case r'unsupported_protocol': return ErrorCode.unsupportedProtocol;
+        case r'registration_closed': return ErrorCode.registrationClosed;
+        case r'registration_needs_email': return ErrorCode.registrationNeedsEmail;
+        case r'registration_invite_required': return ErrorCode.registrationInviteRequired;
+        case r'email_taken': return ErrorCode.emailTaken;
+        case r'invalid_email': return ErrorCode.invalidEmail;
+        case r'invalid_credentials': return ErrorCode.invalidCredentials;
+        case r'account_disabled': return ErrorCode.accountDisabled;
+        case r'unauthorized': return ErrorCode.unauthorized;
+        case r'device_pending': return ErrorCode.devicePending;
+        case r'device_revoked': return ErrorCode.deviceRevoked;
+        case r'device_not_found': return ErrorCode.deviceNotFound;
+        case r'invalid_token': return ErrorCode.invalidToken;
+        case r'token_expired': return ErrorCode.tokenExpired;
+        case r'recovery_failed': return ErrorCode.recoveryFailed;
+        case r'rate_limited': return ErrorCode.rateLimited;
+        case r'invalid_request': return ErrorCode.invalidRequest;
+        case r'email_unavailable': return ErrorCode.emailUnavailable;
+        case r'email_not_verified': return ErrorCode.emailNotVerified;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
