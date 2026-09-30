@@ -14,7 +14,7 @@
 #   initialize on a bind mount of a Windows drive, where this repository
 #   usually lives. `scripts/local.sh nuke` is the only way to delete it.
 # - APP_ENV is development, so placeholder values from .env.example work.
-# - The server is published on port 8280 of the loopback interface.
+# - The server is published on port 8280.
 
 name: tildeck-dev
 
@@ -34,7 +34,7 @@ services:
     environment:
       APP_ENV: development
     ports:
-      - "127.0.0.1:8280:8080"
+      - "8280:8080"
     networks:
       - tildeck
     depends_on:
