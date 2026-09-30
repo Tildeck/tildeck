@@ -93,3 +93,39 @@
     scrollbar-color: rgb(var(--color-line)) transparent;
   }
 }
+
+/* The panel's controls. One definition each, so every form and table
+   looks the same in both themes and directions. */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-brand text-brand-contrast hover:bg-brand/90;
+  }
+
+  .btn-quiet {
+    @apply border border-line bg-surface text-ink hover:border-brand hover:text-brand;
+  }
+
+  .btn-danger {
+    @apply bg-danger text-white hover:bg-danger/90 dark:text-page;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:opacity-60;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink;
+  }
+
+  .card {
+    @apply rounded-2xl border border-line bg-surface;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold;
+  }
+}
