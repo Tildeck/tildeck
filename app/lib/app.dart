@@ -3,13 +3,18 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'l10n/app_localizations.dart';
 import 'server_check.dart';
 import 'ssh/known_hosts.dart';
 import 'ssh/ssh_connector.dart';
+import 'sync/account_service.dart';
+import 'sync/sync_engine.dart';
+import 'sync/sync_server.dart';
 import 'theme.dart';
+import 'ui/account_page.dart';
 import 'ui/sessions_page.dart';
 import 'ui/vault_gate.dart';
 import 'vault/password_rules.dart';
@@ -25,6 +30,7 @@ class TildeckApp extends StatefulWidget {
     this.vault,
     this.commonPasswords,
     this.checker,
+    this.syncClient,
     this.connector,
     this.showKeyBar,
     this.initialLocale,
@@ -37,6 +43,9 @@ class TildeckApp extends StatefulWidget {
   /// Null loads the built-in list from the app's assets.
   final CommonPasswords? commonPasswords;
   final ServerChecker? checker;
+
+  /// The HTTP client for the sync server. Null uses a default one.
+  final http.Client? syncClient;
 
   /// Null connects with host keys kept in the vault.
   final SshConnector? connector;
@@ -58,6 +67,16 @@ class _TildeckAppState extends State<TildeckApp> {
   late final ServerChecker _checker = widget.checker ?? ServerChecker();
   late final Vault _vault =
       widget.vault ?? Vault(crypto: VaultCrypto.load(), resolveFile: () => _supportFile('vault.json'));
+  late final SyncEngine _engine = SyncEngine(
+    vault: _vault,
+    serverFor: (address) => SyncServer(address, client: widget.syncClient),
+  );
+  late final SyncServices _sync = SyncServices(
+    vault: _vault,
+    engine: _engine,
+    accounts: AccountService(vault: _vault, engine: _engine),
+    checker: _checker,
+  );
   late final VaultKnownHosts _knownHosts = VaultKnownHosts(_vault);
   late final SshConnector _connector = widget.connector ?? SshConnector(knownHosts: _knownHosts);
   late final Future<CommonPasswords> _commonPasswords = widget.commonPasswords != null
@@ -68,6 +87,7 @@ class _TildeckAppState extends State<TildeckApp> {
   @override
   void initState() {
     super.initState();
+    _engine; // Syncs from the first unlock on.
     if (_vault.status == VaultStatus.loading) _vault.load();
     _vault.addListener(_onVault);
   }
@@ -75,6 +95,7 @@ class _TildeckAppState extends State<TildeckApp> {
   @override
   void dispose() {
     _vault.removeListener(_onVault);
+    _engine.dispose();
     if (widget.vault == null) _vault.dispose();
     super.dispose();
   }
@@ -110,13 +131,14 @@ class _TildeckAppState extends State<TildeckApp> {
           return VaultGate(
             vault: _vault,
             commonPasswords: common,
+            sync: _sync,
             unlocked: (context) {
               final current = Localizations.localeOf(context);
               final dark = Theme.of(context).brightness == Brightness.dark;
               return SessionsPage(
                 vault: _vault,
                 connector: _connector,
-                checker: _checker,
+                sync: _sync,
                 showKeyBar: widget.showKeyBar ?? Platform.isAndroid,
                 onToggleLocale: () => setState(() {
                   _locale = current.languageCode == 'he' ? const Locale('en') : const Locale('he');

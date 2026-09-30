@@ -343,6 +343,23 @@ async def test_repeated_failures_are_rate_limited(client, mail):
     assert (await client.post("/api/account/signin", json=right, headers=H)).json() == {"error": "rate_limited"}
 
 
+async def test_a_waiting_device_may_keep_asking_but_wrong_claim_tokens_are_limited(client, mail):
+    keys = Keys("user@example.test")
+    await register(client, keys)
+    await verify(client, mail, keys)
+    phone = device("Phone")
+    res = await client.post(
+        "/api/account/signin", json={"email": keys.email, "auth_key": keys.auth_key, "device": phone}, headers=H
+    )
+    claim = {"device_id": phone["id"], "claim_token": res.json()["claim_token"]}
+    for _ in range(40):
+        assert (await client.post("/api/devices/claim", json=claim, headers=H)).json() == {"error": "device_pending"}
+
+    wrong = {"device_id": phone["id"], "claim_token": "not-the-token"}
+    codes = [(await client.post("/api/devices/claim", json=wrong, headers=H)).status_code for _ in range(31)]
+    assert codes[0] == 401 and codes[-1] == 429
+
+
 async def test_email_follows_the_account_language_and_never_carries_keys(client, mail):
     keys = Keys("hebrew@example.test", locale="he")
     await register(client, keys)

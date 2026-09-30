@@ -58,6 +58,22 @@ class PasswordKeys {
   }
 }
 
+/// The keys derived from the recovery key.
+class RecoveryKeys {
+  RecoveryKeys(this.authKey, this.wrapKey);
+
+  /// `RAK`: proves the recovery key to the sync server.
+  final SecureKey authKey;
+
+  /// `RWK`: wraps the vault key.
+  final SecureKey wrapKey;
+
+  void dispose() {
+    authKey.dispose();
+    wrapKey.dispose();
+  }
+}
+
 /// Wrong master password, or a vault key or record that was tampered with:
 /// the AEAD check failed. Deliberately says nothing more.
 class DecryptionFailed implements Exception {
@@ -74,6 +90,7 @@ class VaultCrypto {
 
   static const _authContext = 'tdauth01';
   static const _wrapContext = 'tdwrap01';
+  static const _recoveryContext = 'tdrecv01';
 
   Aead get _aead => sodium.crypto.aeadXChaCha20Poly1305IETF;
 
@@ -140,6 +157,11 @@ class VaultCrypto {
 
   static Uint8List _wrapAd(String vaultId) => Uint8List.fromList(utf8.encode('tildeck:wrap:password:v1|$vaultId'));
 
+  static Uint8List _recoveryWrapAd(String vaultId) =>
+      Uint8List.fromList(utf8.encode('tildeck:wrap:recovery:v1|$vaultId'));
+
+  static Uint8List _localAd(String vaultId) => Uint8List.fromList(utf8.encode('tildeck:local:v1|$vaultId'));
+
   static Uint8List _recordAd(String vaultId, String recordId, int version) =>
       Uint8List.fromList(utf8.encode('tildeck:record:v1|$vaultId|$recordId|$version'));
 
@@ -175,6 +197,59 @@ class VaultCrypto {
       bytes.fillRange(0, bytes.length, 0);
     }
   }
+
+  /// A new random recovery key `RK`: 32 bytes, shown to the user once.
+  Uint8List newRecoveryKey() => sodium.randombytes.buf(32);
+
+  /// `RAK` and `RWK` from the recovery key.
+  RecoveryKeys recoveryKeys(Uint8List recoveryKey) {
+    final master = SecureKey.fromList(sodium, recoveryKey);
+    try {
+      SecureKey sub(int id) => sodium.crypto.kdf.deriveFromKey(
+        masterKey: master,
+        context: _recoveryContext,
+        subkeyId: BigInt.from(id),
+        subkeyLen: 32,
+      );
+      return RecoveryKeys(sub(1), sub(2));
+    } finally {
+      master.dispose();
+    }
+  }
+
+  /// `wrap_rk`: the vault key sealed under the recovery wrapping key.
+  Sealed wrapVaultKeyForRecovery(SecureKey rwk, SecureKey vaultKey, String vaultId) =>
+      vaultKey.runUnlockedSync((bytes) {
+        final copy = Uint8List.fromList(bytes);
+        try {
+          return _seal(rwk, copy, _recoveryWrapAd(vaultId));
+        } finally {
+          copy.fillRange(0, copy.length, 0);
+        }
+      });
+
+  /// Throws [DecryptionFailed] for a wrong recovery key.
+  SecureKey unwrapVaultKeyForRecovery(SecureKey rwk, Sealed wrapped, String vaultId) {
+    final bytes = _open(rwk, wrapped, _recoveryWrapAd(vaultId));
+    try {
+      return SecureKey.fromList(sodium, bytes);
+    } finally {
+      bytes.fillRange(0, bytes.length, 0);
+    }
+  }
+
+  /// This device's own state (its sync account and device token), sealed
+  /// under the vault key in the local vault file. It never syncs.
+  Sealed encryptLocal(SecureKey vaultKey, String vaultId, Uint8List plaintext) =>
+      _seal(vaultKey, plaintext, _localAd(vaultId));
+
+  Uint8List decryptLocal(SecureKey vaultKey, String vaultId, Sealed sealed) =>
+      _open(vaultKey, sealed, _localAd(vaultId));
+
+  /// The 2-byte checksum written after a recovery key: the first two bytes
+  /// of its BLAKE2b hash (libsodium's shortest output is 16 bytes).
+  Uint8List recoveryChecksum(Uint8List recoveryKey) =>
+      Uint8List.sublistView(sodium.crypto.genericHash(message: recoveryKey, outLen: 16), 0, 2);
 
   Sealed encryptRecord(SecureKey vaultKey, String vaultId, String recordId, int version, Uint8List plaintext) =>
       _seal(vaultKey, plaintext, _recordAd(vaultId, recordId, version));

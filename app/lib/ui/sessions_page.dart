@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
-import '../server_check.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
 import '../theme.dart';
 import '../vault/vault.dart';
+import 'account_page.dart';
 import 'host_key_dialog.dart';
 import 'hosts_page.dart';
-import 'sync_server_page.dart';
 import 'terminal_panel.dart';
 
 /// The main screen: saved hosts, and open SSH sessions in tabs. Terminals
@@ -19,7 +18,7 @@ class SessionsPage extends StatefulWidget {
     super.key,
     required this.vault,
     required this.connector,
-    required this.checker,
+    required this.sync,
     required this.showKeyBar,
     required this.onToggleLocale,
     required this.onToggleTheme,
@@ -27,7 +26,7 @@ class SessionsPage extends StatefulWidget {
 
   final Vault vault;
   final SshConnector connector;
-  final ServerChecker checker;
+  final SyncServices sync;
   final bool showKeyBar;
   final VoidCallback onToggleLocale;
   final VoidCallback onToggleTheme;
@@ -108,12 +107,12 @@ class _SessionsPageState extends State<SessionsPage> {
             onPressed: widget.vault.lock,
           ),
           IconButton(
-            tooltip: t.syncServerTitle,
+            key: const ValueKey('openSync'),
+            tooltip: t.syncTitle,
             color: c.deskMuted,
             icon: const Icon(Icons.cloud_sync_outlined),
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute<void>(builder: (_) => SyncServerPage(checker: widget.checker))),
+            onPressed: () =>
+                Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AccountPage(services: widget.sync))),
           ),
           TextButton(
             onPressed: widget.onToggleLocale,

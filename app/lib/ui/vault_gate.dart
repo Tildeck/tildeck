@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
+import '../sync/account_service.dart';
 import '../theme.dart';
 import '../vault/password_rules.dart';
 import '../vault/vault.dart';
+import 'account_page.dart';
 
 /// Shows the vault's creation or unlock screen until it is open, then
 /// [unlocked]. Once built, [unlocked] stays alive (offstage) while the vault
@@ -19,12 +21,17 @@ class VaultGate extends StatefulWidget {
     required this.vault,
     required this.commonPasswords,
     required this.unlocked,
+    this.sync,
     this.autoLock = const Duration(minutes: 15),
   });
 
   final Vault vault;
   final CommonPasswords commonPasswords;
   final WidgetBuilder unlocked;
+
+  /// Offers signing in to an existing sync account instead of creating a
+  /// vault. Null hides it.
+  final SyncServices? sync;
 
   /// Locks the vault after this long without a key press or a touch.
   final Duration autoLock;
@@ -101,7 +108,11 @@ class _VaultGateState extends State<VaultGate> {
           if (locked)
             switch (status) {
               VaultStatus.loading => const Scaffold(body: Center(child: CircularProgressIndicator())),
-              VaultStatus.missing => CreateVaultPage(vault: widget.vault, commonPasswords: widget.commonPasswords),
+              VaultStatus.missing => CreateVaultPage(
+                vault: widget.vault,
+                commonPasswords: widget.commonPasswords,
+                sync: widget.sync,
+              ),
               _ => UnlockPage(vault: widget.vault),
             },
         ],
@@ -144,10 +155,11 @@ class _VaultScreen extends StatelessWidget {
 }
 
 class CreateVaultPage extends StatefulWidget {
-  const CreateVaultPage({super.key, required this.vault, required this.commonPasswords});
+  const CreateVaultPage({super.key, required this.vault, required this.commonPasswords, this.sync});
 
   final Vault vault;
   final CommonPasswords commonPasswords;
+  final SyncServices? sync;
 
   @override
   State<CreateVaultPage> createState() => _CreateVaultPageState();
@@ -244,7 +256,77 @@ class _CreateVaultPageState extends State<CreateVaultPage> {
           onPressed: _busy ? null : _create,
           child: Text(_busy ? t.working : t.createVaultButton),
         ),
+        if (widget.sync != null) ...[
+          const SizedBox(height: 10),
+          TextButton(
+            key: const ValueKey('haveAccount'),
+            onPressed: _busy
+                ? null
+                : () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => SignInPage(services: widget.sync!))),
+            child: Text(t.haveAccount),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Signs in to an existing sync account on a device with no vault yet: the
+/// vault comes from the account. Closes itself once the vault is open.
+class SignInPage extends StatefulWidget {
+  const SignInPage({super.key, required this.services});
+
+  final SyncServices services;
+
+  @override
+  State<SignInPage> createState() => _SignInPageState();
+}
+
+class _SignInPageState extends State<SignInPage> {
+  PendingDevice? _pending;
+
+  @override
+  void dispose() {
+    _pending?.abandon();
+    super.dispose();
+  }
+
+  void _opened() {
+    if (mounted && widget.services.vault.status == VaultStatus.unlocked) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Scaffold(
+      appBar: AppBar(backgroundColor: c.desk, foregroundColor: c.deskInk),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+              child: _pending == null
+                  ? AccountForm(
+                      services: widget.services,
+                      allowRegister: false,
+                      onPending: (p) => setState(() => _pending = p),
+                      onSignedIn: _opened,
+                    )
+                  : PendingDeviceView(
+                      pending: _pending!,
+                      deviceName: _pending!.deviceName,
+                      onDone: () {
+                        setState(() => _pending = null);
+                        _opened();
+                      },
+                    ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

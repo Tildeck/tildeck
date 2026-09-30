@@ -21,15 +21,20 @@ import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/ssh/terminal_session.dart';
+import 'package:tildeck/sync/account_service.dart';
+import 'package:tildeck/sync/sync_engine.dart';
+import 'package:tildeck/sync/sync_server.dart';
 import 'package:tildeck/theme.dart';
 import 'package:tildeck/ui/connect_form.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
-import 'package:tildeck/ui/sync_server_page.dart';
+import 'package:tildeck/ui/account_page.dart';
 import 'package:tildeck/ui/terminal_panel.dart';
 import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 import 'package:xterm/xterm.dart' show TerminalView;
+
+import 'fake_sync_server.dart';
 
 Future<void> loadFonts() async {
   Future<void> load(String family, List<String> files) async {
@@ -147,6 +152,22 @@ Widget app(Vault vault, String locale, ThemeMode mode) => TildeckApp(
   initialThemeMode: mode,
 );
 
+/// Sync for [vault] against an in-memory server; syncing only on request.
+SyncServices syncServices(Vault vault, FakeSyncServer server) {
+  final engine = SyncEngine(
+    vault: vault,
+    serverFor: (address) => SyncServer(address, client: server.client),
+    changeDelay: const Duration(days: 1),
+    interval: const Duration(days: 1),
+  );
+  return SyncServices(
+    vault: vault,
+    engine: engine,
+    accounts: AccountService(vault: vault, engine: engine),
+    checker: ServerChecker(client: server.client),
+  );
+}
+
 /// Lets asset loading and the first frames finish.
 Future<void> settle(WidgetTester tester) async {
   for (var i = 0; i < 5; i++) {
@@ -263,14 +284,111 @@ void main() {
       );
     });
 
-    testWidgets('sync server $locale ${mode.name}', (tester) async {
+    testWidgets('sync sign in $locale ${mode.name}', (tester) async {
       phone(tester);
-      await tester.pumpWidget(screen(locale, mode, SyncServerPage(checker: ServerChecker(client: readyServer))));
+      final server = FakeSyncServer();
+      final services = (await tester.runAsync(() async => syncServices(await sampleVault(unlocked: true), server)))!;
+      await tester.pumpWidget(screen(locale, mode, AccountPage(services: services)));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'https://sync.example.com');
-      await tester.tap(find.byType(FilledButton));
+      await tester.enterText(find.byKey(const ValueKey('syncAddress')), 'https://sync.example.com');
+      await tester.enterText(find.byKey(const ValueKey('syncEmail')), 'shlomi@example.com');
+      await tester.enterText(find.byKey(const ValueKey('syncDeviceName')), 'Office PC');
       await tester.pumpAndSettle();
-      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/sync_server_${locale}_${mode.name}.png'));
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/sync_sign_in_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('recovery key $locale ${mode.name}', (tester) async {
+      phone(tester);
+      await tester.pumpWidget(
+        screen(
+          locale,
+          mode,
+          Scaffold(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+              child: RecoveryKeyView(
+                recoveryKey: 'K7QD-2M9X-VH4T-8RWC-ZP3N-6YJB-F1GE-5SAK-0T8M-QW2D-HX7C-9VNR-4BJP-E6F',
+                onDone: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/recovery_key_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('sync signed in $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final server = FakeSyncServer()
+        ..account = {'email': 'shlomi@example.com'}
+        ..devices['me'] = {'id': 'me', 'name': 'Office PC', 'status': 'active', 'token': 'token-a'}
+        ..devices['laptop'] = {'id': 'laptop', 'name': 'Travel laptop', 'status': 'active', 'token': 'token-l'}
+        ..devices['phone'] = {'id': 'phone', 'name': 'Pixel 9', 'status': 'pending', 'token': 'token-p'};
+      final services = (await tester.runAsync(() async {
+        final vault = await sampleVault(unlocked: true);
+        await vault.setAccount(
+          const SyncAccount(
+            server: 'https://sync.example.com',
+            email: 'shlomi@example.com',
+            deviceId: 'me',
+            deviceName: 'Office PC',
+            token: 'token-a',
+          ),
+        );
+        return syncServices(vault, server);
+      }))!;
+      services.engine.lastSynced = DateTime.utc(2026, 9, 30, 14, 5);
+      await tester.pumpWidget(screen(locale, mode, AccountPage(services: services)));
+      for (var i = 0; i < 5; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump();
+      }
+      expect(find.byKey(const ValueKey('approve-phone')), findsOneWidget);
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/sync_signed_in_${locale}_${mode.name}.png'),
+      );
+    });
+
+    testWidgets('waiting for approval $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final server = FakeSyncServer();
+      final pending = (await tester.runAsync(() async {
+        final first = syncServices(await sampleVault(unlocked: true), server);
+        await first.accounts.register(
+          address: 'https://sync.example.com',
+          email: 'shlomi@example.com',
+          password: 'orange-kettle-winter-42',
+          locale: 'en',
+          deviceName: 'Office PC',
+        );
+        first.engine.dispose();
+        final dir = await Directory.systemTemp.createTemp('tildeck-golden');
+        final empty = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
+        await empty.load();
+        return syncServices(empty, server).accounts.signIn(
+          address: 'https://sync.example.com',
+          email: 'shlomi@example.com',
+          password: 'orange-kettle-winter-42',
+          deviceName: 'Pixel 9',
+        );
+      }))!;
+      addTearDown(pending.abandon);
+      await tester.pumpWidget(
+        screen(
+          locale,
+          mode,
+          Scaffold(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+              child: PendingDeviceView(pending: pending, deviceName: pending.deviceName, onDone: () {}),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/sync_waiting_${locale}_${mode.name}.png'));
     });
   }
 }

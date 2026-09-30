@@ -8,34 +8,13 @@
   "switchToLight": "Switch to light theme",
   "switchToDark": "Switch to dark theme",
   "connectTitle": "Connect to your sync server",
-  "connectIntro": "Tildeck syncs your hosts and keys through a server you run yourself. Everything is encrypted on this device before it leaves.",
   "serverAddressLabel": "Server address",
   "serverAddressHint": "https://sync.example.com",
-  "checkServer": "Check server",
-  "checking": "Checking",
-  "serverReady": "Server is ready",
-  "serverVersion": "Server version {version}",
-  "@serverVersion": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
-  "protocolVersion": "Sync protocol {version}",
-  "@protocolVersion": {
-    "placeholders": {
-      "version": {
-        "type": "int"
-      }
-    }
-  },
   "errorInvalidAddress": "Enter the full address of your server, starting with https://.",
   "errorUnreachable": "The server did not answer. Check the address and that the server is running.",
   "errorNotTildeck": "This address answered, but it is not a Tildeck server.",
   "errorUnsupportedProtocol": "This app version cannot sync with this server. Update the app or the server.",
   "errorDatabaseUnavailable": "The server cannot reach its database. Ask the server operator to check it.",
-  "syncServerTitle": "Sync server",
   "newConnection": "New connection",
   "newConnectionIntro": "Connect to a server over SSH. Saved hosts arrive with the vault in a later version.",
   "hostLabel": "Host",
@@ -143,5 +122,112 @@
         "type": "String"
       }
     }
-  }
+  },
+  "syncTitle": "Sync",
+  "syncIntro": "Keep your hosts and keys in step across your devices through a Tildeck server you run. Everything is encrypted on this device before it leaves.",
+  "emailLabel": "Email",
+  "deviceNameLabel": "Device name",
+  "masterPasswordProof": "Your vault's master password. It never leaves this device.",
+  "createAccountButton": "Create account",
+  "signInButton": "Sign in",
+  "errorWrongMasterPassword": "That is not this vault's master password.",
+  "errorInvalidCredentials": "Wrong email or master password.",
+  "errorEmailTaken": "An account with this email already exists. Sign in to it instead.",
+  "errorRegistrationClosed": "This server does not accept new accounts.",
+  "errorRegistrationInvite": "This server accepts new accounts by invitation only.",
+  "errorRegistrationNeedsEmail": "This server cannot send email yet, so it cannot accept new accounts.",
+  "errorInvalidEmail": "That email address does not look right.",
+  "errorRateLimited": "Too many attempts. Wait a few minutes and try again.",
+  "errorAccountDisabled": "This account is disabled. Contact the server's administrator.",
+  "errorDeviceRevoked": "This request was removed from the account. Sign in again to ask once more.",
+  "errorDifferentVault": "This account holds a different vault than the one on this device.",
+  "errorSyncFailed": "The server refused the request. Try again later.",
+  "recoveryTitle": "Your recovery key",
+  "recoveryIntro": "If you forget your master password, this key is the only way back into your vault. Write it down or print it, and keep it somewhere safe. Tildeck shows it only this once.",
+  "recoverySaved": "I saved my recovery key somewhere safe",
+  "continueButton": "Continue",
+  "signedInAs": "Signed in as {email}",
+  "@signedInAs": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "onServer": "on {server}",
+  "@onServer": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      }
+    }
+  },
+  "syncNow": "Sync now",
+  "syncing": "Syncing",
+  "lastSynced": "Last synced at {time}",
+  "@lastSynced": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "notSyncedYet": "Not synced yet",
+  "problemEmailNotConfirmed": "Confirm your email address to start syncing: open the link sent to {email}.",
+  "@problemEmailNotConfirmed": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "resendEmail": "Send the link again",
+  "emailSent": "Sent. Check your inbox.",
+  "problemSignedOut": "This device was signed out of the account. Sign in again to keep syncing.",
+  "problemUnreachable": "The server is not reachable right now. Tildeck keeps trying.",
+  "devicesTitle": "Devices",
+  "thisDevice": "This device",
+  "devicePending": "Waiting for approval",
+  "deviceLastSeen": "Last seen {time}",
+  "@deviceLastSeen": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "approveDevice": "Approve",
+  "removeDevice": "Remove",
+  "removeDeviceTitle": "Remove {device}?",
+  "@removeDeviceTitle": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "removeDeviceBody": "It stops syncing at once. Its vault stays on it, locked with the master password.",
+  "signOutOfSync": "Sign out of sync",
+  "signOutBody": "This device stops syncing and is removed from the account. The vault stays on this device.",
+  "pendingTitle": "Approve this device",
+  "pendingBody": "Open Tildeck on one of your other devices and approve \"{device}\" under Sync.",
+  "@pendingBody": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "pendingBodyEmail": "Open Tildeck on one of your other devices and approve \"{device}\" under Sync, or use the link in the email we sent.",
+  "@pendingBodyEmail": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "pendingWaiting": "This screen continues by itself once the device is approved.",
+  "haveAccount": "I already have a sync account",
+  "signInTitle": "Sign in to sync",
+  "signInIntro": "Your vault comes from your server, encrypted, and opens here with your master password."
 }
