@@ -133,12 +133,12 @@ async def test_sign_in_needs_the_password_and_an_unused_code(panel, monkeypatch)
 
 async def test_changes_need_the_csrf_token_and_sessions_expire(panel, monkeypatch):
     csrf, _ = await set_up(panel, monkeypatch)
-    change = {"value": "invite"}
-    res = await panel.put("/api/admin/settings/registration_mode", json=change)
+    change = {"values": {"registration_mode": "invite"}}
+    res = await panel.put("/api/admin/settings", json=change)
     assert (res.status_code, res.json()) == (403, {"error": "csrf_failed"})
-    res = await panel.put("/api/admin/settings/registration_mode", json=change, headers={"X-CSRF-Token": "forged"})
+    res = await panel.put("/api/admin/settings", json=change, headers={"X-CSRF-Token": "forged"})
     assert res.status_code == 403
-    assert (await panel.put("/api/admin/settings/registration_mode", json=change, headers=csrf)).status_code == 204
+    assert (await panel.put("/api/admin/settings", json=change, headers=csrf)).status_code == 204
     assert (await panel.get("/api/admin/settings")).status_code == 200
 
     later = clock.now() + timedelta(minutes=31)
@@ -199,21 +199,24 @@ async def test_administrators_see_metadata_and_manage_accounts(panel, client, ma
 async def test_settings_show_where_values_come_from_and_never_a_secret(panel, monkeypatch):
     csrf, _ = await set_up(panel, monkeypatch)
     secret = "smtp-password-that-must-stay-inside"
-    assert (
-        await panel.put("/api/admin/settings/smtp_password", json={"value": secret}, headers=csrf)
-    ).status_code == 204
-    monkeypatch.setenv("PUBLIC_URL", "https://sync.example.test")
-    res = await panel.put("/api/admin/settings/public_url", json={"value": "https://other.test"}, headers=csrf)
-    assert (res.status_code, res.json()) == (409, {"error": "setting_locked"})
-    bad = await panel.put("/api/admin/settings/smtp_port", json={"value": "not-a-port"}, headers=csrf)
-    assert (bad.status_code, bad.json()) == (422, {"error": "invalid_request"})
-    unknown = await panel.put("/api/admin/settings/nope", json={"value": "x"}, headers=csrf)
-    assert unknown.status_code == 404
 
+    async def save(**values):
+        return await panel.put("/api/admin/settings", json={"values": values}, headers=csrf)
+
+    assert (await save(smtp_password=secret, smtp_host="mail.example.test")).status_code == 204
+    monkeypatch.setenv("PUBLIC_URL", "https://sync.example.test")
+    res = await save(public_url="https://other.test")
+    assert (res.status_code, res.json()) == (409, {"error": "setting_locked", "key": "public_url"})
+    unknown = await save(nope="x")
+    assert (unknown.status_code, unknown.json()) == (404, {"error": "not_found", "key": "nope"})
+
+    # One refused value saves nothing of the page.
+    bad = await save(smtp_host="changed.example.test", smtp_port="not-a-port")
+    assert (bad.status_code, bad.json()) == (422, {"error": "invalid_request", "key": "smtp_port"})
     rows = {r["key"]: r for r in (await panel.get("/api/admin/settings")).json()}
-    assert rows["smtp_password"]["configured"] is True and "value" not in {
-        k for k, v in rows["smtp_password"].items() if v is not None
-    }
+    assert rows["smtp_host"]["value"] == "mail.example.test"
+
+    assert rows["smtp_password"]["configured"] is True and rows["smtp_password"]["value"] is None
     assert rows["public_url"]["locked"] is True and rows["public_url"]["origin"] == "env"
     everything = (await panel.get("/api/admin/settings")).text + (await panel.get("/api/admin/activity")).text
     assert secret not in everything

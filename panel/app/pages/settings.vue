@@ -27,34 +27,49 @@ const LTR = new Set(['public_url', 'smtp_host', 'smtp_port', 'smtp_username', 's
 
 const { data: rows, error, status, refresh } = useAsyncData('admin-settings', () => call<SettingRow[]>('/settings'), { server: false })
 const drafts = reactive<Record<string, string>>({})
-const saving = ref<string | null>(null)
-const results = reactive<Record<string, { ok: boolean, text: string } | undefined>>({})
+const saving = ref(false)
+const saved = ref(false)
+const fieldError = ref<{ key: string, text: string } | null>(null)
+const formError = ref('')
 
-watch(rows, (list) => {
-  for (const row of list ?? []) drafts[row.key] = row.secret ? '' : (row.value ?? '')
-}, { immediate: true })
+function reset() {
+  for (const row of rows.value ?? []) drafts[row.key] = row.secret ? '' : (row.value ?? '')
+  fieldError.value = null
+  formError.value = ''
+}
+watch(rows, reset, { immediate: true })
 
 const byKey = computed(() => Object.fromEntries((rows.value ?? []).map(r => [r.key, r])))
 
 function changed(row: SettingRow): boolean {
   return row.secret ? drafts[row.key] !== '' : drafts[row.key] !== (row.value ?? '')
 }
+const changes = computed(() => (rows.value ?? []).filter(r => !r.locked && changed(r)))
 
-async function save(row: SettingRow) {
-  saving.value = row.key
-  results[row.key] = undefined
+// Every change on the page is saved together: all of it, or none of it.
+async function save() {
+  if (!changes.value.length) return
+  saving.value = true
+  saved.value = false
+  fieldError.value = null
+  formError.value = ''
   try {
-    await call(`/settings/${row.key}`, { method: 'PUT', body: { value: drafts[row.key] } })
-    results[row.key] = { ok: true, text: t('settings.saved') }
+    await call('/settings', { method: 'PUT', body: { values: Object.fromEntries(changes.value.map(r => [r.key, drafts[r.key]])) } })
     await refresh()
+    saved.value = true
   }
   catch (e) {
-    results[row.key] = { ok: false, text: errorText(e) }
+    const key = e instanceof AdminApiError ? e.key : null
+    if (key && byKey.value[key]) fieldError.value = { key, text: errorText(e) }
+    else formError.value = errorText(e)
   }
   finally {
-    saving.value = null
+    saving.value = false
   }
 }
+watch(changes, (list) => {
+  if (list.length) saved.value = false
+})
 
 function origin(row: SettingRow): string {
   if (row.locked) return t('settings.origin.env')
@@ -80,7 +95,11 @@ function origin(row: SettingRow): string {
       @retry="refresh"
     />
 
-    <template v-else>
+    <form
+      v-else
+      class="flex flex-col gap-8 pb-4"
+      @submit.prevent="save"
+    >
       <section
         v-for="group in GROUPS"
         :key="group.id"
@@ -94,10 +113,9 @@ function origin(row: SettingRow): string {
             v-for="key in group.keys"
             :key="key"
           >
-            <form
+            <div
               v-if="byKey[key]"
               class="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-6"
-              @submit.prevent="save(byKey[key]!)"
             >
               <div class="sm:w-2/5">
                 <label
@@ -136,19 +154,15 @@ function origin(row: SettingRow): string {
                   autocomplete="off"
                   spellcheck="false"
                 >
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2">
                   <span
                     class="badge"
                     :class="byKey[key]!.locked ? 'bg-warning/10 text-warning' : 'bg-tint text-muted'"
                   >{{ origin(byKey[key]!) }}</span>
-                  <button
-                    v-if="!byKey[key]!.locked"
-                    type="submit"
-                    class="btn btn-primary ms-auto px-3 py-1.5"
-                    :disabled="!changed(byKey[key]!) || saving === key"
-                  >
-                    {{ saving === key ? t('common.working') : t('common.save') }}
-                  </button>
+                  <span
+                    v-if="!byKey[key]!.locked && changed(byKey[key]!)"
+                    class="badge bg-brand/10 text-brand"
+                  >{{ t('settings.changed') }}</span>
                 </div>
                 <p
                   v-if="byKey[key]!.locked"
@@ -157,18 +171,46 @@ function origin(row: SettingRow): string {
                   {{ t('settings.lockedHelp') }}
                 </p>
                 <p
-                  v-if="results[key]"
-                  class="text-xs"
-                  :class="results[key]!.ok ? 'text-success' : 'text-danger'"
-                  role="status"
+                  v-if="fieldError?.key === key"
+                  class="text-xs text-danger"
+                  role="alert"
                 >
-                  {{ results[key]!.text }}
+                  {{ fieldError.text }}
                 </p>
               </div>
-            </form>
+            </div>
           </template>
         </div>
       </section>
-    </template>
+
+      <!-- Appears only with unsaved changes; saves the whole page at once. -->
+      <div
+        v-if="changes.length || saved || formError"
+        class="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-line bg-page/95 px-4 py-3 backdrop-blur lg:-mx-6 lg:px-6"
+        role="status"
+      >
+        <span
+          class="text-sm"
+          :class="formError ? 'text-danger' : saved && !changes.length ? 'text-success' : 'text-ink'"
+        >{{ formError || (changes.length ? t('settings.unsaved', changes.length) : t('settings.saved')) }}</span>
+        <template v-if="changes.length">
+          <button
+            type="button"
+            class="btn btn-quiet ms-auto"
+            :disabled="saving"
+            @click="reset"
+          >
+            {{ t('settings.discard') }}
+          </button>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            :disabled="saving"
+          >
+            {{ saving ? t('common.working') : t('settings.save') }}
+          </button>
+        </template>
+      </div>
+    </form>
   </div>
 </template>
