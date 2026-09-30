@@ -1,6 +1,29 @@
 {
   "components": {
     "schemas": {
+      "Accepted": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "revision"
+        ],
+        "title": "Accepted",
+        "type": "object"
+      },
       "AccountView": {
         "properties": {
           "devices": {
@@ -49,6 +72,37 @@
           "claim_token"
         ],
         "title": "ClaimRequest",
+        "type": "object"
+      },
+      "Conflict": {
+        "description": "A change that was not the next version. current is what the server\nhas (absent if the change claimed an existing record that does not exist).",
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoredRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "const": "version_conflict",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "current"
+        ],
+        "title": "Conflict",
         "type": "object"
       },
       "DeviceInfo": {
@@ -277,6 +331,80 @@
           "kdf"
         ],
         "title": "PreloginResponse",
+        "type": "object"
+      },
+      "PullResponse": {
+        "properties": {
+          "more": {
+            "description": "More records are waiting beyond this page",
+            "title": "More",
+            "type": "boolean"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/StoredRecord"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "revision": {
+            "description": "The cursor to pull from next time",
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "records",
+          "revision",
+          "more"
+        ],
+        "title": "PullResponse",
+        "type": "object"
+      },
+      "PushRequest": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/SyncRecord"
+            },
+            "maxItems": 500,
+            "title": "Changes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "changes"
+        ],
+        "title": "PushRequest",
+        "type": "object"
+      },
+      "PushResponse": {
+        "properties": {
+          "accepted": {
+            "items": {
+              "$ref": "#/components/schemas/Accepted"
+            },
+            "title": "Accepted",
+            "type": "array"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/Conflict"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "conflicts",
+          "revision"
+        ],
+        "title": "PushResponse",
         "type": "object"
       },
       "Readiness": {
@@ -579,6 +707,107 @@
           "status"
         ],
         "title": "SigninResult",
+        "type": "object"
+      },
+      "StoredRecord": {
+        "properties": {
+          "ct": {
+            "anyOf": [
+              {
+                "maxLength": 1048576,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ct"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "nonce": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nonce"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "deleted",
+          "revision"
+        ],
+        "title": "StoredRecord",
+        "type": "object"
+      },
+      "SyncRecord": {
+        "properties": {
+          "ct": {
+            "anyOf": [
+              {
+                "maxLength": 1048576,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ct"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "nonce": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nonce"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "deleted"
+        ],
+        "title": "SyncRecord",
         "type": "object"
       },
       "VaultKeys": {
@@ -1619,6 +1848,197 @@
         "summary": "Info",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/sync/records": {
+      "get": {
+        "description": "Every record, tombstones included, stored after revision `since`, in\nrevision order.",
+        "operationId": "pullRecords",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Since",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Email address not confirmed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request"
+          }
+        },
+        "summary": "Pull",
+        "tags": [
+          "sync"
+        ]
+      },
+      "post": {
+        "description": "Stores each change that is exactly the next version of its record (1\nfor a new record) and reports the others as conflicts with the current\nrecord. Revisions are assigned in one transaction per push, with the\naccount row locked, so they never collide or go backwards.",
+        "operationId": "pushRecords",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Email address not confirmed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request"
+          }
+        },
+        "summary": "Push",
+        "tags": [
+          "sync"
         ]
       }
     }

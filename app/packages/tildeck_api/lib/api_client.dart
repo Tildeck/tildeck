@@ -183,10 +183,14 @@ class ApiClient {
           return valueString == 'true' || valueString == '1';
         case 'DateTime':
           return value is DateTime ? value : DateTime.tryParse(value);
+        case 'Accepted':
+          return Accepted.fromJson(value);
         case 'AccountView':
           return AccountView.fromJson(value);
         case 'ClaimRequest':
           return ClaimRequest.fromJson(value);
+        case 'Conflict':
+          return Conflict.fromJson(value);
         case 'DeviceInfo':
           return DeviceInfo.fromJson(value);
         case 'DeviceView':
@@ -209,6 +213,12 @@ class ApiClient {
           return PreloginRequest.fromJson(value);
         case 'PreloginResponse':
           return PreloginResponse.fromJson(value);
+        case 'PullResponse':
+          return PullResponse.fromJson(value);
+        case 'PushRequest':
+          return PushRequest.fromJson(value);
+        case 'PushResponse':
+          return PushResponse.fromJson(value);
         case 'Readiness':
           return Readiness.fromJson(value);
         case 'RecoveryComplete':
@@ -227,6 +237,10 @@ class ApiClient {
           return SigninRequest.fromJson(value);
         case 'SigninResult':
           return SigninResult.fromJson(value);
+        case 'StoredRecord':
+          return StoredRecord.fromJson(value);
+        case 'SyncRecord':
+          return SyncRecord.fromJson(value);
         case 'VaultKeys':
           return VaultKeys.fromJson(value);
         default:
