@@ -21,7 +21,9 @@ dependencies:
   path_provider: ^2.1.5
   tildeck_api:
     path: packages/tildeck_api
-  xterm: ^4.0.0
+  # A patched copy of xterm 4.0.0: see third_party/xterm/PATCHES.md.
+  xterm:
+    path: third_party/xterm
 
 dev_dependencies:
   flutter_test:

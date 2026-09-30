@@ -9,3 +9,5 @@ analyzer:
     # from the ARB files (flutter gen-l10n).
     - packages/tildeck_api/**
     - lib/l10n/app_localizations*.dart
+    # Vendored third-party code, kept as upstream wrote it.
+    - third_party/**
