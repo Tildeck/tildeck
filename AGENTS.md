@@ -44,6 +44,7 @@ Before reporting work as done, run `scripts/verify.sh --changed` (or `--area <na
 - Commit with the repository-local noreply email (`git config user.email` in this checkout). The GitHub account rejects pushes whose commits carry a private email.
 - A container's runtime UID is the UID of its PID 1. `docker exec ... id -u` reports the exec session's user instead.
 
+- Flutter's native build hooks fail on Windows when the Flutter SDK path contains a space (`'C:\Users\First' is not recognized`). Install Flutter at a path without spaces, such as `C:\src\flutter`; `scripts/windows.ps1` refuses otherwise.
 - Flutter cannot build the Windows desktop app from WSL or Linux. Use `scripts/windows.ps1` locally; CI builds it on a Windows runner.
 - Android blocks cleartext HTTP by default, so sync deployments need HTTPS.
 - The Android application ID `com.tildeck.app` cannot change after the first public release.

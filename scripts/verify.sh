@@ -33,6 +33,8 @@ RUN_ID="verify-$$-$(date +%s)"
 NET="tildeck-$RUN_ID"
 PG_CONTAINER="tildeck-$RUN_ID-db"
 CONTRACT_DIR="out/$RUN_ID-contract"
+SSH_NET="tildeck-$RUN_ID-ssh"
+SSH_CONTAINER="tildeck-$RUN_ID-sshd"
 SERVER_TEST_IMAGE="tildeck-server:verify"
 SERVER_RUNTIME_IMAGE="tildeck-server:verify-runtime"
 
@@ -43,6 +45,8 @@ cleanup() {
   # would leave an anonymous volume behind.
   docker rm -f -v "$PG_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
+  docker rm -f -v "$SSH_CONTAINER" >/dev/null 2>&1 || true
+  docker network rm "$SSH_NET" >/dev/null 2>&1 || true
   rm -rf "${ROOT:?}/$CONTRACT_DIR"
 }
 trap cleanup EXIT
@@ -161,7 +165,50 @@ verify_image() {
   log "runtime image: user $user (UID $uid), panel included, health check calls /api/health/ready"
 }
 
+# A throwaway OpenSSH server for the client's SSH tests, with a password,
+# a plain Ed25519 key, and a passphrase-protected one. Everything it holds is
+# generated here for this run and removed with the container.
+start_test_sshd() {
+  local password key_pass waited=0
+  password="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')"
+  key_pass="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')"
+  docker network create "$SSH_NET" >/dev/null || return 1
+  docker run -d --name "$SSH_CONTAINER" --network "$SSH_NET" \
+    -e PUID=1000 -e PGID=1000 -e USER_NAME=tildeck -e "USER_PASSWORD=$password" -e PASSWORD_ACCESS=true \
+    "$(toolchain_image openssh)" >/dev/null || return 1
+  until docker exec "$SSH_CONTAINER" nc -z 127.0.0.1 2222 >/dev/null 2>&1; do
+    sleep 1
+    waited=$((waited + 1))
+    if ((waited >= 90)); then
+      err "The test SSH server did not start within 90s."
+      docker logs --tail 20 "$SSH_CONTAINER" >&2 || true
+      return 1
+    fi
+  done
+  # Keys are generated as the account's user, so authorized_keys has the
+  # owner and mode sshd insists on.
+  docker exec -u tildeck -e "KEY_PASS=$key_pass" "$SSH_CONTAINER" sh -c '
+    ssh-keygen -q -t ed25519 -N "" -f /tmp/plain &&
+    ssh-keygen -q -t ed25519 -N "$KEY_PASS" -f /tmp/encrypted &&
+    cat /tmp/plain.pub /tmp/encrypted.pub >> /config/.ssh/authorized_keys &&
+    chmod 600 /config/.ssh/authorized_keys' || return 1
+  FLUTTER_DOCKER_ARGS=(
+    --network "$SSH_NET"
+    -e TILDECK_REQUIRE_SSH_TESTS=1
+    -e "TILDECK_TEST_SSH_HOST=$SSH_CONTAINER"
+    -e TILDECK_TEST_SSH_PORT=2222
+    -e TILDECK_TEST_SSH_USER=tildeck
+    -e "TILDECK_TEST_SSH_PASSWORD=$password"
+    -e "TILDECK_TEST_SSH_KEY=$(docker exec "$SSH_CONTAINER" cat /tmp/plain)"
+    -e "TILDECK_TEST_SSH_KEY_ENCRYPTED=$(docker exec "$SSH_CONTAINER" cat /tmp/encrypted)"
+    -e "TILDECK_TEST_SSH_KEY_PASSPHRASE=$key_pass"
+  )
+}
+
 verify_app() {
+  section "app: a throwaway OpenSSH server for the SSH tests"
+  start_test_sshd || return 1
+
   section "app: format, analyze, tests and golden images, debug APK"
   # Formatting covers the code this repository owns; generated code (the API
   # client, gen-l10n output) is excluded. Single quotes on purpose: the
@@ -179,6 +226,7 @@ verify_app() {
     echo "-- flutter build apk --debug"
     flutter build apk --debug --build-name='"$(version)"'
   ' || return 1
+  FLUTTER_DOCKER_ARGS=()
 }
 
 verify_contract() {

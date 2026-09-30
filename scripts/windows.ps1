@@ -54,6 +54,11 @@ function Test-Prerequisites {
     if (-not $flutter) {
         $problems += 'Flutter is not installed or not on PATH. Install it from https://docs.flutter.dev/get-started/install/windows/desktop and reopen the terminal.'
     }
+    elseif ($flutter.Source -match ' ') {
+        # Flutter's native build hooks run the SDK's dart.exe unquoted, so the
+        # build fails with "'C:\Users\First' is not recognized".
+        $problems += "Flutter is installed under a path with a space ($(Split-Path (Split-Path $flutter.Source))). Move it to a path without spaces, for example C:\src\flutter, and update PATH."
+    }
 
     # Visual Studio or Build Tools with the C++ desktop toolchain. vswhere
     # ships with every Visual Studio installer.
