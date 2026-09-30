@@ -46,6 +46,10 @@ updates:
       # Pinned by the Flutter SDK through flutter_localizations; it moves
       # with the Flutter toolchain pin, never on its own.
       - dependency-name: "intl"
+      # sodium 4.1 needs Dart 3.13; the pinned Flutter 3.44 ships Dart 3.12.
+      # Moves with the Flutter toolchain pin.
+      - dependency-name: "sodium"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     open-pull-requests-limit: 5
 
   # The images the server is built on (Node, Python, uv).

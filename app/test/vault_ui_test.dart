@@ -13,7 +13,7 @@ import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
 void main() {
-  testWidgets('create, save a host, lock, and unlock', (tester) async {
+  testWidgets('create, save a host, auto-lock, lock, and unlock', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -75,6 +75,25 @@ void main() {
       'the saved host in the list',
     );
     expect(find.text('Production'), findsOneWidget);
+
+    // Auto-lock while a screen with vault data is open on top: the editor,
+    // with a password typed into it, must not survive the lock.
+    await tester.tap(find.byKey(const ValueKey('addHost')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('hostName')), 'Half-typed secret host');
+    await tester.pump(const Duration(minutes: 15, seconds: 1));
+    await waitFor(
+      () =>
+          find.byKey(const ValueKey('unlock')).evaluate().isNotEmpty &&
+          find.byKey(const ValueKey('hostName')).evaluate().isEmpty,
+      'the unlock screen, with the editor closed, after the idle timer',
+    );
+    expect(find.byKey(const ValueKey('hostName')), findsNothing, reason: 'screens above the vault close when it locks');
+    expect(find.text('Half-typed secret host'), findsNothing);
+
+    await tester.enterText(find.byKey(const ValueKey('unlockPassword')), password);
+    await tester.tap(find.byKey(const ValueKey('unlock')));
+    await waitFor(() => find.text('Web 01').evaluate().isNotEmpty, 'the host after unlocking');
 
     await tester.tap(find.byKey(const ValueKey('lockVault')));
     await waitFor(() => find.byKey(const ValueKey('unlock')).evaluate().isNotEmpty, 'the unlock screen');

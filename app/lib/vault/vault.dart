@@ -224,13 +224,17 @@ class Vault extends ChangeNotifier {
       'wrap_pw': _wrapPw!.toJson(),
       'records': [for (final r in _records.values) r.toJson()],
     });
-    return _writes = _writes.then((_) async {
+    // A failed write (a full disk, a permission problem) fails this save for
+    // its caller, but must not poison the queue for every later write.
+    final write = _writes.catchError((Object _) {}).then((_) async {
       final file = await _vaultFile;
       await file.parent.create(recursive: true);
       final tmp = File('${file.path}.tmp');
       await tmp.writeAsString(snapshot, flush: true);
       await tmp.rename(file.path);
     });
+    _writes = write;
+    return write;
   }
 
   @override

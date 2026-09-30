@@ -53,7 +53,18 @@ class _VaultGateState extends State<VaultGate> {
   }
 
   void _changed() {
-    if (widget.vault.status == VaultStatus.unlocked) _touch();
+    final status = widget.vault.status;
+    if (status == VaultStatus.unlocked) {
+      _touch();
+    } else if (status == VaultStatus.locked) {
+      _idle?.cancel();
+      // Screens and dialogs opened from the vault (an editor with a typed
+      // password, the keys list, a password prompt) sit on the app's
+      // navigator above this gate; they must not survive the lock.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+      });
+    }
     setState(() {});
   }
 
