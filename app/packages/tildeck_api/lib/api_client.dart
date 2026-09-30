@@ -195,22 +195,16 @@ class ApiClient {
           return ErrorBody.fromJson(value);
         case 'ErrorCode':
           return ErrorCodeTypeTransformer().decode(value);
-        case 'HTTPValidationError':
-          return HTTPValidationError.fromJson(value);
         case 'KdfParams':
           return KdfParams.fromJson(value);
         case 'Liveness':
           return Liveness.fromJson(value);
-        case 'LocationInner':
-          return LocationInner.fromJson(value);
         case 'ModelSealed':
           return ModelSealed.fromJson(value);
         case 'NewPassword':
           return NewPassword.fromJson(value);
         case 'PasswordChange':
           return PasswordChange.fromJson(value);
-        case 'PendingApproval':
-          return PendingApproval.fromJson(value);
         case 'PreloginRequest':
           return PreloginRequest.fromJson(value);
         case 'PreloginResponse':
@@ -225,16 +219,14 @@ class ApiClient {
           return RecoveryWrap.fromJson(value);
         case 'RegisterRequest':
           return RegisterRequest.fromJson(value);
-        case 'ResponseSignin':
-          return ResponseSignin.fromJson(value);
         case 'ServerInfo':
           return ServerInfo.fromJson(value);
         case 'SignedIn':
           return SignedIn.fromJson(value);
         case 'SigninRequest':
           return SigninRequest.fromJson(value);
-        case 'ValidationError':
-          return ValidationError.fromJson(value);
+        case 'SigninResult':
+          return SigninResult.fromJson(value);
         case 'VaultKeys':
           return VaultKeys.fromJson(value);
         default:

@@ -4,6 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -11,7 +12,7 @@ from app import migrations_runner, panel, settings_store
 from app.config import get_app_version, get_settings
 from app.db import async_session
 from app.mailer import SmtpMailer
-from app.protocol import ApiError
+from app.protocol import ApiError, ErrorCode
 from app.routers import account, health, links
 
 # Uvicorn configures only its own loggers. Without this every app log line
@@ -62,12 +63,44 @@ def create_app() -> FastAPI:
     async def api_error(request: Request, exc: ApiError) -> JSONResponse:
         return JSONResponse({"error": exc.code.value}, status_code=exc.status_code)
 
+    # A malformed request gets the same stable error body as every refusal.
+    # The field details stay out of the answer: clients never show them.
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
+        return JSONResponse({"error": ErrorCode.invalid_request.value}, status_code=422)
+
+    def contract() -> dict:
+        """FastAPI documents its own validation error body on every route; the
+        server answers with the stable error body instead, so the contract
+        says so (and the generated client gets one error type)."""
+        if app.openapi_schema is None:
+            from fastapi.openapi.utils import get_openapi
+
+            schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+            _stable_validation_errors(schema)
+            app.openapi_schema = schema
+        return app.openapi_schema
+
+    app.openapi = contract
+
     app.include_router(health.router)
     app.include_router(account.router)
     app.include_router(links.router)
     # Last: the panel's catch-all route must not shadow any API route.
     panel.mount(app, get_settings().PANEL_DIR)
     return app
+
+
+def _stable_validation_errors(schema: dict) -> None:
+    components = schema.get("components", {}).get("schemas", {})
+    components.pop("HTTPValidationError", None)
+    components.pop("ValidationError", None)
+    for path in schema.get("paths", {}).values():
+        for operation in path.values():
+            response = operation.get("responses", {}).get("422")
+            if response is not None:
+                response["description"] = "Invalid request"
+                response["content"] = {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorBody"}}}
 
 
 app = create_app()

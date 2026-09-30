@@ -636,7 +636,7 @@ class AccountApi {
   /// * [SigninRequest] signinRequest (required):
   ///
   /// * [int] tildeckProtocol:
-  Future<ResponseSignin?> signin(SigninRequest signinRequest, { int? tildeckProtocol, Future<void>? abortTrigger, }) async {
+  Future<SigninResult?> signin(SigninRequest signinRequest, { int? tildeckProtocol, Future<void>? abortTrigger, }) async {
     final response = await signinWithHttpInfo(signinRequest, tildeckProtocol: tildeckProtocol, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
@@ -645,7 +645,7 @@ class AccountApi {
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
     if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'ResponseSignin',) as ResponseSignin;
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SigninResult',) as SigninResult;
     
     }
     return null;

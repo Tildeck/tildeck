@@ -155,24 +155,12 @@
           "token_expired",
           "recovery_failed",
           "rate_limited",
+          "invalid_request",
           "email_unavailable",
           "email_not_verified"
         ],
         "title": "ErrorCode",
         "type": "string"
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "title": "Detail",
-            "type": "array"
-          }
-        },
-        "title": "HTTPValidationError",
-        "type": "object"
       },
       "KdfParams": {
         "description": "Argon2id parameters chosen by the client; the server enforces the\nminimum of the security model and stores them for the next sign-in.",
@@ -263,36 +251,6 @@
           "new"
         ],
         "title": "PasswordChange",
-        "type": "object"
-      },
-      "PendingApproval": {
-        "properties": {
-          "claim_token": {
-            "title": "Claim Token",
-            "type": "string"
-          },
-          "device_id": {
-            "title": "Device Id",
-            "type": "string"
-          },
-          "email_approval": {
-            "description": "An approval link was sent by email",
-            "title": "Email Approval",
-            "type": "boolean"
-          },
-          "status": {
-            "const": "pending",
-            "default": "pending",
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "device_id",
-          "claim_token",
-          "email_approval"
-        ],
-        "title": "PendingApproval",
         "type": "object"
       },
       "PreloginRequest": {
@@ -439,10 +397,7 @@
           },
           "locale": {
             "default": "en",
-            "enum": [
-              "en",
-              "he"
-            ],
+            "pattern": "^(en|he)$",
             "title": "Locale",
             "type": "string"
           },
@@ -519,6 +474,7 @@
         "type": "object"
       },
       "SignedIn": {
+        "description": "A device that may open the vault: its token and the wrapped key.",
         "properties": {
           "device_token": {
             "title": "Device Token",
@@ -527,12 +483,6 @@
           "email_verified": {
             "title": "Email Verified",
             "type": "boolean"
-          },
-          "status": {
-            "const": "active",
-            "default": "active",
-            "title": "Status",
-            "type": "string"
           },
           "vault": {
             "$ref": "#/components/schemas/VaultKeys"
@@ -569,44 +519,66 @@
         "title": "SigninRequest",
         "type": "object"
       },
-      "ValidationError": {
+      "SigninResult": {
+        "description": "The answer to a sign-in: either the device is active (signed_in) or it\nwaits for approval (pending). One shape, so clients switch on status.",
         "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
+          "claim_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Token"
           },
-          "input": {
-            "title": "Input"
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
           },
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "title": "Location",
-            "type": "array"
+          "email_approval": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An approval link was sent by email",
+            "title": "Email Approval"
           },
-          "msg": {
-            "title": "Message",
-            "type": "string"
+          "signed_in": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SignedIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
-          "type": {
-            "title": "Error Type",
+          "status": {
+            "enum": [
+              "active",
+              "pending"
+            ],
+            "title": "Status",
             "type": "string"
           }
         },
         "required": [
-          "loc",
-          "msg",
-          "type"
+          "status"
         ],
-        "title": "ValidationError",
+        "title": "SigninResult",
         "type": "object"
       },
       "VaultKeys": {
@@ -702,11 +674,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           }
         },
         "summary": "Get Account",
@@ -781,11 +753,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           },
           "429": {
             "content": {
@@ -851,11 +823,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           },
           "429": {
             "content": {
@@ -931,11 +903,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           },
           "429": {
             "content": {
@@ -1011,11 +983,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           },
           "429": {
             "content": {
@@ -1161,15 +1133,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/SignedIn"
-                    },
-                    {
-                      "$ref": "#/components/schemas/PendingApproval"
-                    }
-                  ],
-                  "title": "Response Signin"
+                  "$ref": "#/components/schemas/SigninResult"
                 }
               }
             },
@@ -1209,11 +1173,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           },
           "429": {
             "content": {
@@ -1287,11 +1251,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           },
           "503": {
             "content": {
@@ -1377,11 +1341,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           },
           "429": {
             "content": {
@@ -1484,11 +1448,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           }
         },
         "summary": "Approve",
@@ -1572,11 +1536,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid request"
           }
         },
         "summary": "Revoke",

@@ -17,7 +17,7 @@ class RegisterRequest {
     required this.device,
     required this.email,
     required this.kdf,
-    this.locale = const RegisterRequestLocaleEnum._('en'),
+    this.locale = 'en',
     required this.recoveryAuthKey,
     required this.vaultId,
     required this.wrapPw,
@@ -32,7 +32,7 @@ class RegisterRequest {
 
   KdfParams kdf;
 
-  RegisterRequestLocaleEnum locale;
+  String locale;
 
   String recoveryAuthKey;
 
@@ -119,7 +119,7 @@ class RegisterRequest {
         device: DeviceInfo.fromJson(json[r'device'])!,
         email: mapValueOfType<String>(json, r'email')!,
         kdf: KdfParams.fromJson(json[r'kdf'])!,
-        locale: RegisterRequestLocaleEnum.fromJson(json[r'locale']) ?? const RegisterRequestLocaleEnum._('en'),
+        locale: mapValueOfType<String>(json, r'locale') ?? 'en',
         recoveryAuthKey: mapValueOfType<String>(json, r'recovery_auth_key')!,
         vaultId: mapValueOfType<String>(json, r'vault_id')!,
         wrapPw: ModelSealed.fromJson(json[r'wrap_pw'])!,
@@ -181,82 +181,4 @@ class RegisterRequest {
     'wrap_rk',
   };
 }
-
-
-enum RegisterRequestLocaleEnum {
-  en._(r'en'),
-  he._(r'he'),
-  ;
-
-  /// Instantiate a new enum with the provided value.
-  const RegisterRequestLocaleEnum._(this._value);
-
-  /// The underlying value of this enum member.
-  final String _value;
-
-  @override
-  String toString() => _value;
-
-  /// Encodes this enum as a value suitable for JSON.
-  String toJson() => _value;
-
-  /// Returns the instance of [RegisterRequestLocaleEnum] that was successfully decoded
-  /// from the passed [value] on success, null otherwise.
-  static RegisterRequestLocaleEnum? fromJson(dynamic value) => RegisterRequestLocaleEnumTypeTransformer().decode(value);
-
-  /// Returns a [List] containing instances of [RegisterRequestLocaleEnum]
-  /// that were successfully decoded from the passed [JSON][json].
-  static List<RegisterRequestLocaleEnum> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <RegisterRequestLocaleEnum>[];
-    if (json is List && json.isNotEmpty) {
-      for (final row in json) {
-        final value = RegisterRequestLocaleEnum.fromJson(row);
-        if (value != null) {
-          result.add(value);
-        }
-      }
-    }
-    return result.toList(growable: growable);
-  }
-}
-
-/// Transformation class that can [encode] an instance of [RegisterRequestLocaleEnum] to String,
-/// and [decode] dynamic data back to [RegisterRequestLocaleEnum].
-class RegisterRequestLocaleEnumTypeTransformer {
-  factory RegisterRequestLocaleEnumTypeTransformer() => _instance ??= const RegisterRequestLocaleEnumTypeTransformer._();
-
-  const RegisterRequestLocaleEnumTypeTransformer._();
-
-  String encode(RegisterRequestLocaleEnum data) => data._value;
-
-  /// Returns the instance of [RegisterRequestLocaleEnum] that was successfully decoded
-  /// from the passed [data] value on success, null otherwise.
-  ///
-  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
-  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
-  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
-  ///
-  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
-  /// and users are still using an old app with the old code.
-  RegisterRequestLocaleEnum? decode(dynamic data, {bool allowNull = true}) {
-    if (data is RegisterRequestLocaleEnum) {
-      return data;
-    }
-    if (data != null) {
-      switch (data) {
-        case r'en': return RegisterRequestLocaleEnum.en;
-        case r'he': return RegisterRequestLocaleEnum.he;
-        default:
-          if (!allowNull) {
-            throw ArgumentError('Unknown enum value to decode: $data');
-          }
-      }
-    }
-    return null;
-  }
-
-  /// The singleton instance of this transformer.
-  static RegisterRequestLocaleEnumTypeTransformer? _instance;
-}
-
 

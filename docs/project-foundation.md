@@ -269,6 +269,7 @@ Approved by Shlomi on 2026-09-30: the working version is the full first-release 
 - Rate limits count in memory per server process and reset on a restart.
 - The security model gained a clarification of how an approved device collects its vault key (a one-time claim token held only by the pending device); the approved decisions are unchanged.
 - Tests (33 in the server area): the protocol header, pre-login, registration modes, verification links (single use, expiring), sign-in failures that look the same for known and unknown addresses, a pending device that cannot collect before approval or with a wrong claim token, an approval link that approves only on the button, re-sign-in of an approved device, revocation, idle expiry, password change signing out other devices, recovery, the rate limit, Hebrew emails, no key or wrap in any email, and delivery through a real SMTP server (without TLS: STARTTLS and TLS are not exercised, because the test server has no certificate).
+- Contract rules learned from the Dart generator (CI caught it: the generated client did not compile): no response unions (sign-in returns one `SigninResult` with a `status`), no `Literal` fields with a default value, and no FastAPI validation error schema. Malformed requests answer `422` with the stable `invalid_request` error body, and the contract documents that body instead.
 - To try the account flow end to end later, the server needs an SMTP provider configured (in `.env` or the panel) and `PUBLIC_URL` set to the address behind the HTTPS proxy.
 
 ## Required workflow contracts

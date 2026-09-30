@@ -29,6 +29,7 @@ enum ErrorCode {
   tokenExpired._(r'token_expired'),
   recoveryFailed._(r'recovery_failed'),
   rateLimited._(r'rate_limited'),
+  invalidRequest._(r'invalid_request'),
   emailUnavailable._(r'email_unavailable'),
   emailNotVerified._(r'email_not_verified'),
   ;
@@ -107,6 +108,7 @@ class ErrorCodeTypeTransformer {
         case r'token_expired': return ErrorCode.tokenExpired;
         case r'recovery_failed': return ErrorCode.recoveryFailed;
         case r'rate_limited': return ErrorCode.rateLimited;
+        case r'invalid_request': return ErrorCode.invalidRequest;
         case r'email_unavailable': return ErrorCode.emailUnavailable;
         case r'email_not_verified': return ErrorCode.emailNotVerified;
         default:

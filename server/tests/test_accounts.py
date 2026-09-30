@@ -196,7 +196,7 @@ async def test_a_new_device_waits_for_approval_and_only_it_can_collect_the_vault
     assert res.status_code == 202
     pending = res.json()
     assert pending["status"] == "pending" and pending["email_approval"] is True
-    assert "vault" not in pending and "device_token" not in pending
+    assert pending["signed_in"] is None, "a pending device gets no token and no vault key"
 
     # Before approval: nothing to collect; a wrong claim token is refused.
     claim = {"device_id": phone["id"], "claim_token": pending["claim_token"]}
@@ -248,6 +248,7 @@ async def test_an_existing_device_approves_and_revokes(client, mail):
         "/api/account/signin", json={"email": keys.email, "auth_key": keys.auth_key, "device": phone}, headers=H
     )
     assert again.status_code == 200 and again.json()["status"] == "active"
+    assert again.json()["signed_in"]["vault"]["wrap_pw"] == keys.wrap_pw
 
     assert (await client.post(f"/api/devices/{phone['id']}/revoke", headers=bearer(first))).status_code == 204
     assert (await client.get("/api/account", headers=bearer(phone_token))).status_code == 401
@@ -384,3 +385,10 @@ async def test_mail_goes_out_over_smtp(client, mail, monkeypatch):
         assert b"/links/verify/" in envelope.content
     finally:
         controller.stop()
+
+
+async def test_a_malformed_request_gets_the_stable_error_body(client, mail):
+    res = await client.post("/api/account/signin", json={"email": "a@example.test"}, headers=H)
+    assert (res.status_code, res.json()) == (422, {"error": "invalid_request"})
+    bad_key = {"email": "a@example.test", "auth_key": "short", "device": device()}
+    assert (await client.post("/api/account/signin", json=bad_key, headers=H)).json() == {"error": "invalid_request"}

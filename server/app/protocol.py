@@ -35,6 +35,7 @@ class ErrorCode(StrEnum):
     token_expired = "token_expired"
     recovery_failed = "recovery_failed"
     rate_limited = "rate_limited"
+    invalid_request = "invalid_request"
     # Email.
     email_unavailable = "email_unavailable"
     email_not_verified = "email_not_verified"

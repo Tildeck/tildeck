@@ -56,7 +56,7 @@ class PreloginResponse(BaseModel):
 
 class RegisterRequest(BaseModel):
     email: str = Field(max_length=320)
-    locale: Literal["en", "he"] = "en"
+    locale: str = Field(default="en", pattern="^(en|he)$")
     vault_id: str = Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
     kdf: KdfParams
     auth_key: str
@@ -77,17 +77,22 @@ class VaultKeys(BaseModel):
 
 
 class SignedIn(BaseModel):
-    status: Literal["active"] = "active"
+    """A device that may open the vault: its token and the wrapped key."""
+
     device_token: str
     email_verified: bool
     vault: VaultKeys
 
 
-class PendingApproval(BaseModel):
-    status: Literal["pending"] = "pending"
-    device_id: str
-    claim_token: str
-    email_approval: bool = Field(description="An approval link was sent by email")
+class SigninResult(BaseModel):
+    """The answer to a sign-in: either the device is active (signed_in) or it
+    waits for approval (pending). One shape, so clients switch on status."""
+
+    status: Literal["active", "pending"]
+    signed_in: SignedIn | None = None
+    device_id: str | None = None
+    claim_token: str | None = None
+    email_approval: bool | None = Field(default=None, description="An approval link was sent by email")
 
 
 class SigninRequest(BaseModel):
@@ -352,7 +357,7 @@ async def register(body: RegisterRequest, request: Request, session: AsyncSessio
 
 @router.post(
     "/account/signin",
-    response_model=SignedIn | PendingApproval,
+    response_model=SigninResult,
     operation_id="signin",
     responses=errors(
         (401, "Wrong credentials"),
@@ -363,7 +368,7 @@ async def register(body: RegisterRequest, request: Request, session: AsyncSessio
 )
 async def signin(
     body: SigninRequest, request: Request, response: Response, session: AsyncSession = Depends(get_db)
-) -> SignedIn | PendingApproval:
+) -> SigninResult:
     """An active device receives its token and the wrapped vault key. A device
     the account does not know becomes pending and gets a one-time claim token;
     it receives nothing else until another device or an email link approves it."""
@@ -393,8 +398,11 @@ async def signin(
     if device is not None and device.status == "active":
         token = _issue_token(device)
         await session.commit()
-        return SignedIn(
-            device_token=token, email_verified=account.email_verified_at is not None, vault=_vault_keys(account)
+        return SigninResult(
+            status="active",
+            signed_in=SignedIn(
+                device_token=token, email_verified=account.email_verified_at is not None, vault=_vault_keys(account)
+            ),
         )
 
     if device is None:
@@ -418,7 +426,7 @@ async def signin(
         emailed = await _mail(request, session, account, "approve", device=device.name, link=link)
     await session.commit()
     response.status_code = 202
-    return PendingApproval(device_id=device.id, claim_token=claim, email_approval=emailed)
+    return SigninResult(status="pending", device_id=device.id, claim_token=claim, email_approval=emailed)
 
 
 @router.post(

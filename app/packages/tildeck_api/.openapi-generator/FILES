@@ -17,14 +17,11 @@ lib/model/device_info.dart
 lib/model/device_view.dart
 lib/model/error_body.dart
 lib/model/error_code.dart
-lib/model/http_validation_error.dart
 lib/model/kdf_params.dart
 lib/model/liveness.dart
-lib/model/location_inner.dart
 lib/model/model_sealed.dart
 lib/model/new_password.dart
 lib/model/password_change.dart
-lib/model/pending_approval.dart
 lib/model/prelogin_request.dart
 lib/model/prelogin_response.dart
 lib/model/readiness.dart
@@ -32,10 +29,9 @@ lib/model/recovery_complete.dart
 lib/model/recovery_start.dart
 lib/model/recovery_wrap.dart
 lib/model/register_request.dart
-lib/model/response_signin.dart
 lib/model/server_info.dart
 lib/model/signed_in.dart
 lib/model/signin_request.dart
-lib/model/validation_error.dart
+lib/model/signin_result.dart
 lib/model/vault_keys.dart
 pubspec.yaml

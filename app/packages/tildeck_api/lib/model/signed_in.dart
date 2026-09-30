@@ -15,7 +15,6 @@ class SignedIn {
   SignedIn({
     required this.deviceToken,
     required this.emailVerified,
-    this.status = const SignedInStatusEnum._('active'),
     required this.vault,
   });
 
@@ -23,15 +22,12 @@ class SignedIn {
 
   bool emailVerified;
 
-  SignedInStatusEnum status;
-
   VaultKeys vault;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SignedIn &&
     other.deviceToken == deviceToken &&
     other.emailVerified == emailVerified &&
-    other.status == status &&
     other.vault == vault;
 
   @override
@@ -39,17 +35,15 @@ class SignedIn {
     // ignore: unnecessary_parenthesis
     (deviceToken.hashCode) +
     (emailVerified.hashCode) +
-    (status.hashCode) +
     (vault.hashCode);
 
   @override
-  String toString() => 'SignedIn[deviceToken=$deviceToken, emailVerified=$emailVerified, status=$status, vault=$vault]';
+  String toString() => 'SignedIn[deviceToken=$deviceToken, emailVerified=$emailVerified, vault=$vault]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'device_token'] = this.deviceToken;
       json[r'email_verified'] = this.emailVerified;
-      json[r'status'] = this.status;
       json[r'vault'] = this.vault;
     return json;
   }
@@ -77,7 +71,6 @@ class SignedIn {
       return SignedIn(
         deviceToken: mapValueOfType<String>(json, r'device_token')!,
         emailVerified: mapValueOfType<bool>(json, r'email_verified')!,
-        status: SignedInStatusEnum.fromJson(json[r'status']) ?? const SignedInStatusEnum._('active'),
         vault: VaultKeys.fromJson(json[r'vault'])!,
       );
     }
@@ -131,80 +124,4 @@ class SignedIn {
     'vault',
   };
 }
-
-
-enum SignedInStatusEnum {
-  active._(r'active'),
-  ;
-
-  /// Instantiate a new enum with the provided value.
-  const SignedInStatusEnum._(this._value);
-
-  /// The underlying value of this enum member.
-  final String _value;
-
-  @override
-  String toString() => _value;
-
-  /// Encodes this enum as a value suitable for JSON.
-  String toJson() => _value;
-
-  /// Returns the instance of [SignedInStatusEnum] that was successfully decoded
-  /// from the passed [value] on success, null otherwise.
-  static SignedInStatusEnum? fromJson(dynamic value) => SignedInStatusEnumTypeTransformer().decode(value);
-
-  /// Returns a [List] containing instances of [SignedInStatusEnum]
-  /// that were successfully decoded from the passed [JSON][json].
-  static List<SignedInStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <SignedInStatusEnum>[];
-    if (json is List && json.isNotEmpty) {
-      for (final row in json) {
-        final value = SignedInStatusEnum.fromJson(row);
-        if (value != null) {
-          result.add(value);
-        }
-      }
-    }
-    return result.toList(growable: growable);
-  }
-}
-
-/// Transformation class that can [encode] an instance of [SignedInStatusEnum] to String,
-/// and [decode] dynamic data back to [SignedInStatusEnum].
-class SignedInStatusEnumTypeTransformer {
-  factory SignedInStatusEnumTypeTransformer() => _instance ??= const SignedInStatusEnumTypeTransformer._();
-
-  const SignedInStatusEnumTypeTransformer._();
-
-  String encode(SignedInStatusEnum data) => data._value;
-
-  /// Returns the instance of [SignedInStatusEnum] that was successfully decoded
-  /// from the passed [data] value on success, null otherwise.
-  ///
-  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
-  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
-  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
-  ///
-  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
-  /// and users are still using an old app with the old code.
-  SignedInStatusEnum? decode(dynamic data, {bool allowNull = true}) {
-    if (data is SignedInStatusEnum) {
-      return data;
-    }
-    if (data != null) {
-      switch (data) {
-        case r'active': return SignedInStatusEnum.active;
-        default:
-          if (!allowNull) {
-            throw ArgumentError('Unknown enum value to decode: $data');
-          }
-      }
-    }
-    return null;
-  }
-
-  /// The singleton instance of this transformer.
-  static SignedInStatusEnumTypeTransformer? _instance;
-}
-
 
