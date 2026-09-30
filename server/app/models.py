@@ -118,3 +118,33 @@ class Record(Base):
     ct: Mapped[str | None] = mapped_column(Text, nullable=True)
     device_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Admin(Base):
+    """An administrator of the admin panel. Separate from user accounts and
+    never holds a vault. The password is an Argon2id hash; the TOTP secret is
+    encrypted with the settings encryption key."""
+
+    __tablename__ = "admins"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+    totp_secret_encrypted: Mapped[str] = mapped_column(Text)
+    # The last TOTP time step accepted: a code is never accepted twice.
+    totp_last_step: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AdminSession(Base):
+    """A signed-in panel session. The cookie holds the token; the server keeps
+    only its SHA-256, so signing out and expiry take effect at once."""
+
+    __tablename__ = "admin_sessions"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="CASCADE"))
+    csrf_token: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

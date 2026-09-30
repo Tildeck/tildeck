@@ -8,12 +8,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from app import migrations_runner, panel, settings_store
+from app import admins, migrations_runner, panel, settings_store
 from app.config import get_app_version, get_settings
 from app.db import async_session
 from app.mailer import SmtpMailer
 from app.protocol import ApiError, ErrorCode
-from app.routers import account, health, links, sync
+from app.routers import account, admin, health, links, sync
 
 # Uvicorn configures only its own loggers. Without this every app log line
 # below WARNING is dropped.
@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI):
         raise
     async with async_session() as session:
         await settings_store.assert_startup_state(session)
+        await admins.ensure_setup_token(session)
     logger.info("Tildeck server %s started", get_app_version())
     yield
 
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(account.router)
     app.include_router(sync.router)
     app.include_router(links.router)
+    app.include_router(admin.router)
     # Last: the panel's catch-all route must not shadow any API route.
     panel.mount(app, get_settings().PANEL_DIR)
     return app

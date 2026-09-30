@@ -211,7 +211,13 @@
           "rate_limited",
           "invalid_request",
           "email_unavailable",
-          "email_not_verified"
+          "email_not_verified",
+          "setup_not_needed",
+          "invalid_setup_token",
+          "invalid_totp",
+          "csrf_failed",
+          "setting_locked",
+          "not_found"
         ],
         "title": "ErrorCode",
         "type": "string"

@@ -130,6 +130,7 @@ The associated data binds a ciphertext to its place: `ad = "tildeck:record:v1|" 
 - Sessions use an `HttpOnly`, `Secure`, `SameSite=Strict` cookie, expire after inactivity, and state-changing requests require a CSRF token.
 - Administrators can create, disable, and delete user accounts, revoke devices, and see metadata (email, created, last seen, device names, record counts, storage used). No API returns ciphertext, wrapped keys, or hashes to the panel, and nothing in the panel can decrypt anything.
 - Every administrative action is written to the activity log.
+- **Clarifications from implementing step 6 (2026-10-01).** A TOTP code is accepted once, within one 30-second step of drift either way; the last accepted step is stored. The setup token is 192 random bits, kept in memory as a hash, and replaced at each start until the first administrator exists; that administrator is created only after a code from the new TOTP secret is confirmed. Sessions are stored on the server as a hash of the cookie token and end after 30 idle minutes or 12 hours. "Create user accounts" means invitations: an administrator cannot create a vault's keys for a user.
 
 ## What a compromised server reveals
 

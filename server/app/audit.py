@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AuditEntry
 
-SOURCES = ("user", "system")
+SOURCES = ("user", "admin", "system")
 
 
 def record(
