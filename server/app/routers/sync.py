@@ -153,6 +153,9 @@ async def push(
         .execution_options(populate_existing=True)
     )
     ids = [c.id for c in body.changes]
+    # Each record at most once per push: the records are loaded once, below,
+    # and a second change to a record created in this push would find it
+    # missing and be stored as version 1 again.
     if len(set(ids)) != len(ids):
         raise ApiError(422, ErrorCode.invalid_request)
     existing = {

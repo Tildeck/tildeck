@@ -438,13 +438,19 @@ async def signin(
 async def claim(body: ClaimRequest, request: Request, session: AsyncSession = Depends(get_db)) -> SignedIn:
     """The pending device collects its approval with the claim token only it
     has: its device token and the wrapped vault key."""
-    await _limit(session, request)
+    # A waiting device asks every few seconds, so only wrong claim tokens
+    # count against the address's limit.
+    per_address = int(await settings_store.get_value(session, "signin_limit_per_address") or 30)
+    address_key = f"addr:{_address(request)}"
+    if limiter.exceeded(address_key, per_address):
+        raise ApiError(429, ErrorCode.rate_limited)
     device = await session.get(Device, body.device_id)
     if (
         device is None
         or device.claim_token_hash is None
         or device.claim_token_hash != accounts.token_hash(body.claim_token)
     ):
+        limiter.hit(address_key)
         raise ApiError(401, ErrorCode.invalid_token)
     if device.status == "pending":
         raise ApiError(409, ErrorCode.device_pending)

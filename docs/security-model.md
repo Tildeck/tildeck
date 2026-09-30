@@ -50,7 +50,7 @@ All keys are 32 bytes unless stated otherwise.
 | Recovery key `RK` | Once, at registration | Random | Written down by the user | Never; the server stores a hash of its authentication key |
 | Recovery authentication key `RAK` | When the recovery key is used | `crypto_kdf(RK, id 1, context "tdrecv01")` | Memory, only during recovery | Yes, over TLS; stored as an Argon2id hash |
 | Recovery wrapping key `RWK` | When the recovery key is used | `crypto_kdf(RK, id 2, context "tdrecv01")` | Memory, only during recovery | Never |
-| Device token | At each sign-in | Random | The device's secure storage | Yes, on each request; the server stores its SHA-256 |
+| Device token | At each sign-in | Random | The local vault file, sealed under `VK` | Yes, on each request; the server stores its SHA-256 |
 
 **Wrapped vault key.** The vault key is stored twice, each copy encrypted with XChaCha20-Poly1305 under a random nonce:
 
@@ -65,14 +65,14 @@ Changing the master password re-wraps the same vault key; records are never re-e
 
 **Master password rules.** At least 12 characters; the client refuses passwords found in a small built-in list of the most common passwords. The client explains, once, that there is no password reset and that the recovery key is the only way back.
 
-**Recovery key format.** 32 random bytes plus a 2-byte BLAKE2b checksum, written as Crockford Base32 in groups of four characters. The checksum catches typing mistakes before any network request.
+**Recovery key format.** 32 random bytes plus a 2-byte BLAKE2b checksum, written as Crockford Base32 in groups of four characters. The checksum catches typing mistakes before any network request. The checksum is the first two bytes of the key's 16-byte BLAKE2b hash, libsodium's shortest output; reading a key accepts lower case, spaces, and the letters O, I, and L for 0, 1, and 1. (Clarification recorded on 2026-09-30 while implementing step 5.)
 
 ## The vault on a device
 
 - Records are stored locally in the same encrypted form they are synced in (below). The local database never holds plaintext record contents.
 - Unlocking the vault: the master password derives `PK`, then `KEK`, which unwraps `VK` from the locally stored `wrap_pw`. A wrong password fails the AEAD check; nothing else reveals whether a password is right.
 - `VK` lives in memory only while the vault is unlocked. The vault locks after an idle period (default 15 minutes, a user setting) and when the app is closed. Buffers holding keys are zeroed when freed where the language allows it.
-- The device token is stored in the platform's secure storage (Android Keystore through EncryptedSharedPreferences; Windows DPAPI).
+- The device token, with the account's email address and server, is stored in the local vault file, sealed under `VK` with XChaCha20-Poly1305 and `ad = "tildeck:local:v1|" + vault_id`. It never syncs. It is therefore readable only while the vault is unlocked, which is the only time a device can sync anyway (records need `VK`), so platform secure storage would add nothing while the vault is locked and a dependency while it is open. (Changed on 2026-09-30 while implementing step 5, from platform secure storage: Android Keystore through EncryptedSharedPreferences, Windows DPAPI. It needs Shlomi's confirmation.)
 - A device can also use Tildeck without any account: the vault is then local only, with a locally generated salt and no recovery key. Registering later uploads the same vault unchanged (records and `wrap_pw` are bound to `vault_id`, not to an account) and creates the recovery key at that point.
 - Biometric unlock is out of scope for the first release.
 
@@ -120,6 +120,7 @@ The associated data binds a ciphertext to its place: `ad = "tildeck:record:v1|" 
 - **Pull.** `GET /api/sync/records?since=<revision>` returns every record, tombstones included, with a revision above the cursor, in revision order.
 - **Push.** The client sends changes, each encrypted with its new `version`. The server accepts a change only if that version is exactly the record's current version plus 1 (1 for a new record), then assigns it the next account `revision` and stores it. A stale change is rejected for that record with the stable error code `version_conflict` and the current record.
 - **Conflicts.** For a rejected change, the client decrypts the server's record and compares the `modified_at` times inside the two plaintexts: the newer edit wins. If the local edit wins, the client encrypts it again with the server's version plus 1 and pushes it; otherwise the local change is dropped. A deletion is a change like any other and is kept as a tombstone, so it reaches every device.
+- **Clarifications from implementing step 5 (2026-09-30).** A tombstone has no plaintext and so no `modified_at`: between an edit and a concurrent deletion, the edit wins, so no edit is lost; the deleting device can delete again. A record changed on a device stays at the server's version plus 1 however often it is edited before the server accepts it, because the server accepts only the next version. A pulled record at or below the version a device holds is ignored, so a stored version never goes down, and a pulled record that does not decrypt is reported and never replaces anything. A vault used before it had an account uploads each record as version 1 whatever its local version. A pending device may ask for its approval every few seconds: only wrong claim tokens count against the address's sign-in limit.
 - The client pulls before it pushes, and after every sign-in, unlock, and reconnect.
 
 ## The admin panel

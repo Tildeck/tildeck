@@ -50,6 +50,19 @@ void writeFile(Map<String, dynamic> j) => vaultFile.writeAsStringSync(jsonEncode
 Map<String, dynamic> recordOf(Map<String, dynamic> j, String id) =>
     (j['records'] as List).cast<Map<String, dynamic>>().firstWhere((r) => r['id'] == id);
 
+/// The vault as if the server had accepted every change: reopened and
+/// unlocked, with nothing dirty, so the next edit is the next version.
+Future<Vault> synced() async {
+  final j = readFile();
+  for (final r in (j['records'] as List).cast<Map<String, dynamic>>()) {
+    r['dirty'] = false;
+  }
+  writeFile(j);
+  final vault = await reopen();
+  await vault.unlock(password);
+  return vault;
+}
+
 void main() {
   setUp(() async => dir = await Directory.systemTemp.createTemp('tildeck-vault'));
   tearDown(() => dir.delete(recursive: true));
@@ -113,10 +126,11 @@ void main() {
   });
 
   test('a ciphertext moved to another record, or replayed as a newer version, is refused', () async {
-    final vault = await newVault();
-    await vault.put(host);
-    await vault.put(key);
+    final first = await newVault();
+    await first.put(host);
+    await first.put(key);
     final oldVersion = Map<String, dynamic>.of(recordOf(readFile(), host.id));
+    final vault = await synced();
     await vault.put(HostEntry(id: host.id, name: 'Renamed', host: host.host, username: host.username));
 
     // Swap the two records' ciphertexts.
@@ -145,13 +159,20 @@ void main() {
   });
 
   test('deleting keeps a tombstone without content, at the next version', () async {
-    final vault = await newVault();
-    await vault.put(host);
+    final first = await newVault();
+    await first.put(host);
+    await first.put(key);
+    // Never synced: the change stays the record's first version.
+    await first.delete(key.id);
+    expect(recordOf(readFile(), key.id)['version'], 1);
+
+    final vault = await synced();
     await vault.delete(host.id);
     expect(vault.hosts, isEmpty);
     final record = recordOf(readFile(), host.id);
     expect(record['deleted'], isTrue);
     expect(record['version'], 2);
+    expect(record['dirty'], isTrue);
     expect(record.containsKey('ct'), isFalse);
   });
 
