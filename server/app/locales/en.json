@@ -20,5 +20,7 @@
   "approved_title": "Device approved",
   "approved_body": "The device can now open your vault. You can close this page.",
   "link_invalid_title": "This link cannot be used",
-  "link_invalid_body": "It was already used, it expired, or it is incomplete. Ask Tildeck for a new one."
+  "link_invalid_body": "It was already used, it expired, or it is incomplete. Ask Tildeck for a new one.",
+  "invite_subject": "You are invited to Tildeck",
+  "invite_body": "You are invited to keep your SSH hosts and keys in Tildeck, synced through {server}.\n\nInstall Tildeck, open Sync, and create an account with this email address, this server's address ({server}), and this invitation code:\n{code}\n\nThe code works once, for this address only, within 7 days."
 }

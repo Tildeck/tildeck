@@ -81,6 +81,7 @@ class AccountService {
     required String password,
     required String locale,
     required String deviceName,
+    String? inviteCode,
   }) async {
     final keys = await vault.passwordKeys(password);
     if (keys == null) throw const WrongMasterPassword();
@@ -102,6 +103,7 @@ class AccountService {
             wrapRk: vault.wrapForRecovery(recovery.wrapKey),
             deviceId: deviceId,
             deviceName: deviceName,
+            inviteCode: inviteCode,
           );
       await vault.setAccount(
         SyncAccount(server: address, email: email, deviceId: deviceId, deviceName: deviceName, token: signedIn.token),

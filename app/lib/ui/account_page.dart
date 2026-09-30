@@ -40,6 +40,7 @@ String accountErrorText(AppLocalizations t, Object error) => switch (error) {
     'email_taken' => t.errorEmailTaken,
     'registration_closed' => t.errorRegistrationClosed,
     'registration_invite_required' => t.errorRegistrationInvite,
+    'invalid_invite' => t.errorInvalidInvite,
     'registration_needs_email' => t.errorRegistrationNeedsEmail,
     'invalid_email' => t.errorInvalidEmail,
     'rate_limited' => t.errorRateLimited,
@@ -162,6 +163,7 @@ class _AccountFormState extends State<AccountForm> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _deviceName = TextEditingController(text: AccountService.defaultDeviceName());
+  final _invite = TextEditingController();
   bool _busy = false;
   String? _error;
 
@@ -171,6 +173,7 @@ class _AccountFormState extends State<AccountForm> {
     _email.dispose();
     _password.dispose();
     _deviceName.dispose();
+    _invite.dispose();
     super.dispose();
   }
 
@@ -189,6 +192,7 @@ class _AccountFormState extends State<AccountForm> {
     final email = _email.text.trim();
     final password = _password.text;
     final deviceName = _deviceName.text.trim();
+    final invite = _invite.text.trim();
     final onRegistered = widget.onRegistered, onPending = widget.onPending, onSignedIn = widget.onSignedIn;
     try {
       final check = await s.checker.check(input);
@@ -201,6 +205,7 @@ class _AccountFormState extends State<AccountForm> {
           password: password,
           locale: locale == 'he' ? 'he' : 'en',
           deviceName: deviceName,
+          inviteCode: invite.isEmpty ? null : invite,
         );
         if (mounted) _password.clear();
         onRegistered?.call(key);
@@ -292,6 +297,17 @@ class _AccountFormState extends State<AccountForm> {
             validator: required,
             decoration: InputDecoration(labelText: t.deviceNameLabel),
           ),
+          if (widget.allowRegister) ...[
+            const SizedBox(height: 6),
+            TextFormField(
+              key: const ValueKey('syncInvite'),
+              controller: _invite,
+              textDirection: TextDirection.ltr,
+              autocorrect: false,
+              enabled: !_busy,
+              decoration: InputDecoration(labelText: t.inviteCodeLabel, helperText: t.inviteCodeHelp),
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 6),
             Text(

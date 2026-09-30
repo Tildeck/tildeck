@@ -17,7 +17,8 @@
     "overview": "Overview",
     "users": "Users",
     "settings": "Settings",
-    "activity": "Activity"
+    "activity": "Activity",
+    "invites": "Invitations"
   },
   "common": {
     "loading": "Loading",
@@ -68,6 +69,7 @@
     },
     "areas": {
       "users": "Accounts, their devices, and the storage they use.",
+      "invites": "Invite people by email address.",
       "settings": "Address, registration, email, and limits.",
       "activity": "Every sign-in, change, and administrative action."
     }
@@ -223,7 +225,9 @@
       "device_revoked": "Device removed",
       "password_changed": "Master password changed",
       "recovery_used": "Recovery key used",
-      "recovery_failed": "Recovery key attempt failed"
+      "recovery_failed": "Recovery key attempt failed",
+      "invite_created": "Invitation created",
+      "invite_revoked": "Invitation cancelled"
     }
   },
   "errors": {
@@ -239,6 +243,31 @@
     "invalid_request": "That value is not valid here.",
     "not_found": "This item no longer exists.",
     "unauthorized": "Your session ended. Sign in again.",
+    "invalid_email": "That email address does not look right.",
+    "email_taken": "This address already has an account.",
     "unknown": "Something went wrong. Try again."
+  },
+  "invites": {
+    "title": "Invitations",
+    "intro": "Invite someone by email address. The code works once, for that address only, within 7 days, and registering with it confirms the address. Registration must be set to invitation or open.",
+    "email": "Email address",
+    "create": "Create invitation",
+    "createdTitle": "Invitation for {email}",
+    "copy": "Copy code",
+    "copied": "Copied",
+    "emailed": "The code was sent to this address.",
+    "notEmailed": "Email is not configured: send this code yourself.",
+    "onceOnly": "It is shown only now, and works until {date}.",
+    "empty": "No invitations yet.",
+    "meta": "By {by}, {created}. Expires {expires}.",
+    "revoke": "Cancel invitation",
+    "revokeTitle": "Cancel the invitation for {email}?",
+    "revokeBody": "The code stops working at once.",
+    "status": {
+      "open": "Waiting",
+      "used": "Used",
+      "revoked": "Cancelled",
+      "expired": "Expired"
+    }
   }
 }
