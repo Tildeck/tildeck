@@ -87,7 +87,7 @@ async def test_the_first_administrator_needs_the_setup_token_and_a_working_secon
     start = await panel.post("/api/admin/setup/start", json={**body, "setup_token": token})
     enrollment = start.json()
     assert enrollment["uri"].startswith("otpauth://totp/Tildeck:operator?")
-    assert enrollment["qr_svg"].startswith("<svg")
+    assert enrollment["qr_image"].startswith("data:image/svg+xml")
 
     # No administrator exists until a code from the new secret is confirmed.
     wrong = await panel.post("/api/admin/setup/complete", json={"setup_token": token, "code": "000000"})

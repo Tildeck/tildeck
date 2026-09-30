@@ -107,7 +107,7 @@ class SetupStart(BaseModel):
 class TotpEnrollment(BaseModel):
     secret: str
     uri: str
-    qr_svg: str
+    qr_image: str
 
 
 class SetupComplete(BaseModel):
@@ -137,7 +137,7 @@ async def setup_start(body: SetupStart, request: Request, session: AsyncSession 
     password_hash = await accounts.hash_key(body.password)
     secret = admins.setup.begin(body.username, password_hash)
     uri = admins.otpauth_uri(secret, body.username)
-    return TotpEnrollment(secret=secret, uri=uri, qr_svg=admins.qr_svg(uri))
+    return TotpEnrollment(secret=secret, uri=uri, qr_image=admins.qr_image(uri))
 
 
 @router.post("/setup/complete", response_model=SessionView)

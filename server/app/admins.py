@@ -104,9 +104,10 @@ def otpauth_uri(secret: str, username: str) -> str:
     return pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name=ISSUER)
 
 
-def qr_svg(uri: str) -> str:
-    """The provisioning address as an SVG QR code, for authenticator apps."""
-    return segno.make(uri, error="m").svg_inline(scale=5, border=2, dark="#0b1f1c", light="#ffffff")
+def qr_image(uri: str) -> str:
+    """The provisioning address as an SVG QR code in a data URI, ready to be
+    an image source, for authenticator apps."""
+    return segno.make(uri, error="m").svg_data_uri(scale=5, border=2, dark="#0b1f1c", light="#ffffff")
 
 
 def _now() -> float:
