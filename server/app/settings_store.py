@@ -58,12 +58,30 @@ REGISTRY: dict[str, SettingSpec] = {
             env_var="SMTP_SECURITY",
             default="starttls",
             kind="choice",
-            choices=("starttls", "tls"),
-            description="How the SMTP connection is encrypted",
+            choices=("starttls", "tls", "none"),
+            description="How the SMTP connection is encrypted; none only for a relay on the same host or a private network",
         ),
         SettingSpec(key="smtp_username", env_var="SMTP_USERNAME", description="SMTP user name"),
         SettingSpec(key="smtp_password", secret=True, env_var="SMTP_PASSWORD", description="SMTP password"),
         SettingSpec(key="smtp_from", env_var="SMTP_FROM", description="Sender address of every email"),
+        SettingSpec(
+            key="device_idle_days",
+            env_var="DEVICE_IDLE_DAYS",
+            default="90",
+            description="Days a device may stay unused before it must sign in again",
+        ),
+        SettingSpec(
+            key="signin_limit_per_account",
+            env_var="SIGNIN_LIMIT_PER_ACCOUNT",
+            default="10",
+            description="Failed sign-in and recovery attempts allowed per account in 15 minutes",
+        ),
+        SettingSpec(
+            key="signin_limit_per_address",
+            env_var="SIGNIN_LIMIT_PER_ADDRESS",
+            default="30",
+            description="Account requests allowed per client address in 15 minutes",
+        ),
     )
 }
 
@@ -99,10 +117,18 @@ def _validate_email(key: str, value: str) -> None:
         raise InvalidSettingValue(key)
 
 
+def _validate_positive_int(key: str, value: str) -> None:
+    if not value.isdigit() or int(value) < 1:
+        raise InvalidSettingValue(key)
+
+
 VALIDATORS = {
     "public_url": _validate_url,
     "smtp_port": _validate_port,
     "smtp_from": _validate_email,
+    "device_idle_days": _validate_positive_int,
+    "signin_limit_per_account": _validate_positive_int,
+    "signin_limit_per_address": _validate_positive_int,
 }
 
 

@@ -108,7 +108,7 @@ Hebrew text is allowed only in these locale files, whose exact paths are finaliz
 
 - `app/lib/l10n/app_he.arb` (client)
 - `panel/i18n/locales/he.json` (admin panel)
-- The Hebrew locale file for server email templates under `server/`
+- `server/app/locales/he.json` (server emails and email link pages)
 
 A CI guard scans all tracked text files for Hebrew characters and excludes only those exact paths. Tests that need Hebrew samples load them from the locale files.
 
@@ -148,7 +148,7 @@ Adopted from Pay's settings ruling:
 
 **Bootstrap exception.** A small set of values must exist before the server can reach its database or decrypt stored settings: the database connection and the settings encryption key. These are environment-only by necessity. The panel shows only that they are set, never their values. The list is kept minimal and documented in `.env.example`.
 
-**Settings known so far:** SMTP host, port, security mode, username, password, and sender address; public server URL; registration mode (for example closed, invite-only, or open); session and token lifetimes; and sign-in rate limits. The final list is set in the sync and panel phases.
+**Settings so far:** SMTP host, port, security mode (STARTTLS, TLS, or none for a local relay), username, password, and sender address; public server URL; registration mode (closed, invite, or open); days a device may stay idle before signing in again; and sign-in rate limits per account and per client address. The final list is set in the sync and panel phases.
 
 ## Accounts, authentication, and email
 
@@ -232,7 +232,7 @@ Approved by Shlomi on 2026-09-30: the working version is the full first-release 
 | 1 | Security model | Approved (2026-09-30) | `docs/security-model.md` defines keys, wrapping, records, accounts, devices, recovery, sync, and the admin panel's boundaries | Shlomi approves it |
 | 2 | SSH sessions and terminal | Done in code and tests; waiting for Shlomi's try on his phone and on Windows | Connect with password or private key; sessions in tabs; host key verification with a clear changed-key warning; terminal always LTR; Android key bar (Esc, Tab, Ctrl, arrows); copy and paste | Tests against a pinned OpenSSH container; APK and Windows build tried by Shlomi |
 | 3 | Local vault and hosts | Done in code and tests; waiting for Shlomi's try on Windows | Master password; hosts in groups; private keys and known host keys stored as encrypted records; auto-lock | Tests that no plaintext reaches storage; APK and Windows build |
-| 4 | Accounts and email | Planned; needs step 1 approved | Registration by mode, email verification, pre-login, sign-in, new-device approval, recovery, security emails, rate limits, stable error codes | Server tests against PostgreSQL and an SMTP stub |
+| 4 | Accounts and email | Done on the server; the client uses it in step 5 | Registration by mode, email verification, pre-login, sign-in, new-device approval, recovery, security emails, rate limits, stable error codes | Server tests against PostgreSQL and an SMTP stub |
 | 5 | End-to-end sync | Planned; needs steps 3 and 4 | Pull and push with versions, conflicts, and tombstones; protocol check | Two clients converge in tests; Shlomi syncs his phone and Windows through his HTTPS proxy |
 | 6 | Admin panel screens | Planned | First-run setup with a one-time token, administrator TOTP, users, devices, settings with environment locks, activity log | Panel screenshots in both languages and themes |
 | 7 | SFTP | Planned | Browse, upload, and download over an open session | Tests against the OpenSSH container |
@@ -258,6 +258,18 @@ Approved by Shlomi on 2026-09-30: the working version is the full first-release 
 - Groups are a name on each host rather than records of their own (the security model says so); renaming a group means editing its hosts.
 - Known limitation, Android: typing on the soft keyboard is neither a hardware key event nor a touch, so a long stretch of typing in a terminal does not reset the idle timer and the vault can lock mid-session. Fix before Android use: sessions report input activity to the lock timer.
 - For product step 5: the local vault file is the only record of the highest version seen per record; a pull from the server must never lower a stored version.
+
+### Step 4 notes (2026-09-30)
+
+- The server API for accounts and devices (`/api/account/*`, `/api/devices/*`, protocol header required): pre-login, registration, sign-in, new-device approval (from another device or by an emailed link) and claiming, device listing and revocation, verification email resend, master password change, and recovery with the recovery key. Keys and wraps are opaque base64; the server stores Argon2id hashes (`argon2-cffi`) of the authentication and recovery keys and SHA-256 hashes of every token.
+- The client does not use these endpoints yet: account screens come with sync in step 5.
+- Pre-login answers an unknown address with a stable salt derived from `CONFIG_ENCRYPTION_KEY`, so it does not reveal which accounts exist. Registration does reveal an address that already has an account (`email_taken`); it is rate-limited per client address.
+- Registration modes: `closed` refuses; `open` needs SMTP and `PUBLIC_URL`; `invite` refuses with `registration_invite_required` until the admin panel creates invitations (step 6). Accounts without SMTP are created by an administrator (step 6).
+- Emails (verification, approval, device added, device removed, password changed, recovery used) are plain text in the account's language from `server/app/locales/`. The email link pages live under `/links/`, outside the API contract; approving a device needs a button press, because mail scanners open links on their own.
+- Rate limits count in memory per server process and reset on a restart.
+- The security model gained a clarification of how an approved device collects its vault key (a one-time claim token held only by the pending device); the approved decisions are unchanged.
+- Tests (33 in the server area): the protocol header, pre-login, registration modes, verification links (single use, expiring), sign-in failures that look the same for known and unknown addresses, a pending device that cannot collect before approval or with a wrong claim token, an approval link that approves only on the button, re-sign-in of an approved device, revocation, idle expiry, password change signing out other devices, recovery, the rate limit, Hebrew emails, no key or wrap in any email, and delivery through a real SMTP server (without TLS: STARTTLS and TLS are not exercised, because the test server has no certificate).
+- To try the account flow end to end later, the server needs an SMTP provider configured (in `.env` or the panel) and `PUBLIC_URL` set to the address behind the HTTPS proxy.
 
 ## Required workflow contracts
 

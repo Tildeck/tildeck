@@ -28,12 +28,36 @@ part 'auth/oauth.dart';
 part 'auth/http_basic_auth.dart';
 part 'auth/http_bearer_auth.dart';
 
+part 'api/account_api.dart';
 part 'api/health_api.dart';
 
+part 'model/account_view.dart';
+part 'model/claim_request.dart';
+part 'model/device_info.dart';
+part 'model/device_view.dart';
+part 'model/error_body.dart';
 part 'model/error_code.dart';
+part 'model/http_validation_error.dart';
+part 'model/kdf_params.dart';
 part 'model/liveness.dart';
+part 'model/location_inner.dart';
+part 'model/model_sealed.dart';
+part 'model/new_password.dart';
+part 'model/password_change.dart';
+part 'model/pending_approval.dart';
+part 'model/prelogin_request.dart';
+part 'model/prelogin_response.dart';
 part 'model/readiness.dart';
+part 'model/recovery_complete.dart';
+part 'model/recovery_start.dart';
+part 'model/recovery_wrap.dart';
+part 'model/register_request.dart';
+part 'model/response_signin.dart';
 part 'model/server_info.dart';
+part 'model/signed_in.dart';
+part 'model/signin_request.dart';
+part 'model/validation_error.dart';
+part 'model/vault_keys.dart';
 
 
 /// An [ApiClient] instance that uses the default values obtained from

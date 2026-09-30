@@ -3,13 +3,16 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app import migrations_runner, panel, settings_store
 from app.config import get_app_version, get_settings
 from app.db import async_session
-from app.routers import health
+from app.mailer import SmtpMailer
+from app.protocol import ApiError
+from app.routers import account, health, links
 
 # Uvicorn configures only its own loggers. Without this every app log line
 # below WARNING is dropped.
@@ -52,7 +55,16 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url="/api/openapi.json",
     )
+    # Outgoing email; tests replace it with an in-memory mailer.
+    app.state.mailer = SmtpMailer()
+
+    @app.exception_handler(ApiError)
+    async def api_error(request: Request, exc: ApiError) -> JSONResponse:
+        return JSONResponse({"error": exc.code.value}, status_code=exc.status_code)
+
     app.include_router(health.router)
+    app.include_router(account.router)
+    app.include_router(links.router)
     # Last: the panel's catch-all route must not shadow any API route.
     panel.mount(app, get_settings().PANEL_DIR)
     return app

@@ -15,6 +15,7 @@ dependencies = [
     "alembic>=1.15",
     "pydantic-settings>=2.8",
     "cryptography>=44",
+    "argon2-cffi>=23.1",
 ]
 
 [dependency-groups]
@@ -23,6 +24,7 @@ dev = [
     "pytest-asyncio>=0.25",
     "httpx>=0.28",
     "ruff>=0.9",
+    "aiosmtpd>=1.4",
 ]
 
 [tool.uv]

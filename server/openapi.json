@@ -1,13 +1,212 @@
 {
   "components": {
     "schemas": {
+      "AccountView": {
+        "properties": {
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceView"
+            },
+            "title": "Devices",
+            "type": "array"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "email_verified": {
+            "title": "Email Verified",
+            "type": "boolean"
+          },
+          "locale": {
+            "title": "Locale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "email_verified",
+          "locale",
+          "devices"
+        ],
+        "title": "AccountView",
+        "type": "object"
+      },
+      "ClaimRequest": {
+        "properties": {
+          "claim_token": {
+            "maxLength": 100,
+            "title": "Claim Token",
+            "type": "string"
+          },
+          "device_id": {
+            "title": "Device Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "claim_token"
+        ],
+        "title": "ClaimRequest",
+        "type": "object"
+      },
+      "DeviceInfo": {
+        "properties": {
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "DeviceInfo",
+        "type": "object"
+      },
+      "DeviceView": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "active",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status",
+          "created_at",
+          "last_seen_at",
+          "current"
+        ],
+        "title": "DeviceView",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorCode"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
       "ErrorCode": {
         "enum": [
           "database_unavailable",
-          "unsupported_protocol"
+          "unsupported_protocol",
+          "registration_closed",
+          "registration_needs_email",
+          "registration_invite_required",
+          "email_taken",
+          "invalid_email",
+          "invalid_credentials",
+          "account_disabled",
+          "unauthorized",
+          "device_pending",
+          "device_revoked",
+          "device_not_found",
+          "invalid_token",
+          "token_expired",
+          "recovery_failed",
+          "rate_limited",
+          "email_unavailable",
+          "email_not_verified"
         ],
         "title": "ErrorCode",
         "type": "string"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "KdfParams": {
+        "description": "Argon2id parameters chosen by the client; the server enforces the\nminimum of the security model and stores them for the next sign-in.",
+        "properties": {
+          "alg": {
+            "pattern": "^argon2id13$",
+            "title": "Alg",
+            "type": "string"
+          },
+          "mem": {
+            "maximum": 1073741824.0,
+            "minimum": 67108864.0,
+            "title": "Mem",
+            "type": "integer"
+          },
+          "ops": {
+            "maximum": 20.0,
+            "minimum": 3.0,
+            "title": "Ops",
+            "type": "integer"
+          },
+          "salt": {
+            "title": "Salt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alg",
+          "ops",
+          "mem",
+          "salt"
+        ],
+        "title": "KdfParams",
+        "type": "object"
       },
       "Liveness": {
         "properties": {
@@ -21,6 +220,105 @@
           "status"
         ],
         "title": "Liveness",
+        "type": "object"
+      },
+      "NewPassword": {
+        "properties": {
+          "auth_key": {
+            "title": "Auth Key",
+            "type": "string"
+          },
+          "kdf": {
+            "$ref": "#/components/schemas/KdfParams"
+          },
+          "wrap_pw": {
+            "$ref": "#/components/schemas/Sealed"
+          }
+        },
+        "required": [
+          "kdf",
+          "auth_key",
+          "wrap_pw"
+        ],
+        "title": "NewPassword",
+        "type": "object"
+      },
+      "PasswordChange": {
+        "properties": {
+          "auth_key": {
+            "title": "Auth Key",
+            "type": "string"
+          },
+          "keep_other_devices": {
+            "default": false,
+            "title": "Keep Other Devices",
+            "type": "boolean"
+          },
+          "new": {
+            "$ref": "#/components/schemas/NewPassword"
+          }
+        },
+        "required": [
+          "auth_key",
+          "new"
+        ],
+        "title": "PasswordChange",
+        "type": "object"
+      },
+      "PendingApproval": {
+        "properties": {
+          "claim_token": {
+            "title": "Claim Token",
+            "type": "string"
+          },
+          "device_id": {
+            "title": "Device Id",
+            "type": "string"
+          },
+          "email_approval": {
+            "description": "An approval link was sent by email",
+            "title": "Email Approval",
+            "type": "boolean"
+          },
+          "status": {
+            "const": "pending",
+            "default": "pending",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "claim_token",
+          "email_approval"
+        ],
+        "title": "PendingApproval",
+        "type": "object"
+      },
+      "PreloginRequest": {
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "PreloginRequest",
+        "type": "object"
+      },
+      "PreloginResponse": {
+        "properties": {
+          "kdf": {
+            "$ref": "#/components/schemas/KdfParams"
+          }
+        },
+        "required": [
+          "kdf"
+        ],
+        "title": "PreloginResponse",
         "type": "object"
       },
       "Readiness": {
@@ -59,6 +357,143 @@
         "title": "Readiness",
         "type": "object"
       },
+      "RecoveryComplete": {
+        "properties": {
+          "device": {
+            "$ref": "#/components/schemas/DeviceInfo"
+          },
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          },
+          "new": {
+            "$ref": "#/components/schemas/NewPassword"
+          },
+          "recovery_auth_key": {
+            "title": "Recovery Auth Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "recovery_auth_key",
+          "new",
+          "device"
+        ],
+        "title": "RecoveryComplete",
+        "type": "object"
+      },
+      "RecoveryStart": {
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          },
+          "recovery_auth_key": {
+            "title": "Recovery Auth Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "recovery_auth_key"
+        ],
+        "title": "RecoveryStart",
+        "type": "object"
+      },
+      "RecoveryWrap": {
+        "properties": {
+          "vault_id": {
+            "title": "Vault Id",
+            "type": "string"
+          },
+          "wrap_rk": {
+            "$ref": "#/components/schemas/Sealed"
+          }
+        },
+        "required": [
+          "vault_id",
+          "wrap_rk"
+        ],
+        "title": "RecoveryWrap",
+        "type": "object"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "auth_key": {
+            "title": "Auth Key",
+            "type": "string"
+          },
+          "device": {
+            "$ref": "#/components/schemas/DeviceInfo"
+          },
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          },
+          "kdf": {
+            "$ref": "#/components/schemas/KdfParams"
+          },
+          "locale": {
+            "default": "en",
+            "enum": [
+              "en",
+              "he"
+            ],
+            "title": "Locale",
+            "type": "string"
+          },
+          "recovery_auth_key": {
+            "title": "Recovery Auth Key",
+            "type": "string"
+          },
+          "vault_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "title": "Vault Id",
+            "type": "string"
+          },
+          "wrap_pw": {
+            "$ref": "#/components/schemas/Sealed"
+          },
+          "wrap_rk": {
+            "$ref": "#/components/schemas/Sealed"
+          }
+        },
+        "required": [
+          "email",
+          "vault_id",
+          "kdf",
+          "auth_key",
+          "recovery_auth_key",
+          "wrap_pw",
+          "wrap_rk",
+          "device"
+        ],
+        "title": "RegisterRequest",
+        "type": "object"
+      },
+      "Sealed": {
+        "description": "A nonce and a ciphertext, opaque to the server.",
+        "properties": {
+          "ct": {
+            "title": "Ct",
+            "type": "string"
+          },
+          "nonce": {
+            "title": "Nonce",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nonce",
+          "ct"
+        ],
+        "title": "Sealed",
+        "type": "object"
+      },
       "ServerInfo": {
         "properties": {
           "name": {
@@ -82,6 +517,119 @@
         ],
         "title": "ServerInfo",
         "type": "object"
+      },
+      "SignedIn": {
+        "properties": {
+          "device_token": {
+            "title": "Device Token",
+            "type": "string"
+          },
+          "email_verified": {
+            "title": "Email Verified",
+            "type": "boolean"
+          },
+          "status": {
+            "const": "active",
+            "default": "active",
+            "title": "Status",
+            "type": "string"
+          },
+          "vault": {
+            "$ref": "#/components/schemas/VaultKeys"
+          }
+        },
+        "required": [
+          "device_token",
+          "email_verified",
+          "vault"
+        ],
+        "title": "SignedIn",
+        "type": "object"
+      },
+      "SigninRequest": {
+        "properties": {
+          "auth_key": {
+            "title": "Auth Key",
+            "type": "string"
+          },
+          "device": {
+            "$ref": "#/components/schemas/DeviceInfo"
+          },
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "auth_key",
+          "device"
+        ],
+        "title": "SigninRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VaultKeys": {
+        "description": "What a device needs to open the vault with the master password.",
+        "properties": {
+          "kdf": {
+            "$ref": "#/components/schemas/KdfParams"
+          },
+          "vault_id": {
+            "title": "Vault Id",
+            "type": "string"
+          },
+          "wrap_pw": {
+            "$ref": "#/components/schemas/Sealed"
+          }
+        },
+        "required": [
+          "vault_id",
+          "kdf",
+          "wrap_pw"
+        ],
+        "title": "VaultKeys",
+        "type": "object"
       }
     }
   },
@@ -92,6 +640,951 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/account": {
+      "get": {
+        "operationId": "getAccount",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Account",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/password": {
+      "post": {
+        "description": "Re-wraps the same vault key under a new master password. Every other\ndevice is signed out unless the user asks to keep them.",
+        "operationId": "changePassword",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Wrong current credentials"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Change Password",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/prelogin": {
+      "post": {
+        "description": "The KDF parameters for an address. An address without an account gets\nstable made-up parameters, so the answer does not reveal which exist.",
+        "operationId": "prelogin",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreloginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreloginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Prelogin",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/recovery/complete": {
+      "post": {
+        "description": "Sets a new master password with the recovery key, signs out every\ndevice, and signs in this one.",
+        "operationId": "completeRecovery",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryComplete"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedIn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Wrong recovery key"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Recovery Complete",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/recovery/start": {
+      "post": {
+        "description": "Proves the recovery key and returns the vault key wrapped by it.",
+        "operationId": "startRecovery",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryWrap"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Wrong recovery key"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Recovery Start",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/register": {
+      "post": {
+        "description": "Creates an account and signs in the registering device, which created\nthe vault. Syncing waits until the email address is confirmed.",
+        "operationId": "register",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedIn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Registration is not open"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "The address has an account"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Register",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/signin": {
+      "post": {
+        "description": "An active device receives its token and the wrapped vault key. A device\nthe account does not know becomes pending and gets a one-time claim token;\nit receives nothing else until another device or an email link approves it.",
+        "operationId": "signin",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SigninRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SignedIn"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PendingApproval"
+                    }
+                  ],
+                  "title": "Response Signin"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Wrong credentials"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Account disabled"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "This device was revoked"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Signin",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/verify-email/resend": {
+      "post": {
+        "operationId": "resendVerification",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Email is not configured"
+          }
+        },
+        "summary": "Resend Verification",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/devices/claim": {
+      "post": {
+        "description": "The pending device collects its approval with the claim token only it\nhas: its device token and the wrapped vault key.",
+        "operationId": "claimDevice",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedIn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Wrong claim token"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not approved yet"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Claim",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/devices/{device_id}/approve": {
+      "post": {
+        "operationId": "approveDevice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "title": "Device Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such device"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not pending"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/devices/{device_id}/revoke": {
+      "post": {
+        "description": "Revokes a device (the current one signs out). Its token stops working\nimmediately.",
+        "operationId": "revokeDevice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "title": "Device Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No such device"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke",
+        "tags": [
+          "account"
+        ]
+      }
+    },
     "/api/health/live": {
       "get": {
         "operationId": "getLiveness",
