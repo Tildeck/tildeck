@@ -74,7 +74,7 @@ Changing the master password re-wraps the same vault key; records are never re-e
 - `VK` lives in memory only while the vault is unlocked. The vault locks after an idle period (default 15 minutes, a user setting) and when the app is closed. Buffers holding keys are zeroed when freed where the language allows it.
 - The device token, with the account's email address and server, is stored in the local vault file, sealed under `VK` with XChaCha20-Poly1305 and `ad = "tildeck:local:v1|" + vault_id`. It never syncs. It is therefore readable only while the vault is unlocked, which is the only time a device can sync anyway (records need `VK`), so platform secure storage would add nothing while the vault is locked and a dependency while it is open. (Changed on 2026-09-30 while implementing step 5, from platform secure storage: Android Keystore through EncryptedSharedPreferences, Windows DPAPI. Approved by Shlomi on 2026-10-01.)
 - A device can also use Tildeck without any account: the vault is then local only, with a locally generated salt and no recovery key. Registering later uploads the same vault unchanged (records and `wrap_pw` are bound to `vault_id`, not to an account) and creates the recovery key at that point.
-- Biometric unlock is out of scope for the first release.
+- Biometric unlock was out of scope for the first release; Shlomi asked for it on 2026-10-01 (typing the master password at every unlock on a phone is too much). It comes with stage 3 of the Termius parity plan, and its design is added here for approval before it is built.
 
 ## Records
 

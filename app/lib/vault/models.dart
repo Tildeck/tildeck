@@ -9,11 +9,14 @@ sealed class VaultEntry {
   String get type;
   Map<String, Object?> dataJson();
 
-  static VaultEntry fromJson(String id, String type, Map<String, dynamic> data) => switch (type) {
+  /// Null for a type this version does not know: a record from a newer
+  /// version of the app. It stays in the vault untouched, and is not shown.
+  static VaultEntry? fromJson(String id, String type, Map<String, dynamic> data) => switch (type) {
     HostEntry.recordType => HostEntry.fromJson(id, data),
     KeyEntry.recordType => KeyEntry.fromJson(id, data),
     KnownHostEntry.recordType => KnownHostEntry.fromJson(id, data),
-    _ => throw FormatException('unknown record type $type'),
+    SnippetEntry.recordType => SnippetEntry.fromJson(id, data),
+    _ => null,
   };
 }
 
@@ -32,6 +35,7 @@ class HostEntry extends VaultEntry {
     this.auth = HostAuth.password,
     this.password,
     this.keyId,
+    this.startupSnippetId,
   });
 
   static const recordType = 'host';
@@ -49,6 +53,9 @@ class HostEntry extends VaultEntry {
   /// A [KeyEntry] id, for key authentication.
   final String? keyId;
 
+  /// A [SnippetEntry] id, run in the shell as soon as the session opens.
+  final String? startupSnippetId;
+
   @override
   String get type => recordType;
 
@@ -62,6 +69,7 @@ class HostEntry extends VaultEntry {
     'auth': auth.name,
     'password': password,
     'key_id': keyId,
+    'startup_snippet_id': startupSnippetId,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -74,6 +82,7 @@ class HostEntry extends VaultEntry {
     auth: HostAuth.values.byName(d['auth'] as String? ?? 'password'),
     password: d['password'] as String?,
     keyId: d['key_id'] as String?,
+    startupSnippetId: d['startup_snippet_id'] as String?,
   );
 
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
@@ -133,4 +142,26 @@ class KnownHostEntry extends VaultEntry {
     keyType: d['key_type'] as String,
     fingerprint: d['fingerprint'] as String,
   );
+}
+
+/// A saved command or script: run in an open session, on several hosts at
+/// once, or when a host's session starts.
+class SnippetEntry extends VaultEntry {
+  const SnippetEntry({required super.id, required this.name, required this.command});
+
+  static const recordType = 'snippet';
+
+  final String name;
+
+  /// One or more lines, sent to the shell as typed, each followed by Enter.
+  final String command;
+
+  @override
+  String get type => recordType;
+
+  @override
+  Map<String, Object?> dataJson() => {'name': name, 'command': command};
+
+  static SnippetEntry fromJson(String id, Map<String, dynamic> d) =>
+      SnippetEntry(id: id, name: d['name'] as String, command: d['command'] as String);
 }

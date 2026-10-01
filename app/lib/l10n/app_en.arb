@@ -280,5 +280,33 @@
         "type": "String"
       }
     }
+  },
+  "snippetsTitle": "Snippets",
+  "addSnippet": "New snippet",
+  "editSnippet": "Edit snippet",
+  "noSnippetsYet": "No snippets yet. Save the commands you run often, then run them in a session, on several hosts at once, or when a host connects.",
+  "snippetNameLabel": "Name",
+  "snippetNameHint": "Restart web server",
+  "snippetCommandLabel": "Command",
+  "snippetCommandHelp": "Each line is sent as typed, followed by Enter.",
+  "runOnHosts": "Run on several hosts",
+  "runOnHostsTitle": "Run \"{name}\" on",
+  "runOnHostsButton": "{count, plural, =1{Run on 1 host} other{Run on {count} hosts}}",
+  "startupSnippetLabel": "Startup snippet",
+  "startupSnippetHelp": "Runs in the shell as soon as the session opens.",
+  "noStartupSnippet": "None",
+  "@runOnHostsTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@runOnHostsButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

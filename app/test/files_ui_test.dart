@@ -69,6 +69,15 @@ class TempFiles implements LocalFiles {
   }
 }
 
+/// Real file work completes outside the test clock: let it run between
+/// frames until [done], for up to ten seconds.
+Future<void> waitFor(WidgetTester tester, bool Function() done) async {
+  for (var i = 0; i < 200 && !done(); i++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.pump();
+  }
+}
+
 void main() {
   testWidgets('a folder opens, a file downloads where the user keeps files, and uploads go to the folder', (
     tester,
@@ -98,18 +107,13 @@ void main() {
     await tester.pump();
     expect(browser.opened, ['/home/deploy/logs']);
 
-    await tester.runAsync(() async {
-      await tester.tap(find.byKey(const ValueKey('entry-notes.txt')));
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('entry-notes.txt')));
+    await waitFor(tester, () => local.kept.isNotEmpty);
     expect(local.kept, ['hello']);
     expect(find.textContaining('Saved to'), findsOneWidget);
 
-    await tester.runAsync(() async {
-      await tester.tap(find.byKey(const ValueKey('filesUpload')));
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
+    await tester.tap(find.byKey(const ValueKey('filesUpload')));
+    await waitFor(tester, () => browser.uploaded.isNotEmpty);
     expect(browser.uploaded, [('script.sh', 'echo hi\n')]);
   });
 }

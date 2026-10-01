@@ -30,6 +30,7 @@ import 'package:tildeck/ui/connect_form.dart';
 import 'package:tildeck/ui/files_page.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
+import 'package:tildeck/ui/snippets_page.dart';
 import 'package:tildeck/ui/account_page.dart';
 import 'package:tildeck/ui/terminal_panel.dart';
 import 'package:tildeck/vault/models.dart';
@@ -434,6 +435,20 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/files_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('snippets $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() async {
+        final v = await sampleVault(unlocked: true);
+        await v.put(const SnippetEntry(id: 's1', name: 'Restart web', command: 'sudo systemctl restart nginx'));
+        await v.put(const SnippetEntry(id: 's2', name: 'Disk usage', command: 'df -h\ndu -sh /var/log/*'));
+        await v.put(const SnippetEntry(id: 's3', name: 'Tail app log', command: 'tail -f /var/log/app/current.log'));
+        return v;
+      }))!;
+      await tester.pumpWidget(screen(locale, mode, SnippetsPage(vault: vault)));
+      await tester.pumpAndSettle();
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/snippets_${locale}_${mode.name}.png'));
     });
 
     testWidgets('waiting for approval $locale ${mode.name}', (tester) async {
