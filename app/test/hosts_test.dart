@@ -141,6 +141,12 @@ void main() {
     expect(target.jump?.host, 'bastion.example.com');
     expect(target.jump?.password, 'bastion-pw');
     expect(target.jump?.jump, isNull);
+    expect(target.agentKeys, isNull, reason: 'agent forwarding is off unless chosen');
+    await tester.runAsync(() => vault.put(HostEntry.fromJson('d', {...db.dataJson(), 'agent_forwarding': true})));
+    await tester.runAsync(() => vault.put(const KeyEntry(id: 'k', name: 'Git', privateKey: 'PEM', passphrase: 'pp')));
+    final agent = (await connectionTargetFor(context, vault, vault.entry<HostEntry>('d')!))!;
+    expect(agent.agentKeys, [(privateKey: 'PEM', passphrase: 'pp')]);
+    expect(agent.jump?.agentKeys, isNull, reason: 'only the host that asked for it');
 
     // A chain: the bastion is reached through the edge.
     await tester.runAsync(() => vault.put(bastion.copyWithJump('e')));

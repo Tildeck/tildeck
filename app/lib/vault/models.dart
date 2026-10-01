@@ -43,6 +43,7 @@ class HostEntry extends VaultEntry {
     this.tags = const [],
     this.env = const {},
     this.jumpHostId,
+    this.agentForwarding = false,
   });
 
   static const recordType = 'host';
@@ -74,6 +75,10 @@ class HostEntry extends VaultEntry {
   /// have its own, which makes a chain.
   final String? jumpHostId;
 
+  /// Lets the server use the vault's keys while connected (like ssh -A),
+  /// for signing in from it onward. The keys never leave this device.
+  final bool agentForwarding;
+
   @override
   String get type => recordType;
 
@@ -91,6 +96,7 @@ class HostEntry extends VaultEntry {
     'tags': tags,
     'env': env,
     'jump_host_id': jumpHostId,
+    'agent_forwarding': agentForwarding,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -107,6 +113,7 @@ class HostEntry extends VaultEntry {
     tags: [...?(d['tags'] as List?)?.cast<String>()],
     env: {...?(d['env'] as Map?)?.cast<String, String>()},
     jumpHostId: d['jump_host_id'] as String?,
+    agentForwarding: d['agent_forwarding'] as bool? ?? false,
   );
 
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';

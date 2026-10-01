@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Agent forwarding per host: the server can sign in onward with the vault's keys during the session, without the keys leaving the device.
 - Jump hosts: connect to a host through another saved host, or a chain of them, set per host or per group.
 - Port forwarding: local, remote, and dynamic (SOCKS5) rules through saved hosts, synced across devices, turned on and off from their own page.
 - Split view on wide screens: two sessions side by side.
@@ -23,3 +24,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - A local encrypted vault in the client: a master password, saved hosts in groups, private keys, and trusted host keys, all encrypted on the device; automatic lock after 15 minutes.
 - SSH sessions in the client: connect with a password or a private key, sessions in tabs, host key verification with a warning when a server's key changes, and an on-screen key bar on Android.
 - Project foundation: repository baseline, sync server shell with health checks and a settings registry, admin panel shell, client app shell for Windows and Android, Docker definitions, workflow scripts, and CI.
+
+### Fixed
+
+- A host's environment variable that the server does not accept no longer fails the session; it is skipped, as ssh does.

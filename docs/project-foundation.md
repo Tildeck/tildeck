@@ -310,7 +310,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 | Stage | Scope | Status |
 |---|---|---|
 | 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
-| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding and jump hosts done |
+| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding, jump hosts, and agent forwarding done |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
 | Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
@@ -374,6 +374,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The editor offers only hosts whose own chain does not lead back, so a loop cannot be chosen; one made anyway by edits on two devices ends the chain where it repeats.
 - A failure at a jump host names it: "At deploy@bastion: the server rejected the username or the credentials."
 - Tests: chains, group inheritance, loop-free choices, and loops ending. Against the OpenSSH container, which is its own jump host: one hop, two hops, closing both connections together, a failure at the jump host named, and a target the jump host cannot reach.
+
+### Agent forwarding (2026-10-01)
+
+- A switch per host, off by default, lets the server use the vault's keys while connected (like `ssh -A`), for example to pull from Git or sign in onward. The client answers the server's agent requests itself; the keys never leave the device. Keys whose passphrase is not saved are left out.
+- The switch explains the risk: anyone with root on the server can use the keys during the session.
+- Only the host that asks for it gets the agent, not its jump hosts.
+- Session requests are pipelined, as ssh(1) sends them: a refused environment variable, agent forwarding, or pty is skipped, and only a refused shell or command fails the session. Before this, a variable outside the server's AcceptEnv failed the whole session.
+- Tests: the agent offered only when chosen; a refused environment variable no longer stops the shell (fails on the old behavior). Against the OpenSSH container, which now allows agent forwarding: the server signs in to itself with nothing but the forwarded key, and without the switch it has no agent and cannot.
 
 ## Required workflow contracts
 

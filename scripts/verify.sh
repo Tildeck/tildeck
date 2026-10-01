@@ -192,12 +192,13 @@ start_test_sshd() {
     ssh-keygen -q -t ed25519 -N "$KEY_PASS" -f /tmp/encrypted &&
     cat /tmp/plain.pub /tmp/encrypted.pub >> /config/.ssh/authorized_keys &&
     chmod 600 /config/.ssh/authorized_keys' || return 1
-  # Accept the test's environment variables and allow port forwarding (the
+  # Accept the test's environment variables and allow port and agent
+  # forwarding (the
   # image turns it off; sshd keeps the first value of a keyword, so these go
   # first), then reload sshd (SIGHUP re-execs it with the new configuration)
   # and wait for it to listen again.
   docker exec "$SSH_CONTAINER" sh -c '
-    sed -i "1i AllowTcpForwarding yes" /config/sshd/sshd_config &&
+    sed -i -e "1i AllowAgentForwarding yes" -e "1i AllowTcpForwarding yes" /config/sshd/sshd_config &&
     echo "AcceptEnv TILDECK_*" >> /config/sshd/sshd_config &&
     pkill -HUP -f "sshd.pam -D"' || return 1
   waited=0
