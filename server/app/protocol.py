@@ -22,6 +22,7 @@ class ErrorCode(StrEnum):
     registration_closed = "registration_closed"
     registration_needs_email = "registration_needs_email"
     registration_invite_required = "registration_invite_required"
+    invalid_invite = "invalid_invite"
     email_taken = "email_taken"
     invalid_email = "invalid_email"
     # Sign-in, devices, and tokens.

@@ -19,7 +19,7 @@ from app import accounts, audit, clock, settings_store
 from app.accounts import KdfParams, Sealed
 from app.db import get_db
 from app.mailer import Mail, email_configured, text
-from app.models import Account, Device, EmailToken
+from app.models import Account, Device, EmailToken, Invite
 from app.protocol import ApiError, ErrorCode, errors, require_protocol
 
 logger = logging.getLogger("tildeck.accounts")
@@ -64,6 +64,7 @@ class RegisterRequest(BaseModel):
     wrap_pw: Sealed
     wrap_rk: Sealed
     device: DeviceInfo
+    invite_code: str | None = Field(default=None, max_length=100, description="An invitation from an administrator")
 
     _keys = field_validator("auth_key", "recovery_auth_key")(accounts.key32)
 
@@ -209,6 +210,24 @@ async def _mail(request: Request, session: AsyncSession, account: Account, kind:
         return False
 
 
+async def send_invite(request: Request, session: AsyncSession, email: str, code: str, locale: str) -> bool:
+    """Emails an invitation with its code, when email is configured."""
+    if not await email_configured(session):
+        return False
+    values = {"server": await _server_label(session), "code": code}
+    try:
+        await request.app.state.mailer.send(
+            session,
+            Mail(
+                to=email, subject=text(locale, "invite_subject", **values), body=text(locale, "invite_body", **values)
+            ),
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001 - the invitation exists either way; its code is shown to the admin
+        logger.error("Could not send an invitation mail: %s", exc)
+        return False
+
+
 async def _link(
     session: AsyncSession, account: Account, purpose: str, ttl: timedelta, device: Device | None = None
 ) -> str:
@@ -316,10 +335,11 @@ async def register(body: RegisterRequest, request: Request, session: AsyncSessio
     mode = await settings_store.get_value(session, "registration_mode")
     if mode == "closed":
         raise ApiError(403, ErrorCode.registration_closed)
-    if mode == "invite":
-        # Invitations are created in the admin panel (product step 6).
+    invite = await _invite_for(session, body.invite_code, email) if body.invite_code else None
+    if mode == "invite" and invite is None:
         raise ApiError(403, ErrorCode.registration_invite_required)
-    if not await email_configured(session):
+    # An invitation confirms the address, so it needs no email to verify.
+    if invite is None and not await email_configured(session):
         raise ApiError(403, ErrorCode.registration_needs_email)
     if await _account_by_email(session, email) is not None:
         raise ApiError(409, ErrorCode.email_taken)
@@ -339,20 +359,47 @@ async def register(body: RegisterRequest, request: Request, session: AsyncSessio
         wrap_pw=body.wrap_pw.model_dump_json(),
         wrap_rk=body.wrap_rk.model_dump_json(),
     )
+    if invite is not None:
+        account.email_verified_at = clock.now()
+        invite.used_at = clock.now()
     session.add(account)
     device = Device(
         id=body.device.id, account_id=account.id, name=body.device.name, status="active", approved_at=clock.now()
     )
     session.add(device)
     token = _issue_token(device)
-    link = await _link(session, account, "verify", VERIFY_TTL)
+    link = None if invite is not None else await _link(session, account, "verify", VERIFY_TTL)
     audit.record(
-        session, actor=email, source="user", action="account_registered", entity="account", entity_id=account.id
+        session,
+        actor=email,
+        source="user",
+        action="account_registered",
+        entity="account",
+        entity_id=account.id,
+        new_value="invited" if invite is not None else None,
     )
     await session.commit()
-    await _mail(request, session, account, "verify", link=link)
-    await session.commit()
-    return SignedIn(device_token=token, email_verified=False, vault=_vault_keys(account))
+    if link is not None:
+        await _mail(request, session, account, "verify", link=link)
+        await session.commit()
+    return SignedIn(device_token=token, email_verified=invite is not None, vault=_vault_keys(account))
+
+
+async def _invite_for(session: AsyncSession, code: str, email: str) -> Invite:
+    """The unused, unexpired invitation with this code for this address.
+    Locked, so two registrations cannot both use it."""
+    invite = await session.scalar(
+        select(Invite).where(Invite.code_hash == accounts.token_hash(code.strip())).with_for_update()
+    )
+    if (
+        invite is None
+        or invite.used_at is not None
+        or invite.revoked_at is not None
+        or invite.expires_at <= clock.now()
+        or invite.email != email
+    ):
+        raise ApiError(403, ErrorCode.invalid_invite)
+    return invite
 
 
 @router.post(

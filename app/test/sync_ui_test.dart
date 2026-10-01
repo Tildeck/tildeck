@@ -92,6 +92,7 @@ void main() {
     expect(server.account, isNull);
 
     await tester.enterText(find.byKey(const ValueKey('syncPassword')), password);
+    await tester.enterText(find.byKey(const ValueKey('syncInvite')), ' invite-code-123 ');
     await tap(tester, 'syncRegister');
     await waitFor(tester, () => shown(find.byKey(const ValueKey('recoveryKey'))), 'the recovery key');
 
@@ -106,6 +107,7 @@ void main() {
     await tester.pump();
     expect(find.text('Signed in as user@example.test'), findsOneWidget);
     expect(server.account!['auth_key'], isNot(contains(password)));
+    expect(server.account!['invite_code'], 'invite-code-123');
 
     // The second device has no vault: it signs in and waits for approval.
     final b = (await tester.runAsync(() async {

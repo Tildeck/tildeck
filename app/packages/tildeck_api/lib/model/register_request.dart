@@ -16,6 +16,7 @@ class RegisterRequest {
     required this.authKey,
     required this.device,
     required this.email,
+    this.inviteCode,
     required this.kdf,
     this.locale = 'en',
     required this.recoveryAuthKey,
@@ -29,6 +30,9 @@ class RegisterRequest {
   DeviceInfo device;
 
   String email;
+
+  /// An invitation from an administrator
+  String? inviteCode;
 
   KdfParams kdf;
 
@@ -47,6 +51,7 @@ class RegisterRequest {
     other.authKey == authKey &&
     other.device == device &&
     other.email == email &&
+    other.inviteCode == inviteCode &&
     other.kdf == kdf &&
     other.locale == locale &&
     other.recoveryAuthKey == recoveryAuthKey &&
@@ -60,6 +65,7 @@ class RegisterRequest {
     (authKey.hashCode) +
     (device.hashCode) +
     (email.hashCode) +
+    (inviteCode == null ? 0 : inviteCode!.hashCode) +
     (kdf.hashCode) +
     (locale.hashCode) +
     (recoveryAuthKey.hashCode) +
@@ -68,13 +74,18 @@ class RegisterRequest {
     (wrapRk.hashCode);
 
   @override
-  String toString() => 'RegisterRequest[authKey=$authKey, device=$device, email=$email, kdf=$kdf, locale=$locale, recoveryAuthKey=$recoveryAuthKey, vaultId=$vaultId, wrapPw=$wrapPw, wrapRk=$wrapRk]';
+  String toString() => 'RegisterRequest[authKey=$authKey, device=$device, email=$email, inviteCode=$inviteCode, kdf=$kdf, locale=$locale, recoveryAuthKey=$recoveryAuthKey, vaultId=$vaultId, wrapPw=$wrapPw, wrapRk=$wrapRk]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'auth_key'] = this.authKey;
       json[r'device'] = this.device;
       json[r'email'] = this.email;
+    if (this.inviteCode != null) {
+      json[r'invite_code'] = this.inviteCode;
+    } else {
+      json[r'invite_code'] = null;
+    }
       json[r'kdf'] = this.kdf;
       json[r'locale'] = this.locale;
       json[r'recovery_auth_key'] = this.recoveryAuthKey;
@@ -118,6 +129,7 @@ class RegisterRequest {
         authKey: mapValueOfType<String>(json, r'auth_key')!,
         device: DeviceInfo.fromJson(json[r'device'])!,
         email: mapValueOfType<String>(json, r'email')!,
+        inviteCode: mapValueOfType<String>(json, r'invite_code'),
         kdf: KdfParams.fromJson(json[r'kdf'])!,
         locale: mapValueOfType<String>(json, r'locale') ?? 'en',
         recoveryAuthKey: mapValueOfType<String>(json, r'recovery_auth_key')!,

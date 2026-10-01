@@ -197,6 +197,7 @@
           "registration_closed",
           "registration_needs_email",
           "registration_invite_required",
+          "invalid_invite",
           "email_taken",
           "invalid_email",
           "invalid_credentials",
@@ -525,6 +526,19 @@
             "maxLength": 320,
             "title": "Email",
             "type": "string"
+          },
+          "invite_code": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An invitation from an administrator",
+            "title": "Invite Code"
           },
           "kdf": {
             "$ref": "#/components/schemas/KdfParams"

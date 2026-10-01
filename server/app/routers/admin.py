@@ -6,7 +6,8 @@ only: no route returns ciphertext, wrapped keys, or hashes.
 """
 
 import hmac
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Cookie, Depends, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
@@ -17,9 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import accounts, admins, audit, clock, settings_store
 from app.accounts import RateLimiter
 from app.db import get_db
-from app.models import Account, Admin, AdminSession, AuditEntry, Device, Record
+from app.models import Account, Admin, AdminSession, AuditEntry, Device, Invite, Record
 from app.protocol import ApiError, ErrorCode
-from app.routers.account import revoke_device
+from app.routers.account import revoke_device, send_invite
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], include_in_schema=False)
 
@@ -450,6 +451,120 @@ async def change_settings(
             status, code = refusals[type(e)]
             return JSONResponse({"error": code.value, "key": key}, status_code=status)
     await session.commit()
+    return Response(status_code=204)
+
+
+# --- Invitations -------------------------------------------------------------
+
+INVITE_TTL = timedelta(days=7)
+
+
+class InviteCreate(BaseModel):
+    email: str = Field(max_length=320)
+    locale: str = Field(default="en", pattern="^(en|he)$")
+
+
+class InviteCreated(BaseModel):
+    id: str
+    email: str
+    code: str
+    expires_at: datetime
+    emailed: bool
+
+
+class InviteRow(BaseModel):
+    id: str
+    email: str
+    created_by: str
+    created_at: datetime
+    expires_at: datetime
+    status: str
+
+
+def _invite_status(invite: Invite) -> str:
+    if invite.used_at is not None:
+        return "used"
+    if invite.revoked_at is not None:
+        return "revoked"
+    if invite.expires_at <= clock.now():
+        return "expired"
+    return "open"
+
+
+@router.post("/invites", response_model=InviteCreated, status_code=201)
+async def create_invite(
+    body: InviteCreate,
+    request: Request,
+    caller: Caller = Depends(current_admin),
+    session: AsyncSession = Depends(get_db),
+) -> InviteCreated:
+    """An invitation for one address. The code is shown here once and, with
+    email configured, sent to the address; the server keeps only its hash."""
+    email = accounts.normalize_email(body.email)
+    if not accounts.EMAIL_RE.match(email):
+        raise ApiError(422, ErrorCode.invalid_email)
+    if await session.scalar(select(Account).where(Account.email == email)) is not None:
+        raise ApiError(409, ErrorCode.email_taken)
+    code = secrets.token_urlsafe(12)
+    invite = Invite(
+        id=accounts.new_id(),
+        code_hash=accounts.token_hash(code),
+        email=email,
+        created_by=caller.name,
+        expires_at=clock.now() + INVITE_TTL,
+    )
+    session.add(invite)
+    audit.record(
+        session,
+        actor=caller.name,
+        source="admin",
+        action="invite_created",
+        entity="invite",
+        entity_id=invite.id,
+        new_value=email,
+    )
+    await session.commit()
+    emailed = await send_invite(request, session, email, code, body.locale)
+    return InviteCreated(id=invite.id, email=email, code=code, expires_at=invite.expires_at, emailed=emailed)
+
+
+@router.get("/invites", response_model=list[InviteRow])
+async def list_invites(
+    caller: Caller = Depends(current_admin), session: AsyncSession = Depends(get_db)
+) -> list[InviteRow]:
+    rows = (await session.scalars(select(Invite).order_by(Invite.created_at.desc()))).all()
+    return [
+        InviteRow(
+            id=i.id,
+            email=i.email,
+            created_by=i.created_by,
+            created_at=i.created_at,
+            expires_at=i.expires_at,
+            status=_invite_status(i),
+        )
+        for i in rows
+    ]
+
+
+@router.post("/invites/{invite_id}/revoke", status_code=204)
+async def revoke_invite(
+    invite_id: str, caller: Caller = Depends(current_admin), session: AsyncSession = Depends(get_db)
+) -> Response:
+    invite = await session.get(Invite, invite_id)
+    if invite is None:
+        raise ApiError(404, ErrorCode.not_found)
+    if invite.used_at is None and invite.revoked_at is None:
+        invite.revoked_at = clock.now()
+        audit.record(
+            session,
+            actor=caller.name,
+            source="admin",
+            action="invite_revoked",
+            entity="invite",
+            entity_id=invite.id,
+            old_value=invite.email,
+        )
+        await session.commit()
     return Response(status_code=204)
 
 

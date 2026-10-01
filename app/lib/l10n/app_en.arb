@@ -134,7 +134,7 @@
   "errorInvalidCredentials": "Wrong email or master password.",
   "errorEmailTaken": "An account with this email already exists. Sign in to it instead.",
   "errorRegistrationClosed": "This server does not accept new accounts.",
-  "errorRegistrationInvite": "This server accepts new accounts by invitation only.",
+  "errorRegistrationInvite": "This server creates accounts by invitation only. Enter the invitation code you received.",
   "errorRegistrationNeedsEmail": "This server cannot send email yet, so it cannot accept new accounts.",
   "errorInvalidEmail": "That email address does not look right.",
   "errorRateLimited": "Too many attempts. Wait a few minutes and try again.",
@@ -229,5 +229,8 @@
   "pendingWaiting": "This screen continues by itself once the device is approved.",
   "haveAccount": "I already have a sync account",
   "signInTitle": "Sign in to sync",
-  "signInIntro": "Your vault comes from your server, encrypted, and opens here with your master password."
+  "signInIntro": "Your vault comes from your server, encrypted, and opens here with your master password.",
+  "inviteCodeLabel": "Invitation code",
+  "inviteCodeHelp": "Only if you were invited.",
+  "errorInvalidInvite": "This invitation code is not valid for this email address. It may be used, expired, or cancelled."
 }

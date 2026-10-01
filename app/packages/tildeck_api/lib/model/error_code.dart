@@ -17,6 +17,7 @@ enum ErrorCode {
   registrationClosed._(r'registration_closed'),
   registrationNeedsEmail._(r'registration_needs_email'),
   registrationInviteRequired._(r'registration_invite_required'),
+  invalidInvite._(r'invalid_invite'),
   emailTaken._(r'email_taken'),
   invalidEmail._(r'invalid_email'),
   invalidCredentials._(r'invalid_credentials'),
@@ -102,6 +103,7 @@ class ErrorCodeTypeTransformer {
         case r'registration_closed': return ErrorCode.registrationClosed;
         case r'registration_needs_email': return ErrorCode.registrationNeedsEmail;
         case r'registration_invite_required': return ErrorCode.registrationInviteRequired;
+        case r'invalid_invite': return ErrorCode.invalidInvite;
         case r'email_taken': return ErrorCode.emailTaken;
         case r'invalid_email': return ErrorCode.invalidEmail;
         case r'invalid_credentials': return ErrorCode.invalidCredentials;

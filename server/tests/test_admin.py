@@ -16,7 +16,7 @@ from app.db import engine
 from app.main import app
 from app.routers import account as account_routes
 from app.routers import admin as admin_routes
-from tests.test_accounts import Keys, b64, bearer, mail, register, verify  # noqa: F401 - mail is a fixture
+from tests.test_accounts import H, Keys, b64, bearer, mail, register, verify  # noqa: F401 - mail is a fixture
 
 USERNAME = "operator"
 PASSWORD = "a-long-admin-password"
@@ -220,3 +220,67 @@ async def test_settings_show_where_values_come_from_and_never_a_secret(panel, mo
     assert rows["public_url"]["locked"] is True and rows["public_url"]["origin"] == "env"
     everything = (await panel.get("/api/admin/settings")).text + (await panel.get("/api/admin/activity")).text
     assert secret not in everything
+
+
+async def test_an_invitation_registers_one_address_once_and_confirms_it(panel, client, monkeypatch):
+    csrf, _ = await set_up(panel, monkeypatch)
+    # Invitations need no email: this server has none configured.
+    monkeypatch.setenv("REGISTRATION_MODE", "invite")
+    res = await panel.post("/api/admin/invites", json={"email": "Guest@Example.test"}, headers=csrf)
+    assert res.status_code == 201 and res.json()["emailed"] is False
+    code = res.json()["code"]
+
+    uninvited = Keys("other@example.test")
+    refused = await client.post("/api/account/register", json=uninvited.register_body(), headers=H)
+    assert (refused.status_code, refused.json()) == (403, {"error": "registration_invite_required"})
+    wrong_address = await client.post(
+        "/api/account/register", json={**uninvited.register_body(), "invite_code": code}, headers=H
+    )
+    assert (wrong_address.status_code, wrong_address.json()) == (403, {"error": "invalid_invite"})
+
+    guest = Keys("guest@example.test")
+    ok = await client.post("/api/account/register", json={**guest.register_body(), "invite_code": code}, headers=H)
+    assert ok.status_code == 201 and ok.json()["email_verified"] is True
+    # Confirmed by the invitation: the device syncs at once.
+    assert (await client.get("/api/sync/records", headers=bearer(ok.json()["device_token"]))).status_code == 200
+
+    again = Keys("guest@example.test")
+    reused = await client.post("/api/account/register", json={**again.register_body(), "invite_code": code}, headers=H)
+    assert reused.status_code in (403, 409)
+    [row] = (await panel.get("/api/admin/invites")).json()
+    assert row["status"] == "used" and row["email"] == "guest@example.test"
+    assert "code" not in row, "the code is shown once, at creation"
+
+
+async def test_revoked_and_expired_invitations_are_refused(panel, client, monkeypatch):
+    csrf, _ = await set_up(panel, monkeypatch)
+    monkeypatch.setenv("REGISTRATION_MODE", "invite")
+
+    async def invite(email: str) -> dict:
+        res = await panel.post("/api/admin/invites", json={"email": email}, headers=csrf)
+        return res.json()
+
+    revoked = await invite("a@example.test")
+    assert (await panel.post(f"/api/admin/invites/{revoked['id']}/revoke", headers=csrf)).status_code == 204
+    body = {**Keys("a@example.test").register_body(), "invite_code": revoked["code"]}
+    assert (await client.post("/api/account/register", json=body, headers=H)).json() == {"error": "invalid_invite"}
+
+    expired = await invite("b@example.test")
+    later = clock.now() + timedelta(days=8)
+    monkeypatch.setattr(clock, "now", lambda: later)
+    body = {**Keys("b@example.test").register_body(), "invite_code": expired["code"]}
+    assert (await client.post("/api/account/register", json=body, headers=H)).json() == {"error": "invalid_invite"}
+
+
+async def test_an_invitation_is_emailed_when_email_is_configured(panel, client, mail, monkeypatch):  # noqa: F811
+    csrf, _ = await set_up(panel, monkeypatch)
+    res = await panel.post("/api/admin/invites", json={"email": "guest@example.test", "locale": "he"}, headers=csrf)
+    assert res.json()["emailed"] is True
+    [message] = [m for m in mail.sent if m.to == "guest@example.test"]
+    assert res.json()["code"] in message.body and "Tildeck" in message.subject
+    taken = await panel.post("/api/admin/invites", json={"email": "guest@example.test"}, headers=csrf)
+    assert taken.status_code == 201, "an open invitation does not block another"
+    keys = Keys("user@example.test")
+    await register(client, keys)
+    exists = await panel.post("/api/admin/invites", json={"email": "user@example.test"}, headers=csrf)
+    assert (exists.status_code, exists.json()) == (409, {"error": "email_taken"})

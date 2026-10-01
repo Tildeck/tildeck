@@ -11,6 +11,7 @@ const areas = computed(() => session.value
   ? [
       { to: '/', label: t('nav.overview'), on: route.path === '/' },
       { to: '/users', label: t('nav.users'), on: route.path.startsWith('/users') },
+      { to: '/invites', label: t('nav.invites'), on: route.path === '/invites' },
       { to: '/settings', label: t('nav.settings'), on: route.path === '/settings' },
       { to: '/activity', label: t('nav.activity'), on: route.path === '/activity' },
     ]

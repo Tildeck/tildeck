@@ -151,6 +151,7 @@ class SyncServer {
     required Sealed wrapRk,
     required String deviceId,
     required String deviceName,
+    String? inviteCode,
   }) async {
     final res = await _call(
       () => _account.register(
@@ -164,6 +165,7 @@ class SyncServer {
           wrapPw: _sealedOut(wrapPw),
           wrapRk: _sealedOut(wrapRk),
           device: api.DeviceInfo(id: deviceId, name: deviceName),
+          inviteCode: inviteCode,
         ),
         tildeckProtocol: kProtocolVersion,
       ),

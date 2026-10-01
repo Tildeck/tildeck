@@ -76,11 +76,11 @@ function retry() {
     </section>
 
     <nav
-      class="grid gap-4 sm:grid-cols-3"
+      class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       :aria-label="t('shell.areas')"
     >
       <NuxtLink
-        v-for="area in ['users', 'settings', 'activity']"
+        v-for="area in ['users', 'invites', 'settings', 'activity']"
         :key="area"
         :to="`/${area}`"
         class="card group flex flex-col gap-1 p-5 transition-colors hover:border-brand"
