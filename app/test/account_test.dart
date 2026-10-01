@@ -17,6 +17,7 @@ const newPassword = 'lantern-river-autumn-77';
 
 late Directory dir;
 late FakeSyncServer server;
+final devices = <Device>[];
 
 /// One device: its vault, sync engine, and account service.
 class Device {
@@ -29,6 +30,7 @@ class Device {
       interval: const Duration(days: 1),
     );
     accounts = AccountService(vault: vault, engine: engine);
+    devices.add(this);
   }
 
   final String name;
@@ -83,7 +85,15 @@ void main() {
     dir = await Directory.systemTemp.createTemp('tildeck-account');
     server = FakeSyncServer();
   });
-  tearDown(() => dir.delete(recursive: true));
+  tearDown(() async {
+    // Unlocking starts a sync; let every one finish before the files go.
+    for (final d in devices) {
+      await d.engine.sync();
+      d.engine.dispose();
+    }
+    devices.clear();
+    await dir.delete(recursive: true);
+  });
 
   test('changing the master password re-wraps the same vault and signs out the other devices', () async {
     final (a, _) = await registered();
