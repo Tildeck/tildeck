@@ -5,6 +5,7 @@ import '../logo.dart';
 import '../ssh/file_browser.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
+import '../terminal/terminal_themes.dart';
 import '../theme.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
@@ -12,6 +13,7 @@ import 'files_page.dart';
 import 'host_key_dialog.dart';
 import 'password_pages.dart';
 import 'snippets_page.dart';
+import 'terminal_settings_page.dart';
 import 'hosts_page.dart';
 import 'terminal_panel.dart';
 
@@ -137,15 +139,6 @@ class _SessionsPageState extends State<SessionsPage> {
             onPressed: widget.vault.lock,
           ),
           IconButton(
-            key: const ValueKey('openPassword'),
-            tooltip: t.changePasswordTitle,
-            color: c.deskMuted,
-            icon: const Icon(Icons.password_rounded),
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute<void>(builder: (_) => ChangePasswordPage(services: widget.sync))),
-          ),
-          IconButton(
             key: const ValueKey('openSync'),
             tooltip: t.syncTitle,
             color: c.deskMuted,
@@ -153,16 +146,50 @@ class _SessionsPageState extends State<SessionsPage> {
             onPressed: () =>
                 Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AccountPage(services: widget.sync))),
           ),
-          TextButton(
-            onPressed: widget.onToggleLocale,
-            style: TextButton.styleFrom(foregroundColor: c.deskMuted),
-            child: Text(_otherLanguageName(context)),
-          ),
-          IconButton(
-            onPressed: widget.onToggleTheme,
-            tooltip: dark ? t.switchToLight : t.switchToDark,
-            color: c.deskMuted,
-            icon: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+          // The rest in one menu, so the bar fits a phone.
+          PopupMenuButton<String>(
+            key: const ValueKey('moreMenu'),
+            tooltip: t.moreActions,
+            iconColor: c.deskMuted,
+            onSelected: (action) {
+              switch (action) {
+                case 'appearance':
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => TerminalSettingsPage(vault: widget.vault)));
+                case 'password':
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => ChangePasswordPage(services: widget.sync)));
+                case 'language':
+                  widget.onToggleLocale();
+                case 'theme':
+                  widget.onToggleTheme();
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                key: const ValueKey('openTerminalSettings'),
+                value: 'appearance',
+                child: ListTile(leading: const Icon(Icons.palette_outlined), title: Text(t.terminalSettingsTitle)),
+              ),
+              PopupMenuItem(
+                key: const ValueKey('openPassword'),
+                value: 'password',
+                child: ListTile(leading: const Icon(Icons.password_rounded), title: Text(t.changePasswordTitle)),
+              ),
+              PopupMenuItem(
+                value: 'language',
+                child: ListTile(leading: const Icon(Icons.translate_rounded), title: Text(_otherLanguageName(context))),
+              ),
+              PopupMenuItem(
+                value: 'theme',
+                child: ListTile(
+                  leading: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+                  title: Text(dark ? t.switchToLight : t.switchToDark),
+                ),
+              ),
+            ],
           ),
           const SizedBox(width: 8),
         ],
@@ -221,11 +248,20 @@ class _SessionsPageState extends State<SessionsPage> {
                 children: [
                   HostsPage(vault: widget.vault, onConnect: _open),
                   for (final (i, session) in _sessions.indexed)
-                    TerminalPanel(
+                    ListenableBuilder(
                       key: ObjectKey(session),
-                      session: session,
-                      showKeyBar: widget.showKeyBar,
-                      onReconnect: () => _open(session.target, replacing: i),
+                      listenable: widget.vault,
+                      builder: (context, _) {
+                        final prefs = widget.vault.preferences;
+                        return TerminalPanel(
+                          session: session,
+                          showKeyBar: widget.showKeyBar,
+                          onReconnect: () => _open(session.target, replacing: i),
+                          theme: themeById(prefs.terminalTheme).theme,
+                          fontSize: prefs.fontSize ?? defaultFontSize,
+                          onFontSize: (size) => widget.vault.put(prefs.copyWith(fontSize: size)),
+                        );
+                      },
                     ),
                 ],
               ),
@@ -243,6 +279,53 @@ class _SessionsPageState extends State<SessionsPage> {
   }
 }
 
+/// Asks for a tab name; an empty one brings back the connection label.
+Future<void> _rename(BuildContext context, TerminalSession session) async {
+  final name = await showDialog<String>(
+    context: context,
+    builder: (_) => _RenameDialog(initial: session.title ?? ''),
+  );
+  if (name != null) session.rename(name);
+}
+
+class _RenameDialog extends StatefulWidget {
+  const _RenameDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_RenameDialog> createState() => _RenameDialogState();
+}
+
+class _RenameDialogState extends State<_RenameDialog> {
+  late final _name = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(t.renameTab),
+      content: TextField(
+        key: const ValueKey('tabName'),
+        controller: _name,
+        autofocus: true,
+        onSubmitted: (_) => Navigator.pop(context, _name.text),
+        decoration: InputDecoration(labelText: t.tabNameLabel, helperText: t.tabNameHelp),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, _name.text), child: Text(t.save)),
+      ],
+    );
+  }
+}
+
 class _TabStrip extends StatelessWidget {
   const _TabStrip({required this.sessions, required this.selected, required this.onSelect, required this.onClose});
 
@@ -256,7 +339,13 @@ class _TabStrip extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final c = context.colors;
 
-    Widget tab({required bool on, required Widget child, required VoidCallback onTap, Key? key}) => Padding(
+    Widget tab({
+      required bool on,
+      required Widget child,
+      required VoidCallback onTap,
+      VoidCallback? onRename,
+      Key? key,
+    }) => Padding(
       padding: const EdgeInsetsDirectional.only(end: 6),
       child: Material(
         key: key,
@@ -268,6 +357,8 @@ class _TabStrip extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           onTap: onTap,
+          onDoubleTap: onRename,
+          onLongPress: onRename,
           child: Padding(padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 8, 8), child: child),
         ),
       ),
@@ -287,8 +378,10 @@ class _TabStrip extends StatelessWidget {
             ListenableBuilder(
               listenable: session,
               builder: (context, _) => tab(
+                key: ValueKey('tab-$i'),
                 on: i == selected,
                 onTap: () => onSelect(i),
+                onRename: () => _rename(context, session),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -305,10 +398,11 @@ class _TabStrip extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // A connection label is Latin content: always LTR.
+                    // A connection label is Latin content: always LTR. A name
+                    // the user gave keeps its own direction.
                     Text(
-                      session.target.label,
-                      textDirection: TextDirection.ltr,
+                      session.title ?? session.target.label,
+                      textDirection: session.title == null ? TextDirection.ltr : null,
                       style: TextStyle(color: c.ink, fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(width: 4),

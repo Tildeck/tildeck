@@ -24,6 +24,16 @@ class TerminalSession extends ChangeNotifier {
   late final TerminalController controller;
 
   SessionState state = SessionState.connecting;
+
+  /// A name the user gave the tab; null shows the connection label.
+  String? title;
+
+  void rename(String? name) {
+    final trimmed = name?.trim();
+    title = trimmed == null || trimmed.isEmpty ? null : trimmed;
+    notifyListeners();
+  }
+
   ConnectProblem? problem;
 
   SSHClient? _client;

@@ -5,12 +5,21 @@ import 'package:xterm/xterm.dart';
 import '../l10n/app_localizations.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
+import '../terminal/terminal_themes.dart';
 import '../theme.dart';
 
 /// The terminal of one session. Terminal content is always left to right,
 /// whatever the interface language.
-class TerminalPanel extends StatelessWidget {
-  const TerminalPanel({super.key, required this.session, required this.showKeyBar, required this.onReconnect});
+class TerminalPanel extends StatefulWidget {
+  TerminalPanel({
+    super.key,
+    required this.session,
+    required this.showKeyBar,
+    required this.onReconnect,
+    TerminalTheme? theme,
+    this.fontSize = defaultFontSize,
+    this.onFontSize,
+  }) : theme = theme ?? terminalThemes.first.theme;
 
   final TerminalSession session;
 
@@ -18,39 +27,49 @@ class TerminalPanel extends StatelessWidget {
   /// Tab, Ctrl, or arrow keys.
   final bool showKeyBar;
   final VoidCallback onReconnect;
+  final TerminalTheme theme;
+  final double fontSize;
 
-  static const _theme = TerminalTheme(
-    cursor: Color(0xFF5EEAD4),
-    selection: Color(0x805EEAD4),
-    foreground: Color(0xFFE7F4F2),
-    background: Color(0xFF0B181B),
-    black: Color(0xFF1B2B2F),
-    red: Color(0xFFF87171),
-    green: Color(0xFF4ADE80),
-    yellow: Color(0xFFFBBF24),
-    blue: Color(0xFF60A5FA),
-    magenta: Color(0xFFF472B6),
-    cyan: Color(0xFF2DD4BF),
-    white: Color(0xFFD5E3E1),
-    brightBlack: Color(0xFF5B7075),
-    brightRed: Color(0xFFFCA5A5),
-    brightGreen: Color(0xFF86EFAC),
-    brightYellow: Color(0xFFFDE68A),
-    brightBlue: Color(0xFF93C5FD),
-    brightMagenta: Color(0xFFF9A8D4),
-    brightCyan: Color(0xFF5EEAD4),
-    brightWhite: Color(0xFFFFFFFF),
-    searchHitBackground: Color(0xFFFBBF24),
-    searchHitBackgroundCurrent: Color(0xFF2DD4BF),
-    searchHitForeground: Color(0xFF0B181B),
-  );
+  /// Ctrl and + or - (or 0, back to the default) asks for another size.
+  final ValueChanged<double>? onFontSize;
 
-  Future<void> _copy(BuildContext context) async {
+  @override
+  State<TerminalPanel> createState() => _TerminalPanelState();
+}
+
+/// One search hit: a line of the buffer and the columns it spans.
+typedef _Hit = ({int line, int start, int end});
+
+class _TerminalPanelState extends State<TerminalPanel> {
+  TerminalSession get session => widget.session;
+
+  final _scroll = ScrollController();
+  final _searchField = TextEditingController();
+  final _searchFocus = FocusNode();
+  final _terminalFocus = FocusNode();
+  bool _searching = false;
+  List<_Hit> _hits = const [];
+  int _current = -1;
+  final _highlights = <TerminalHighlight>[];
+
+  static const _maxHits = 500;
+
+  @override
+  void dispose() {
+    _clearHighlights();
+    _scroll.dispose();
+    _searchField.dispose();
+    _searchFocus.dispose();
+    _terminalFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _copy() async {
     final text = session.selectedText;
     if (text == null || text.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: text));
     session.controller.clearSelection();
-    if (context.mounted) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).copied), duration: const Duration(seconds: 1)),
       );
@@ -62,11 +81,90 @@ class TerminalPanel extends StatelessWidget {
     if (data?.text case final text?) session.paste(text);
   }
 
+  void _size(double size) => widget.onFontSize?.call(size.clamp(minFontSize, maxFontSize));
+
+  void _openSearch() {
+    setState(() => _searching = true);
+    _searchFocus.requestFocus();
+    _searchField.selection = TextSelection(baseOffset: 0, extentOffset: _searchField.text.length);
+  }
+
+  void _closeSearch() {
+    _clearHighlights();
+    setState(() {
+      _searching = false;
+      _hits = const [];
+      _current = -1;
+    });
+    _terminalFocus.requestFocus();
+  }
+
+  void _clearHighlights() {
+    for (final h in _highlights) {
+      h.dispose();
+    }
+    _highlights.clear();
+  }
+
+  /// Finds every occurrence of the query in the buffer, case-insensitive,
+  /// and highlights them; the last (newest) one is current.
+  void _search(String query) {
+    final hits = <_Hit>[];
+    final needle = query.toLowerCase();
+    if (needle.isNotEmpty) {
+      final lines = session.terminal.buffer.lines;
+      for (var i = 0; i < lines.length && hits.length < _maxHits; i++) {
+        final text = lines[i].getText().toLowerCase();
+        for (var at = text.indexOf(needle); at >= 0 && hits.length < _maxHits; at = text.indexOf(needle, at + 1)) {
+          hits.add((line: i, start: at, end: at + needle.length));
+        }
+      }
+    }
+    setState(() {
+      _hits = hits;
+      _current = hits.isEmpty ? -1 : hits.length - 1;
+    });
+    _paintHits();
+  }
+
+  void _paintHits() {
+    _clearHighlights();
+    final buffer = session.terminal.buffer;
+    for (final (i, hit) in _hits.indexed) {
+      _highlights.add(
+        session.controller.highlight(
+          p1: buffer.createAnchor(hit.start, hit.line),
+          p2: buffer.createAnchor(hit.end, hit.line),
+          // Translucent, so the matched text stays readable.
+          color: (i == _current ? widget.theme.searchHitBackgroundCurrent : widget.theme.searchHitBackground)
+              .withValues(alpha: 0.45),
+        ),
+      );
+    }
+    if (_current >= 0) _reveal(_hits[_current].line);
+  }
+
+  /// Scrolls so [line] shows, about a third from the top.
+  void _reveal(int line) {
+    if (!_scroll.hasClients) return;
+    final lineHeight = widget.fontSize * 1.2;
+    final top = (line - session.terminal.viewHeight ~/ 3) * lineHeight;
+    _scroll.jumpTo(top.clamp(0.0, _scroll.position.maxScrollExtent));
+  }
+
+  void _step(int by) {
+    if (_hits.isEmpty) return;
+    setState(() => _current = (_current + by) % _hits.length);
+    _paintHits();
+  }
+
   @override
   Widget build(BuildContext context) {
     // The interface direction, read before the terminal forces LTR, for the
     // parts that speak the interface language.
     final appDirection = Directionality.of(context);
+    final t = AppLocalizations.of(context);
+    final theme = widget.theme;
     return ListenableBuilder(
       listenable: session,
       builder: (context, _) {
@@ -74,32 +172,70 @@ class TerminalPanel extends StatelessWidget {
           // The desktop terminal convention: Ctrl+C and Ctrl+V belong to the
           // remote program, so copy and paste add Shift.
           bindings: {
-            const SingleActivator(LogicalKeyboardKey.keyC, control: true, shift: true): () => _copy(context),
+            const SingleActivator(LogicalKeyboardKey.keyC, control: true, shift: true): _copy,
             const SingleActivator(LogicalKeyboardKey.keyV, control: true, shift: true): _paste,
+            const SingleActivator(LogicalKeyboardKey.keyF, control: true, shift: true): _openSearch,
+            const SingleActivator(LogicalKeyboardKey.equal, control: true): () => _size(widget.fontSize + 1),
+            const SingleActivator(LogicalKeyboardKey.equal, control: true, shift: true): () =>
+                _size(widget.fontSize + 1),
+            const SingleActivator(LogicalKeyboardKey.numpadAdd, control: true): () => _size(widget.fontSize + 1),
+            const SingleActivator(LogicalKeyboardKey.minus, control: true): () => _size(widget.fontSize - 1),
+            const SingleActivator(LogicalKeyboardKey.numpadSubtract, control: true): () => _size(widget.fontSize - 1),
+            const SingleActivator(LogicalKeyboardKey.digit0, control: true): () => _size(defaultFontSize),
           },
           child: TerminalView(
             session.terminal,
             controller: session.controller,
-            theme: _theme,
-            textStyle: const TerminalStyle(fontFamily: 'JetBrainsMono', fontSize: 14),
+            scrollController: _scroll,
+            focusNode: _terminalFocus,
+            theme: theme,
+            textStyle: TerminalStyle(fontFamily: 'JetBrainsMono', fontSize: widget.fontSize),
             padding: const EdgeInsets.all(8),
             autofocus: true,
             // Right click copies a selection, or pastes when nothing is
             // selected, as in the Windows console.
-            onSecondaryTapDown: (_, _) => session.selectedText?.isNotEmpty == true ? _copy(context) : _paste(),
+            onSecondaryTapDown: (_, _) => session.selectedText?.isNotEmpty == true ? _copy() : _paste(),
           ),
         );
 
         return Directionality(
           textDirection: TextDirection.ltr,
           child: ColoredBox(
-            color: _theme.background,
+            color: theme.background,
             child: Column(
               children: [
+                if (_searching)
+                  Directionality(
+                    textDirection: appDirection,
+                    child: _SearchBar(
+                      field: _searchField,
+                      focus: _searchFocus,
+                      count: _hits.isEmpty
+                          ? (_searchField.text.isEmpty ? '' : t.noMatches)
+                          : t.matchOf(_current + 1, _hits.length),
+                      onChanged: _search,
+                      onNext: () => _step(1),
+                      onPrevious: () => _step(-1),
+                      onClose: _closeSearch,
+                    ),
+                  ),
                 Expanded(
                   child: Stack(
                     children: [
                       Positioned.fill(child: view),
+                      if (!_searching && session.state == SessionState.connected)
+                        Positioned(
+                          top: 6,
+                          right: 10,
+                          child: IconButton.filledTonal(
+                            key: const ValueKey('terminalSearch'),
+                            tooltip: t.searchTerminal,
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 18,
+                            onPressed: _openSearch,
+                            icon: const Icon(Icons.search_rounded),
+                          ),
+                        ),
                       if (session.state != SessionState.connected)
                         Positioned(
                           left: 12,
@@ -107,19 +243,86 @@ class TerminalPanel extends StatelessWidget {
                           bottom: 12,
                           child: Directionality(
                             textDirection: appDirection,
-                            child: _StatusBanner(session: session, onReconnect: onReconnect),
+                            child: _StatusBanner(session: session, onReconnect: widget.onReconnect),
                           ),
                         ),
                     ],
                   ),
                 ),
-                if (showKeyBar && session.state == SessionState.connected)
-                  KeyBar(session: session, onCopy: () => _copy(context), onPaste: _paste),
+                if (widget.showKeyBar && session.state == SessionState.connected)
+                  KeyBar(session: session, onCopy: _copy, onPaste: _paste),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({
+    required this.field,
+    required this.focus,
+    required this.count,
+    required this.onChanged,
+    required this.onNext,
+    required this.onPrevious,
+    required this.onClose,
+  });
+
+  final TextEditingController field;
+  final FocusNode focus;
+  final String count;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onNext;
+  final VoidCallback onPrevious;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    return Material(
+      color: c.surface,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+        child: CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.escape): onClose,
+            const SingleActivator(LogicalKeyboardKey.enter): onNext,
+            const SingleActivator(LogicalKeyboardKey.enter, shift: true): onPrevious,
+          },
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('terminalSearchField'),
+                  controller: field,
+                  focusNode: focus,
+                  textDirection: TextDirection.ltr,
+                  autocorrect: false,
+                  onChanged: onChanged,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: t.searchTerminal,
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                count,
+                key: const ValueKey('terminalSearchCount'),
+                style: TextStyle(color: c.muted),
+              ),
+              IconButton(tooltip: t.previousMatch, onPressed: onPrevious, icon: const Icon(Icons.keyboard_arrow_up)),
+              IconButton(tooltip: t.nextMatch, onPressed: onNext, icon: const Icon(Icons.keyboard_arrow_down)),
+              IconButton(tooltip: t.closeSearch, onPressed: onClose, icon: const Icon(Icons.close_rounded)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -334,6 +334,9 @@ class Vault extends ChangeNotifier {
   List<KnownHostEntry> get knownHosts => _of<KnownHostEntry>().toList();
   List<GroupEntry> get groups => _of<GroupEntry>().toList();
 
+  /// The user's preferences; the defaults until something is chosen.
+  PreferencesEntry get preferences => entry<PreferencesEntry>(PreferencesEntry.fixedId) ?? const PreferencesEntry();
+
   /// The shared settings of the group named [name], if it has any.
   GroupEntry? groupNamed(String name) {
     final key = name.trim();

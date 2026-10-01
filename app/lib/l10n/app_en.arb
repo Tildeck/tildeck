@@ -336,5 +336,29 @@
         "type": "String"
       }
     }
-  }
+  },
+  "terminalSettingsTitle": "Terminal appearance",
+  "fontSizeLabel": "Font size",
+  "fontSizeHelp": "In a terminal, Ctrl and + or - changes it too, and Ctrl and 0 brings back the default.",
+  "terminalThemeLabel": "Color scheme",
+  "searchTerminal": "Search the terminal",
+  "noMatches": "No matches",
+  "matchOf": "{current} of {total}",
+  "previousMatch": "Previous match",
+  "nextMatch": "Next match",
+  "closeSearch": "Close search",
+  "renameTab": "Rename tab",
+  "tabNameLabel": "Tab name",
+  "tabNameHelp": "Empty shows the connection again.",
+  "@matchOf": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "moreActions": "More"
 }

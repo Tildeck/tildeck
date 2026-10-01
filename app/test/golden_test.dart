@@ -32,6 +32,7 @@ import 'package:tildeck/ui/group_editor_page.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
 import 'package:tildeck/ui/snippets_page.dart';
+import 'package:tildeck/ui/terminal_settings_page.dart';
 import 'package:tildeck/ui/account_page.dart';
 import 'package:tildeck/ui/terminal_panel.dart';
 import 'package:tildeck/vault/models.dart';
@@ -467,6 +468,45 @@ void main() {
       await expectLater(
         find.byType(MaterialApp),
         matchesGoldenFile('goldens/group_settings_${locale}_${mode.name}.png'),
+      );
+    });
+
+    testWidgets('terminal appearance $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() async {
+        final v = await sampleVault(unlocked: true);
+        await v.put(v.preferences.copyWith(terminalTheme: 'solarized-dark', fontSize: 15));
+        return v;
+      }))!;
+      await tester.pumpWidget(screen(locale, mode, TerminalSettingsPage(vault: vault)));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/terminal_appearance_${locale}_${mode.name}.png'),
+      );
+    });
+
+    testWidgets('terminal search $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final session = sampleSession();
+      addTearDown(session.dispose);
+      await tester.pumpWidget(
+        screen(
+          locale,
+          mode,
+          Scaffold(
+            body: TerminalPanel(session: session, showKeyBar: false, onReconnect: () {}),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('terminalSearch')));
+      await tester.pump();
+      await tester.enterText(find.byKey(const ValueKey('terminalSearchField')), 'nginx');
+      await tester.pump();
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/terminal_search_${locale}_${mode.name}.png'),
       );
     });
 

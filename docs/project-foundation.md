@@ -309,7 +309,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 | Stage | Scope | Status |
 |---|---|---|
-| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, and environment variables done; the rest planned |
+| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, and tab names done; split view and history planned |
 | 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Planned |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
@@ -329,6 +329,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - A group (hosts still name their group) can have settings: a username, a key, a startup snippet, and environment variables. A host takes them wherever it leaves its own field empty, and the host's own value always wins; group and host environment variables merge, host first. The settings button next to a group name edits them.
 - Environment variables are requested for the shell when the session opens. The server applies only names its `AcceptEnv` setting allows; the test server in `verify.sh --area app` allows `TILDECK_*` for its test.
 - Tests: search, the NAME=value format, inheritance from a group with the host's own values winning, and against the OpenSSH container a variable that reaches the shell. Golden images of the hosts list with tags and of the group settings page.
+
+### Terminal appearance, search, and tab names (2026-10-01)
+
+- Ten color schemes (Tildeck Dark and Light, Solarized Dark and Light, Nord, Gruvbox Dark, One Dark, Monokai, Dracula, GitHub Light, with their published palettes) and a font size from 9 to 28, on the Terminal appearance page with a live preview. Ctrl and + or - changes the size in a terminal, Ctrl and 0 restores it. Both are kept in one preferences record in the vault, so every device follows.
+- Search in the terminal (the search button, or Ctrl+Shift+F): every match in the scrollback, case-insensitive, highlighted translucently; Enter and Shift+Enter or the arrows step through them, Escape closes.
+- A tab can be renamed with a double click or a long press; an empty name brings back the connection.
+- The top bar keeps Lock and Sync; terminal appearance, the master password, the language, and the theme moved into a More menu. A golden image caught the bar overflowing a phone's width by 35 pixels once the appearance button was added.
+- The UI tests' waits now allow 20 seconds: with more test files running at once, Argon2id took longer than the old 6 seconds.
 
 ## Required workflow contracts
 
