@@ -145,5 +145,20 @@
   "signInIntro": "הכספת מגיעה מהשרת שלך מוצפנת, ונפתחת כאן עם הסיסמה הראשית.",
   "inviteCodeLabel": "קוד הזמנה",
   "inviteCodeHelp": "רק אם קיבלת הזמנה.",
-  "errorInvalidInvite": "קוד ההזמנה לא תקף לכתובת המייל הזו. ייתכן שכבר נעשה בו שימוש, שתוקפו פג או שבוטל."
+  "errorInvalidInvite": "קוד ההזמנה לא תקף לכתובת המייל הזו. ייתכן שכבר נעשה בו שימוש, שתוקפו פג או שבוטל.",
+  "changePasswordTitle": "החלפת הסיסמה הראשית",
+  "changePasswordIntro": "הכספת נשארת כמו שהיא, רק הסיסמה שפותחת אותה מתחלפת.",
+  "currentPasswordLabel": "הסיסמה הראשית הנוכחית",
+  "newPasswordLabel": "סיסמה ראשית חדשה",
+  "signOutOthers": "לנתק את המכשירים האחרים שלי",
+  "signOutOthersHelp": "הם ייכנסו שוב עם הסיסמה החדשה. מומלץ אם ייתכן שמישהו מכיר את הישנה.",
+  "changePasswordButton": "החלפת סיסמה",
+  "passwordChanged": "הסיסמה הראשית הוחלפה.",
+  "forgotPassword": "שכחת את הסיסמה הראשית?",
+  "recoverTitle": "שחזור הכספת",
+  "recoverIntro": "עם ה-recovery key ששמרת כשיצרת את חשבון הסנכרון אפשר לקבוע סיסמה ראשית חדשה. המכשירים האחרים שלך ינותקו וייכנסו שוב עם הסיסמה החדשה.",
+  "recoveryKeyLabel": "Recovery key",
+  "recoverButton": "קביעת סיסמה חדשה",
+  "errorInvalidRecoveryKey": "יש טעות הקלדה ב-recovery key. כדאי לבדוק אותו תו אחרי תו.",
+  "errorRecoveryFailed": "המייל או ה-recovery key לא נכונים."
 }

@@ -71,11 +71,16 @@ class _TildeckAppState extends State<TildeckApp> {
     vault: _vault,
     serverFor: (address) => SyncServer(address, client: widget.syncClient),
   );
-  late final SyncServices _sync = SyncServices(
+  SyncServices? _syncServices;
+
+  /// Built once the common password list has loaded: new master passwords
+  /// on the sync screens are checked against it.
+  SyncServices _sync(CommonPasswords common) => _syncServices ??= SyncServices(
     vault: _vault,
     engine: _engine,
     accounts: AccountService(vault: _vault, engine: _engine),
     checker: _checker,
+    commonPasswords: common,
   );
   late final VaultKnownHosts _knownHosts = VaultKnownHosts(_vault);
   late final SshConnector _connector = widget.connector ?? SshConnector(knownHosts: _knownHosts);
@@ -131,14 +136,14 @@ class _TildeckAppState extends State<TildeckApp> {
           return VaultGate(
             vault: _vault,
             commonPasswords: common,
-            sync: _sync,
+            sync: _sync(common),
             unlocked: (context) {
               final current = Localizations.localeOf(context);
               final dark = Theme.of(context).brightness == Brightness.dark;
               return SessionsPage(
                 vault: _vault,
                 connector: _connector,
-                sync: _sync,
+                sync: _sync(common),
                 showKeyBar: widget.showKeyBar ?? Platform.isAndroid,
                 onToggleLocale: () => setState(() {
                   _locale = current.languageCode == 'he' ? const Locale('en') : const Locale('he');

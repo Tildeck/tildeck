@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
 import 'host_key_dialog.dart';
+import 'password_pages.dart';
 import 'hosts_page.dart';
 import 'terminal_panel.dart';
 
@@ -105,6 +106,15 @@ class _SessionsPageState extends State<SessionsPage> {
             color: c.deskMuted,
             icon: const Icon(Icons.lock_outline),
             onPressed: widget.vault.lock,
+          ),
+          IconButton(
+            key: const ValueKey('openPassword'),
+            tooltip: t.changePasswordTitle,
+            color: c.deskMuted,
+            icon: const Icon(Icons.password_rounded),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(builder: (_) => ChangePasswordPage(services: widget.sync))),
           ),
           IconButton(
             key: const ValueKey('openSync'),

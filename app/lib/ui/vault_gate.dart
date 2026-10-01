@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../vault/password_rules.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
+import 'password_pages.dart';
 
 /// Shows the vault's creation or unlock screen until it is open, then
 /// [unlocked]. Once built, [unlocked] stays alive (offstage) while the vault
@@ -113,7 +114,7 @@ class _VaultGateState extends State<VaultGate> {
                 commonPasswords: widget.commonPasswords,
                 sync: widget.sync,
               ),
-              _ => UnlockPage(vault: widget.vault),
+              _ => UnlockPage(vault: widget.vault, sync: widget.sync),
             },
         ],
       ),
@@ -309,11 +310,27 @@ class _SignInPageState extends State<SignInPage> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
               child: _pending == null
-                  ? AccountForm(
-                      services: widget.services,
-                      allowRegister: false,
-                      onPending: (p) => setState(() => _pending = p),
-                      onSignedIn: _opened,
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AccountForm(
+                          services: widget.services,
+                          allowRegister: false,
+                          onPending: (p) => setState(() => _pending = p),
+                          onSignedIn: _opened,
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: TextButton(
+                            key: const ValueKey('signInForgot'),
+                            onPressed: () => Navigator.of(
+                              context,
+                            ).push(MaterialPageRoute<void>(builder: (_) => RecoveryPage(services: widget.services))),
+                            child: Text(AppLocalizations.of(context).forgotPassword),
+                          ),
+                        ),
+                      ],
                     )
                   : PendingDeviceView(
                       pending: _pending!,
@@ -332,9 +349,12 @@ class _SignInPageState extends State<SignInPage> {
 }
 
 class UnlockPage extends StatefulWidget {
-  const UnlockPage({super.key, required this.vault});
+  const UnlockPage({super.key, required this.vault, this.sync});
 
   final Vault vault;
+
+  /// Offers recovery with the recovery key. Null hides it.
+  final SyncServices? sync;
 
   @override
   State<UnlockPage> createState() => _UnlockPageState();
@@ -391,6 +411,18 @@ class _UnlockPageState extends State<UnlockPage> {
           onPressed: _busy ? null : _unlock,
           child: Text(_busy ? t.working : t.unlockButton),
         ),
+        if (widget.sync != null) ...[
+          const SizedBox(height: 10),
+          TextButton(
+            key: const ValueKey('forgotPassword'),
+            onPressed: _busy
+                ? null
+                : () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => RecoveryPage(services: widget.sync!))),
+            child: Text(t.forgotPassword),
+          ),
+        ],
       ],
     );
   }

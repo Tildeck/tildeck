@@ -27,6 +27,7 @@ import 'package:tildeck/sync/sync_server.dart';
 import 'package:tildeck/theme.dart';
 import 'package:tildeck/ui/connect_form.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
+import 'package:tildeck/ui/password_pages.dart';
 import 'package:tildeck/ui/account_page.dart';
 import 'package:tildeck/ui/terminal_panel.dart';
 import 'package:tildeck/vault/models.dart';
@@ -165,6 +166,7 @@ SyncServices syncServices(Vault vault, FakeSyncServer server) {
     engine: engine,
     accounts: AccountService(vault: vault, engine: engine),
     checker: ServerChecker(client: server.client),
+    commonPasswords: CommonPasswords({'1q2w3e4r5t6y'}),
   );
 }
 
@@ -348,6 +350,32 @@ void main() {
       await expectLater(
         find.byType(MaterialApp),
         matchesGoldenFile('goldens/sync_signed_in_${locale}_${mode.name}.png'),
+      );
+    });
+
+    testWidgets('recover and change password $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final services = (await tester.runAsync(
+        () async => syncServices(await sampleVault(unlocked: true), FakeSyncServer()),
+      ))!;
+      await tester.pumpWidget(screen(locale, mode, RecoveryPage(services: services)));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('recoverAddress')), 'https://sync.example.com');
+      await tester.enterText(find.byKey(const ValueKey('recoverEmail')), 'shlomi@example.com');
+      await tester.enterText(
+        find.byKey(const ValueKey('recoverKey')),
+        'K7QD-2M9X-VH4T-8RWC-ZP3N-6YJB-F1GE-5SAK-0T8M-QW2D-HX7C-9VNR-4BJP-E6F',
+      );
+      // The default device name is the machine's: fixed here for a stable image.
+      await tester.enterText(find.byKey(const ValueKey('recoverDeviceName')), 'Office PC');
+      await tester.pumpAndSettle();
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/recover_${locale}_${mode.name}.png'));
+
+      await tester.pumpWidget(screen(locale, mode, ChangePasswordPage(services: services)));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/change_password_${locale}_${mode.name}.png'),
       );
     });
 

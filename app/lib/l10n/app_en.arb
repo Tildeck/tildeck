@@ -232,5 +232,20 @@
   "signInIntro": "Your vault comes from your server, encrypted, and opens here with your master password.",
   "inviteCodeLabel": "Invitation code",
   "inviteCodeHelp": "Only if you were invited.",
-  "errorInvalidInvite": "This invitation code is not valid for this email address. It may be used, expired, or cancelled."
+  "errorInvalidInvite": "This invitation code is not valid for this email address. It may be used, expired, or cancelled.",
+  "changePasswordTitle": "Change master password",
+  "changePasswordIntro": "Your vault stays the same: only the password that opens it changes.",
+  "currentPasswordLabel": "Current master password",
+  "newPasswordLabel": "New master password",
+  "signOutOthers": "Sign out my other devices",
+  "signOutOthersHelp": "They sign in again with the new password. Recommended if someone may know the old one.",
+  "changePasswordButton": "Change password",
+  "passwordChanged": "Master password changed.",
+  "forgotPassword": "Forgot your master password?",
+  "recoverTitle": "Recover your vault",
+  "recoverIntro": "Set a new master password with the recovery key you saved when you created your sync account. Your other devices will be signed out and sign in again with the new password.",
+  "recoveryKeyLabel": "Recovery key",
+  "recoverButton": "Set new password",
+  "errorInvalidRecoveryKey": "That recovery key has a typo. Check it character by character.",
+  "errorRecoveryFailed": "The email or the recovery key is not right."
 }

@@ -7,7 +7,10 @@ import 'package:tildeck/app.dart';
 import 'package:tildeck/server_check.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
+import 'package:tildeck/sync/account_service.dart';
 import 'package:tildeck/sync/recovery_key.dart';
+import 'package:tildeck/sync/sync_engine.dart';
+import 'package:tildeck/sync/sync_server.dart';
 import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/vault/vault.dart';
@@ -43,10 +46,13 @@ void main() {
   Future<void> waitFor(WidgetTester tester, bool Function() done, String what) async {
     for (var i = 0; i < 300; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
-      await tester.pump();
+      // Advances the test clock too, so route transitions finish.
+      await tester.pump(const Duration(milliseconds: 20));
       if (done()) return;
     }
-    final error = find.byKey(const ValueKey('syncError'));
+    final error = find.byKey(const ValueKey('syncError')).evaluate().isNotEmpty
+        ? find.byKey(const ValueKey('syncError'))
+        : find.byKey(const ValueKey('passwordError'));
     fail('timed out waiting for $what${error.evaluate().isEmpty ? '' : ': ${tester.widget<Text>(error).data}'}');
   }
 
@@ -192,6 +198,67 @@ void main() {
     );
     // Approval alone starts a sync; nobody presses "Sync now".
     await waitFor(tester, () => shown(find.textContaining('Last synced')), 'a sync');
+  });
+
+  testWidgets('a forgotten master password is reset with the recovery key, then changed again', (tester) async {
+    tester.view.physicalSize = const Size(1000, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final vault = (await tester.runAsync(() async {
+      final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/a.json'));
+      await v.load();
+      await v.create(password);
+      await v.put(HostEntry(id: v.newId(), name: 'Database', host: 'db.example.com', username: 'ops'));
+      return v;
+    }))!;
+    final engine = SyncEngine(
+      vault: vault,
+      serverFor: (a) => SyncServer(a, client: server.client),
+      changeDelay: const Duration(days: 1),
+      interval: const Duration(days: 1),
+    );
+    final recoveryKey = (await tester.runAsync(
+      () => AccountService(vault: vault, engine: engine).register(
+        address: 'https://sync.example.test',
+        email: 'user@example.test',
+        password: password,
+        locale: 'en',
+        deviceName: 'Office PC',
+      ),
+    ))!;
+    engine.dispose();
+    vault.lock();
+
+    await tester.pumpWidget(app(vault));
+    await waitFor(tester, () => shown(find.byKey(const ValueKey('forgotPassword'))), 'the unlock screen');
+    await tap(tester, 'forgotPassword');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('recoverAddress')), 'https://sync.example.test');
+    await tester.enterText(find.byKey(const ValueKey('recoverEmail')), 'user@example.test');
+    await tester.enterText(find.byKey(const ValueKey('recoverKey')), recoveryKey);
+    await tester.enterText(find.byKey(const ValueKey('newPassword')), 'lantern-river-autumn-77');
+    await tester.enterText(find.byKey(const ValueKey('newPasswordConfirm')), 'lantern-river-autumn-77');
+    await tap(tester, 'recover');
+    await waitFor(tester, () => vault.status == VaultStatus.unlocked && shown(find.text('Database')), 'the vault');
+
+    // And changed once more, from the key button.
+    await tap(tester, 'openPassword');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('currentPassword')), 'lantern-river-autumn-77');
+    await tester.enterText(find.byKey(const ValueKey('newPassword')), 'harbor-maple-sunrise-15');
+    await tester.enterText(find.byKey(const ValueKey('newPasswordConfirm')), 'harbor-maple-sunrise-15');
+    await tap(tester, 'changePassword');
+    await waitFor(
+      tester,
+      () => server.passwordChanges == 1 && !shown(find.byKey(const ValueKey('changePassword'))),
+      'the change',
+    );
+    final reopened = (await tester.runAsync(() async {
+      final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/a.json'));
+      await v.load();
+      return v.unlock('harbor-maple-sunrise-15');
+    }))!;
+    expect(reopened, isTrue);
   });
 
   testWidgets('a signed-in device approves a waiting one', (tester) async {
