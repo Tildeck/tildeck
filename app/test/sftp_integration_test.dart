@@ -142,6 +142,58 @@ void main() {
     });
   });
 
+  group('editing over SFTP', skip: skip, () {
+    late SSHClient client;
+    late String folder;
+    setUp(() async {
+      client = await SshConnector(knownHosts: MemoryKnownHosts()).connect(
+        ConnectionTarget(host: host!, port: port, username: user, password: password),
+        promptHostKey: ({required target, required presented, required status, previous}) async => true,
+      );
+      folder = 'tildeck-edit-${Random().nextInt(1 << 32)}';
+      await client.run(
+        r"mkdir -p ~/$F && printf 'a\r\nb\r\n' > ~/$F/win.conf && head -c 3000000 /dev/zero | tr '\0' x > ~/$F/big.txt && "
+                r"printf 'x\0y' > ~/$F/bin.dat && printf 'caf\351' > ~/$F/latin1.txt"
+            .replaceAll(r'$F', folder),
+      );
+    });
+    tearDown(() async {
+      await client.run('rm -rf ~/$folder');
+      client.close();
+    });
+
+    Future<String> remote(String name) async => utf8.decode(await client.run('cat ~/$folder/$name'));
+
+    test('a text file is edited, its line ends kept, and a change on the server is not overwritten unasked', () async {
+      final browser = FileBrowser(client.sftp);
+      addTearDown(browser.dispose);
+      await browser.start();
+      await browser.goTo(folder);
+      RemoteEntry entry(String name) => browser.entries.firstWhere((e) => e.name == name);
+
+      final file = (await browser.openText(entry('win.conf')))!;
+      expect(file.text, 'a\nb\n');
+      expect(file.crlf, isTrue);
+      expect(await browser.saveText(file, 'a\nc\n'), isTrue);
+      expect(await remote('win.conf'), 'a\r\nc\r\n', reason: 'Windows line ends stay');
+
+      // Someone else writes to it; saving again is refused, then forced.
+      await client.run('printf "theirs\\r\\n" >> ~/$folder/win.conf');
+      expect(await browser.saveText(file, 'mine\n'), isFalse);
+      expect(browser.problem, FileProblem.changed);
+      expect(await remote('win.conf'), contains('theirs'), reason: 'their change is kept');
+      expect(await browser.saveText(file, 'mine\n', overwrite: true), isTrue);
+      expect(await remote('win.conf'), 'mine\r\n');
+
+      expect(await browser.openText(entry('big.txt')), isNull);
+      expect(browser.problem, FileProblem.tooLarge);
+      expect(await browser.openText(entry('bin.dat')), isNull);
+      expect(browser.problem, FileProblem.notText);
+      expect(await browser.openText(entry('latin1.txt')), isNull);
+      expect(browser.problem, FileProblem.notText, reason: 'only UTF-8 is edited, so nothing is mangled');
+    });
+  });
+
   test('permissions read as ls shows them', () {
     expect(permissionString(0x1ed), 'rwxr-xr-x'); // 0755
     expect(permissionString(0x1a4), 'rw-r--r--'); // 0644

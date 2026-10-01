@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartssh2/dartssh2.dart';
@@ -7,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'ssh_connector.dart' show ConnectException, ConnectProblem;
 
 /// Why a file operation failed. Each maps to a localized message.
-enum FileProblem { noSftp, denied, notFound, exists, failed, disconnected }
+enum FileProblem { noSftp, denied, notFound, exists, failed, disconnected, tooLarge, notText, changed }
 
 class FileProblemException implements Exception {
   const FileProblemException(this.problem);
@@ -40,6 +41,22 @@ class RemoteEntry {
 }
 
 enum SortBy { name, size, modified }
+
+/// A remote text file open for editing, and how it was when it was read:
+/// saving checks that nobody changed it since.
+class EditedFile {
+  EditedFile({required this.path, required this.text, required this.modified, required this.size, required this.crlf});
+
+  final String path;
+
+  /// With \n line ends; [crlf] files get \r\n back when saved.
+  final String text;
+  int? modified;
+  int? size;
+  final bool crlf;
+
+  String get name => path.substring(path.lastIndexOf('/') + 1);
+}
 
 /// Permission bits as ls shows them: rwxr-xr-x.
 String permissionString(int mode) {
@@ -212,6 +229,69 @@ class FileBrowser extends ChangeNotifier {
       await _remove(joinRemote(target, n.filename), isDirectory: type == SftpFileType.directory);
     }
     await _sftp!.rmdir(target);
+  }
+
+  /// Larger files are downloaded, not edited here.
+  static const editLimit = 2 * 1024 * 1024;
+
+  /// Reads [entry] as text to edit; null with [problem] set when it is too
+  /// large, not text, or cannot be read.
+  Future<EditedFile?> openText(RemoteEntry entry) async {
+    EditedFile? opened;
+    await _guard(() async {
+      final attrs = await _sftp!.stat(entry.path);
+      if ((attrs.size ?? 0) > editLimit) throw const FileProblemException(FileProblem.tooLarge);
+      final file = await _sftp!.open(entry.path);
+      final Uint8List bytes;
+      try {
+        bytes = await file.readBytes();
+      } finally {
+        await file.close();
+      }
+      // A NUL byte means binary, whatever else decodes.
+      if (bytes.contains(0)) throw const FileProblemException(FileProblem.notText);
+      final String text;
+      try {
+        text = utf8.decode(bytes);
+      } on FormatException {
+        throw const FileProblemException(FileProblem.notText);
+      }
+      final crlf = text.contains('\r\n');
+      opened = EditedFile(
+        path: entry.path,
+        text: crlf ? text.replaceAll('\r\n', '\n') : text,
+        modified: attrs.modifyTime,
+        size: attrs.size,
+        crlf: crlf,
+      );
+    });
+    return opened;
+  }
+
+  /// Writes [text] over [file] on the server. Unless [overwrite], refuses
+  /// with [FileProblem.changed] when the file changed since it was read.
+  Future<bool> saveText(EditedFile file, String text, {bool overwrite = false}) async {
+    var saved = false;
+    await _guard(() async {
+      final now = await _sftp!.stat(file.path);
+      if (!overwrite && (now.modifyTime != file.modified || now.size != file.size)) {
+        throw const FileProblemException(FileProblem.changed);
+      }
+      final bytes = utf8.encode(file.crlf ? text.replaceAll('\n', '\r\n') : text);
+      final remote = await _sftp!.open(file.path, mode: SftpFileOpenMode.write | SftpFileOpenMode.truncate);
+      try {
+        await remote.writeBytes(bytes);
+      } finally {
+        await remote.close();
+      }
+      final after = await _sftp!.stat(file.path);
+      file
+        ..modified = after.modifyTime
+        ..size = after.size;
+      saved = true;
+      if (path != null) await _list(path!);
+    });
+    return saved;
   }
 
   /// Sets the permission bits of [entry].

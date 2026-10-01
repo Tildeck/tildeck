@@ -29,6 +29,7 @@ import 'package:tildeck/sync/sync_engine.dart';
 import 'package:tildeck/sync/sync_server.dart';
 import 'package:tildeck/theme.dart';
 import 'package:tildeck/ui/connect_form.dart';
+import 'package:tildeck/ui/file_editor_page.dart';
 import 'package:tildeck/ui/files_page.dart';
 import 'package:tildeck/ui/group_editor_page.dart';
 import 'package:tildeck/ui/history_page.dart';
@@ -510,6 +511,24 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('deleteProxy')), findsOneWidget);
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/proxy_editor_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('file editor $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final file = EditedFile(
+        path: '/etc/nginx/sites-available/app.conf',
+        text:
+            'server {\n    listen 80;\n    server_name app.example.com;\n\n    location / {\n'
+            '        proxy_pass http://127.0.0.1:3000;\n    }\n}\n',
+        modified: 1,
+        size: 1,
+        crlf: false,
+      );
+      await tester.pumpWidget(screen(locale, mode, FileEditorPage(browser: SampleBrowser(), file: file)));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('editorText')), '${file.text}# edited\n');
+      await tester.pumpAndSettle();
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/file_editor_${locale}_${mode.name}.png'));
     });
 
     testWidgets('keys $locale ${mode.name}', (tester) async {

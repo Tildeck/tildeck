@@ -331,5 +331,17 @@
   "sortByModified": "מיון לפי תאריך",
   "goToFolder": "מעבר לתיקייה",
   "folderPathLabel": "נתיב",
-  "open": "פתיחה"
+  "open": "פתיחה",
+  "editFile": "עריכה",
+  "fileErrorTooLarge": "גדול מדי לעריכה כאן (יותר מ-2 MB). אפשר להוריד אותו במקום.",
+  "fileErrorNotText": "זה לא קובץ טקסט. אפשר להוריד אותו במקום.",
+  "fileErrorChanged": "הקובץ השתנה בשרת מאז שנפתח.",
+  "fileSavedOnServer": "נשמר בשרת.",
+  "changedOnServerTitle": "השתנה בשרת",
+  "changedOnServerBody": "⁨{name}⁩ השתנה בשרת מאז שנפתח. שמירה עכשיו תחליף את השינויים האלה.",
+  "saveAnyway": "לשמור בכל זאת",
+  "unsavedTitle": "לבטל את השינויים?",
+  "unsavedBody": "השינויים ב-⁨{name}⁩ לא נשמרו.",
+  "discard": "ביטול השינויים",
+  "keepEditing": "להמשיך לערוך"
 }

@@ -581,5 +581,31 @@
         "type": "String"
       }
     }
+  },
+  "editFile": "Edit",
+  "fileErrorTooLarge": "Too large to edit here (over 2 MB). Download it instead.",
+  "fileErrorNotText": "This is not a text file. Download it instead.",
+  "fileErrorChanged": "The file changed on the server since it was opened.",
+  "fileSavedOnServer": "Saved on the server.",
+  "changedOnServerTitle": "Changed on the server",
+  "changedOnServerBody": "{name} changed on the server since you opened it. Saving now replaces those changes.",
+  "saveAnyway": "Save anyway",
+  "unsavedTitle": "Discard your changes?",
+  "unsavedBody": "Your changes to {name} are not saved.",
+  "discard": "Discard",
+  "keepEditing": "Keep editing",
+  "@changedOnServerBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@unsavedBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   }
 }

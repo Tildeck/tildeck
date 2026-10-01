@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Edit text files on the server, with a warning when the file changed there since it was opened.
 - Files: rename, permissions, copy the path, and delete (folders with their contents, after asking); hidden files and sorting; go to a path; and a host's files opened directly from its menu, without a terminal.
 - SSH certificates: a key can carry an OpenSSH user certificate, offered first when it signs in, with who it is for and until when shown on the Keys page.
 - Keys: generate Ed25519 or RSA 4096 keys, import from a file, see fingerprints, copy the public key, install it on a server, and export the private key protected by a passphrase.
