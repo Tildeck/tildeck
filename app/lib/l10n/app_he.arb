@@ -296,5 +296,15 @@
   "exportKey": "ייצוא המפתח הפרטי",
   "exportKeyHelp": "Passphrase מגן על הקובץ. בלי אחד, כל מי שמשיג את הקובץ יכול להשתמש במפתח.",
   "exportPassphrase": "Passphrase לקובץ (מומלץ)",
-  "keyExported": "נשמר ב-{path}."
+  "keyExported": "נשמר ב-{path}.",
+  "addCertificate": "הוספת תעודה",
+  "removeCertificate": "הסרת התעודה",
+  "certificateHelp": "תעודת OpenSSH למפתח הזה, התוכן של קובץ ה-cert.pub שלו, חתומה בידי רשות שהשרתים סומכים עליה. היא מוצעת לפני המפתח עצמו.",
+  "certificateLabel": "תעודה",
+  "certificateUnreadable": "זו לא תעודת משתמש של OpenSSH.",
+  "certificateOtherKey": "התעודה הזו שייכת למפתח אחר.",
+  "certificateValid": "תעודה עבור {principals}, בתוקף עד {date}",
+  "certificateForever": "תעודה עבור {principals}, בלי תאריך סיום",
+  "certificateExpired": "התעודה פגה ב-{date}",
+  "certificateAnyUser": "כל משתמש"
 }

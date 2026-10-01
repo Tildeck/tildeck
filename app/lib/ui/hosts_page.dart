@@ -64,6 +64,7 @@ Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault,
       password: target.password,
       privateKey: target.privateKey,
       passphrase: target.passphrase,
+      certificate: target.certificate,
       jump: jump,
       proxy: target.proxy,
     );
@@ -104,6 +105,7 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
     password: password,
     privateKey: key?.privateKey,
     passphrase: key?.passphrase,
+    certificate: key?.certificate,
     startupCommand: host.isTelnet
         ? null
         : vault.entry<SnippetEntry>(host.startupSnippetId ?? group?.startupSnippetId)?.command,

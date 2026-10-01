@@ -192,15 +192,20 @@ start_test_sshd() {
   docker exec -u tildeck -e "KEY_PASS=$key_pass" "$SSH_CONTAINER" sh -c '
     ssh-keygen -q -t ed25519 -N "" -f /tmp/plain &&
     ssh-keygen -q -t ed25519 -N "$KEY_PASS" -f /tmp/encrypted &&
+    ssh-keygen -q -t ed25519 -N "" -f /tmp/ca &&
     cat /tmp/plain.pub /tmp/encrypted.pub >> /config/.ssh/authorized_keys &&
     chmod 600 /config/.ssh/authorized_keys' || return 1
-  # Accept the test's environment variables and allow port and agent
-  # forwarding (the
-  # image turns it off; sshd keeps the first value of a keyword, so these go
-  # first), then reload sshd (SIGHUP re-execs it with the new configuration)
-  # and wait for it to listen again.
+  # Accept the test's environment variables, allow port and agent
+  # forwarding (the image turns it off; sshd keeps the first value of a
+  # keyword, so these go first), trust certificates signed by the test
+  # authority (/tmp/ca, which the account can sign with), and turn off the
+  # penalties for failed sign-ins: the tests fail some on purpose, all from
+  # one address, and would lock themselves out. Then reload sshd
+  # (SIGHUP re-execs it with the new configuration) and wait for it to
+  # listen again.
   docker exec "$SSH_CONTAINER" sh -c '
-    sed -i -e "1i AllowAgentForwarding yes" -e "1i AllowTcpForwarding yes" /config/sshd/sshd_config &&
+    sed -i -e "1i AllowAgentForwarding yes" -e "1i AllowTcpForwarding yes" \
+      -e "1i TrustedUserCAKeys /tmp/ca.pub" -e "1i PerSourcePenalties no" /config/sshd/sshd_config &&
     echo "AcceptEnv TILDECK_*" >> /config/sshd/sshd_config &&
     pkill -HUP -f "sshd.pam -D"' || return 1
   waited=0

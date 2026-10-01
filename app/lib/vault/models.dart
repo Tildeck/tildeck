@@ -151,6 +151,7 @@ class KeyEntry extends VaultEntry {
     this.keyType,
     this.fingerprint,
     this.publicKey,
+    this.certificate,
   });
 
   static const recordType = 'key';
@@ -167,6 +168,21 @@ class KeyEntry extends VaultEntry {
   /// The line for authorized_keys.
   final String? publicKey;
 
+  /// An OpenSSH certificate for this key (the -cert.pub line), signed by a
+  /// certificate authority the servers trust; offered before the bare key.
+  final String? certificate;
+
+  KeyEntry withCertificate(String? certificate) => KeyEntry(
+    id: id,
+    name: name,
+    privateKey: privateKey,
+    passphrase: passphrase,
+    keyType: keyType,
+    fingerprint: fingerprint,
+    publicKey: publicKey,
+    certificate: certificate,
+  );
+
   @override
   String get type => recordType;
 
@@ -178,6 +194,7 @@ class KeyEntry extends VaultEntry {
     'key_type': keyType,
     'fingerprint': fingerprint,
     'public_key': publicKey,
+    'certificate': certificate,
   };
 
   static KeyEntry fromJson(String id, Map<String, dynamic> d) => KeyEntry(
@@ -188,6 +205,7 @@ class KeyEntry extends VaultEntry {
     keyType: d['key_type'] as String?,
     fingerprint: d['fingerprint'] as String?,
     publicKey: d['public_key'] as String?,
+    certificate: d['certificate'] as String?,
   );
 }
 

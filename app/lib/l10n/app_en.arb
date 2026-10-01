@@ -501,5 +501,39 @@
         "type": "String"
       }
     }
+  },
+  "addCertificate": "Add a certificate",
+  "removeCertificate": "Remove the certificate",
+  "certificateHelp": "An OpenSSH certificate for this key, the contents of its -cert.pub file, signed by an authority your servers trust. It is offered before the key itself.",
+  "certificateLabel": "Certificate",
+  "certificateUnreadable": "This is not an OpenSSH user certificate.",
+  "certificateOtherKey": "This certificate is for a different key.",
+  "certificateValid": "Certificate for {principals}, valid until {date}",
+  "certificateForever": "Certificate for {principals}, no end date",
+  "certificateExpired": "Certificate expired on {date}",
+  "certificateAnyUser": "any user",
+  "@certificateValid": {
+    "placeholders": {
+      "principals": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@certificateForever": {
+    "placeholders": {
+      "principals": {
+        "type": "String"
+      }
+    }
+  },
+  "@certificateExpired": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
   }
 }
