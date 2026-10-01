@@ -433,6 +433,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - A host's menu opens its files directly, on a connection of their own that closes with the page: no terminal needed. A failure to connect shows the same message a session would.
 - Tests: against the OpenSSH container, on a tree made by the shell: hidden files, each sort, going to a path, renaming (and refusing to replace or to take a path), permissions read back by `stat`, deleting a link without its target, and deleting a folder tree. On the page: rename with the stem selected, permissions from 644 to 664, copy the path, and delete after asking, with a cancel deleting nothing.
 
+### Files: editing text on the server (2026-10-02)
+
+- A file's menu offers Edit: the file opens in a monospace editor, left to right in either language, and Save writes it back over SFTP. The title marks unsaved changes, and leaving with them asks first, since they exist nowhere else.
+- Saving first checks the file's size and modification time against the ones it was opened with. If someone changed it on the server meanwhile, it says so and saves only when asked to.
+- Files with Windows line ends are edited with plain ones and saved with Windows ones again.
+- Only UTF-8 text up to 2 MB opens: a larger file, a file with a NUL byte, or one in another encoding is refused with a message to download it instead, so nothing is mangled.
+- Tests: against the OpenSSH container: a CRLF file edited and saved with its line ends, a change by someone else refused then saved over when asked, and a large, a binary, and a Latin-1 file refused. On the page: saving after a change on the server asks; leaving unsaved asks, and keeping or discarding works. Golden: the editor in both languages.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

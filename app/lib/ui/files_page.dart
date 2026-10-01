@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../ssh/file_browser.dart';
 import '../ssh/local_files.dart';
 import '../theme.dart';
+import 'file_editor_page.dart';
 import 'terminal_panel.dart' show connectProblemText;
 
 String fileProblemText(AppLocalizations t, FileProblem problem) => switch (problem) {
@@ -15,6 +16,9 @@ String fileProblemText(AppLocalizations t, FileProblem problem) => switch (probl
   FileProblem.exists => t.fileErrorExists,
   FileProblem.disconnected => t.fileErrorDisconnected,
   FileProblem.failed => t.fileErrorFailed,
+  FileProblem.tooLarge => t.fileErrorTooLarge,
+  FileProblem.notText => t.fileErrorNotText,
+  FileProblem.changed => t.fileErrorChanged,
 };
 
 /// The files of the server behind an open session: browse folders, upload
@@ -137,6 +141,15 @@ class _FilesPageState extends State<FilesPage> {
     switch (action) {
       case 'download':
         await _download(entry);
+      case 'edit':
+        final file = await browser.openText(entry);
+        if (file != null && mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => FileEditorPage(browser: browser, file: file),
+            ),
+          );
+        }
       case 'rename':
         await _rename(entry);
       case 'permissions':
@@ -387,7 +400,10 @@ class _EntryTile extends StatelessWidget {
         key: ValueKey('entryMenu-${entry.name}'),
         onSelected: onAction,
         itemBuilder: (_) => [
-          if (!entry.isDirectory) PopupMenuItem(value: 'download', child: Text(t.download)),
+          if (!entry.isDirectory) ...[
+            PopupMenuItem(key: const ValueKey('entryEdit'), value: 'edit', child: Text(t.editFile)),
+            PopupMenuItem(value: 'download', child: Text(t.download)),
+          ],
           PopupMenuItem(key: const ValueKey('entryRename'), value: 'rename', child: Text(t.renameAction)),
           PopupMenuItem(key: const ValueKey('entryPermissions'), value: 'permissions', child: Text(t.permissionsTitle)),
           PopupMenuItem(key: const ValueKey('entryCopyPath'), value: 'copyPath', child: Text(t.copyPath)),

@@ -106,6 +106,11 @@ class SyncEngine extends ChangeNotifier {
 
   Future<void>? _current;
 
+  /// Completes when no sync is running: for tests that must not end while
+  /// one still writes.
+  @visibleForTesting
+  Future<void> get idle => _current ?? Future.value();
+
   Future<void> _run() async {
     _running = true;
     _changeTimer?.cancel();
