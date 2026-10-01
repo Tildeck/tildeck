@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:xterm/xterm.dart';
 
 import '../activity.dart';
+import 'autocomplete.dart';
 import 'file_browser.dart';
 import 'ssh_connector.dart';
 
@@ -27,6 +28,19 @@ class TerminalSession extends ChangeNotifier {
 
   /// A name the user gave the tab; null shows the connection label.
   String? title;
+
+  /// The server's own command history, for suggestions; read over a
+  /// separate exec channel after connecting, and never stored.
+  List<String> history = const [];
+
+  /// Whether to read the history and follow typing for suggestions.
+  bool autocomplete = true;
+
+  /// The line being typed, followed in memory to filter suggestions.
+  final line = LineTracker();
+
+  /// The cursor's line asks for a password.
+  bool atPasswordPrompt = false;
 
   void rename(String? name) {
     final trimmed = name?.trim();
@@ -54,11 +68,16 @@ class TerminalSession extends ChangeNotifier {
       // Streams can split a multi-byte character; the decoders keep the
       // partial bytes until the rest arrives.
       _subscriptions.add(
-        shell.stdout.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen(terminal.write),
+        shell.stdout.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((data) {
+          terminal.write(data);
+          _checkPrompt();
+        }),
       );
       terminal.onOutput = (data) {
         // Soft keyboard typing sends no key events: tell the idle lock.
         userActivity.ping();
+        line.feed(data);
+        if (autocomplete) notifyListeners();
         shell.write(utf8.encode(applyCtrl(data)));
       };
       terminal.onResize = (width, height, pixelWidth, pixelHeight) =>
@@ -66,6 +85,7 @@ class TerminalSession extends ChangeNotifier {
 
       state = SessionState.connected;
       notifyListeners();
+      if (autocomplete) unawaited(_loadHistory(client));
       final startup = target.startupCommand;
       if (startup != null && startup.trim().isNotEmpty) run(startup);
 
@@ -105,6 +125,43 @@ class TerminalSession extends ChangeNotifier {
     final code = data.toUpperCase().codeUnitAt(0);
     // Ctrl+A to Ctrl+Z and Ctrl+[ \ ] ^ _ are the ASCII control codes 1 to 31.
     return code >= 0x40 && code <= 0x5f ? String.fromCharCode(code & 0x1f) : data;
+  }
+
+  Future<void> _loadHistory(SSHClient client) async {
+    try {
+      final out = await client.run(historyCommand, stderr: false).timeout(const Duration(seconds: 8));
+      history = parseHistory(utf8.decode(out, allowMalformed: true));
+      notifyListeners();
+    } catch (_) {
+      // A server that refuses exec channels, or no history: no suggestions.
+      history = const [];
+    }
+  }
+
+  void _checkPrompt() {
+    final buffer = terminal.buffer;
+    final y = buffer.absoluteCursorY;
+    final prompt = y < buffer.lines.length && isPasswordPrompt(buffer.lines[y].getText());
+    if (prompt != atPasswordPrompt) {
+      atPasswordPrompt = prompt;
+      notifyListeners();
+    }
+  }
+
+  /// Completes the typed line with [command], without running it.
+  void complete(String command) {
+    if (state != SessionState.connected) return;
+    terminal.textInput(completionInput(line.line ?? '', command));
+  }
+
+  /// Answers a password prompt with the password this session signed in
+  /// with.
+  void fillPassword() {
+    final password = target.password;
+    if (state != SessionState.connected || password == null || !atPasswordPrompt) return;
+    terminal.textInput('$password\r');
+    atPasswordPrompt = false;
+    notifyListeners();
   }
 
   /// Runs a snippet: each line is sent as typed and followed by Enter.

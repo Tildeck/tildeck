@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
 import '../l10n/app_localizations.dart';
+import '../ssh/autocomplete.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
 import '../terminal/terminal_themes.dart';
@@ -19,6 +20,7 @@ class TerminalPanel extends StatefulWidget {
     TerminalTheme? theme,
     this.fontSize = defaultFontSize,
     this.onFontSize,
+    this.snippets = const {},
   }) : theme = theme ?? terminalThemes.first.theme;
 
   final TerminalSession session;
@@ -32,6 +34,9 @@ class TerminalPanel extends StatefulWidget {
 
   /// Ctrl and + or - (or 0, back to the default) asks for another size.
   final ValueChanged<double>? onFontSize;
+
+  /// Snippet names and commands, offered among the suggestions.
+  final Map<String, String> snippets;
 
   @override
   State<TerminalPanel> createState() => _TerminalPanelState();
@@ -249,6 +254,11 @@ class _TerminalPanelState extends State<TerminalPanel> {
                     ],
                   ),
                 ),
+                if (session.state == SessionState.connected && session.autocomplete)
+                  Directionality(
+                    textDirection: appDirection,
+                    child: _SuggestionBar(session: session, snippets: widget.snippets),
+                  ),
                 if (widget.showKeyBar && session.state == SessionState.connected)
                   KeyBar(session: session, onCopy: _copy, onPaste: _paste),
               ],
@@ -256,6 +266,66 @@ class _TerminalPanelState extends State<TerminalPanel> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Suggestions for the line being typed: commands from the server's
+/// history and snippets, or the saved password at a password prompt. A tap
+/// completes the line; the user still presses Enter.
+class _SuggestionBar extends StatelessWidget {
+  const _SuggestionBar({required this.session, required this.snippets});
+
+  final TerminalSession session;
+  final Map<String, String> snippets;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    final canFill = session.atPasswordPrompt && session.target.password != null;
+    final typed = session.line.line;
+    final suggestions = canFill || typed == null
+        ? const <Suggestion>[]
+        : suggest(typed, session.history, snippets: snippets);
+    if (!canFill && suggestions.isEmpty) return const SizedBox.shrink();
+    return Material(
+      color: c.surface,
+      child: SizedBox(
+        height: 44,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          children: [
+            if (canFill)
+              ActionChip(
+                key: const ValueKey('fillPassword'),
+                avatar: Icon(Icons.key_rounded, size: 16, color: c.brand),
+                label: Text(t.fillPassword),
+                onPressed: session.fillPassword,
+              ),
+            for (final (i, s) in suggestions.indexed)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 6),
+                child: ActionChip(
+                  key: ValueKey('suggestion-$i'),
+                  avatar: Icon(s.snippetName == null ? Icons.history_rounded : Icons.code_rounded, size: 16),
+                  label: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: Text(
+                      s.command,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textDirection: TextDirection.ltr,
+                      style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13),
+                    ),
+                  ),
+                  onPressed: () => session.complete(s.command),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

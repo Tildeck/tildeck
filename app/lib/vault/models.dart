@@ -247,7 +247,7 @@ String formatEnv(Map<String, String> env) => [for (final e in env.entries) '${e.
 /// The user's preferences, one record with a fixed id on every device, so
 /// they sync and a change on one device reaches the others.
 class PreferencesEntry extends VaultEntry {
-  const PreferencesEntry({this.terminalTheme, this.fontSize}) : super(id: fixedId);
+  const PreferencesEntry({this.terminalTheme, this.fontSize, this.autocomplete}) : super(id: fixedId);
 
   static const recordType = 'preferences';
   static const fixedId = '00000000-0000-4000-8000-000000000001';
@@ -256,17 +256,30 @@ class PreferencesEntry extends VaultEntry {
   final String? terminalTheme;
   final double? fontSize;
 
-  PreferencesEntry copyWith({String? terminalTheme, double? fontSize}) =>
-      PreferencesEntry(terminalTheme: terminalTheme ?? this.terminalTheme, fontSize: fontSize ?? this.fontSize);
+  /// Suggestions from the server's history and from snippets; null is on.
+  final bool? autocomplete;
+
+  PreferencesEntry copyWith({String? terminalTheme, double? fontSize, bool? autocomplete}) => PreferencesEntry(
+    terminalTheme: terminalTheme ?? this.terminalTheme,
+    fontSize: fontSize ?? this.fontSize,
+    autocomplete: autocomplete ?? this.autocomplete,
+  );
 
   @override
   String get type => recordType;
 
   @override
-  Map<String, Object?> dataJson() => {'terminal_theme': terminalTheme, 'font_size': fontSize};
+  Map<String, Object?> dataJson() => {
+    'terminal_theme': terminalTheme,
+    'font_size': fontSize,
+    'autocomplete': autocomplete,
+  };
 
-  static PreferencesEntry fromJson(String id, Map<String, dynamic> d) =>
-      PreferencesEntry(terminalTheme: d['terminal_theme'] as String?, fontSize: (d['font_size'] as num?)?.toDouble());
+  static PreferencesEntry fromJson(String id, Map<String, dynamic> d) => PreferencesEntry(
+    terminalTheme: d['terminal_theme'] as String?,
+    fontSize: (d['font_size'] as num?)?.toDouble(),
+    autocomplete: d['autocomplete'] as bool?,
+  );
 }
 
 /// One connection, for the history: where, when, from which device, and

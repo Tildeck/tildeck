@@ -57,7 +57,7 @@ class _SessionsPageState extends State<SessionsPage> {
   }
 
   void _open(ConnectionTarget target, {int? replacing}) {
-    final session = TerminalSession(target);
+    final session = TerminalSession(target)..autocomplete = widget.vault.preferences.autocomplete ?? true;
     setState(() {
       if (replacing == null) {
         _sessions.add(session);
@@ -262,6 +262,7 @@ class _SessionsPageState extends State<SessionsPage> {
                           theme: themeById(prefs.terminalTheme).theme,
                           fontSize: prefs.fontSize ?? defaultFontSize,
                           onFontSize: (size) => widget.vault.put(prefs.copyWith(fontSize: size)),
+                          snippets: {for (final x in widget.vault.snippets) x.name: x.command},
                         );
                       },
                     ),

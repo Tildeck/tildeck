@@ -227,5 +227,8 @@
   "recentTitle": "אחרונים",
   "durationHours": "{hours} שע׳ {minutes} דק׳",
   "durationMinutes": "{minutes} דק׳",
-  "durationSeconds": "{seconds} שנ׳"
+  "durationSeconds": "{seconds} שנ׳",
+  "fillPassword": "מילוי הסיסמה השמורה",
+  "autocompleteLabel": "הצעות תוך כדי הקלדה",
+  "autocompleteHelp": "פקודות מההיסטוריה של השרת עצמו ומה-snippets שלך, והסיסמה השמורה כשהשרת מבקש סיסמה. ההיסטוריה נקראת מהשרת בכל session ולא נשמרת. חל על sessions חדשים."
 }
