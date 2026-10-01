@@ -230,7 +230,8 @@ start_test_sshd() {
 # gives a shell without signing in. Only the Telnet tests talk to it.
 start_test_telnetd() {
   local waited=0
-  docker run -d --name "$TELNET_CONTAINER" --network "$SSH_NET"     "$(toolchain_image telnet)" telnetd -F -p 2323 -l /bin/sh >/dev/null || return 1
+  docker run -d --name "$TELNET_CONTAINER" --network "$SSH_NET" \
+    "$(toolchain_image telnet)" telnetd -F -p 2323 -l /bin/sh >/dev/null || return 1
   until docker exec "$TELNET_CONTAINER" nc -z 127.0.0.1 2323 >/dev/null 2>&1; do
     sleep 1
     waited=$((waited + 1))
