@@ -11,21 +11,30 @@ import '../sync/account_service.dart';
 import '../sync/sync_engine.dart';
 import '../sync/sync_server.dart';
 import '../theme.dart';
+import '../vault/password_rules.dart';
 import '../vault/vault.dart';
 
 /// Everything the sync screens need.
 class SyncServices {
-  const SyncServices({required this.vault, required this.engine, required this.accounts, required this.checker});
+  const SyncServices({
+    required this.vault,
+    required this.engine,
+    required this.accounts,
+    required this.checker,
+    required this.commonPasswords,
+  });
 
   final Vault vault;
   final SyncEngine engine;
   final AccountService accounts;
   final ServerChecker checker;
+  final CommonPasswords commonPasswords;
 }
 
 /// The localized message for a failed account request.
 String accountErrorText(AppLocalizations t, Object error) => switch (error) {
   WrongMasterPassword() => t.errorWrongMasterPassword,
+  InvalidRecoveryKey() => t.errorInvalidRecoveryKey,
   DifferentVault() => t.errorDifferentVault,
   ServerFailed(:final problem) => switch (problem) {
     ServerProblem.invalidAddress => t.errorInvalidAddress,
@@ -37,6 +46,7 @@ String accountErrorText(AppLocalizations t, Object error) => switch (error) {
   SyncFailure(unreachable: true, code: null) => t.errorUnreachable,
   SyncFailure(:final code) => switch (code) {
     'invalid_credentials' => t.errorInvalidCredentials,
+    'recovery_failed' => t.errorRecoveryFailed,
     'email_taken' => t.errorEmailTaken,
     'registration_closed' => t.errorRegistrationClosed,
     'registration_invite_required' => t.errorRegistrationInvite,

@@ -56,6 +56,15 @@ class FakeSyncServer {
         return _signin(body);
       case ('POST', '/api/devices/claim'):
         return _claim(body);
+      case ('POST', '/api/account/recovery/start'):
+        if (!_recoveryOk(body)) return _error(401, 'recovery_failed');
+        return _json({'vault_id': account!['vault_id'], 'wrap_rk': account!['wrap_rk']});
+      case ('POST', '/api/account/recovery/complete'):
+        if (!_recoveryOk(body)) return _error(401, 'recovery_failed');
+        _setPassword(body['new'] as Map<String, dynamic>);
+        _revokeOthers(null);
+        final device = body['device'] as Map<String, dynamic>;
+        return _json(_signedIn(_addDevice(device['id'] as String, device['name'] as String, 'active')));
     }
 
     final token = (request.headers['authorization'] ?? '').replaceFirst('Bearer ', '');
@@ -80,6 +89,13 @@ class FakeSyncServer {
         ],
       });
     }
+    if (request.method == 'POST' && path == '/api/account/password') {
+      if (body['auth_key'] != account!['auth_key']) return _error(401, 'invalid_credentials');
+      _setPassword(body['new'] as Map<String, dynamic>);
+      if (body['keep_other_devices'] != true) _revokeOthers(caller);
+      passwordChanges++;
+      return http.Response('', 204);
+    }
     final action = RegExp(r'^/api/devices/([^/]+)/(approve|revoke)$').firstMatch(path);
     if (request.method == 'POST' && action != null) {
       final device = devices[action[1]];
@@ -97,6 +113,28 @@ class FakeSyncServer {
     if (path != '/api/sync/records') return _error(404, 'not_found');
     if (request.method == 'GET') return _pull(int.parse(request.url.queryParameters['since'] ?? '0'));
     return _push(body);
+  }
+
+  int passwordChanges = 0;
+
+  bool _recoveryOk(Map<String, dynamic> body) =>
+      account != null &&
+      body['email'] == account!['email'] &&
+      body['recovery_auth_key'] == account!['recovery_auth_key'];
+
+  void _setPassword(Map<String, dynamic> next) {
+    account!
+      ..['kdf'] = next['kdf']
+      ..['auth_key'] = next['auth_key']
+      ..['wrap_pw'] = next['wrap_pw'];
+  }
+
+  void _revokeOthers(Map<String, dynamic>? keep) {
+    for (final d in devices.values) {
+      if (identical(d, keep) || d['status'] == 'revoked') continue;
+      d['status'] = 'revoked';
+      tokens.remove(d['token']);
+    }
   }
 
   static const _kdf = {'alg': 'argon2id13', 'ops': 3, 'mem': 67108864, 'salt': 'AAAAAAAAAAAAAAAAAAAAAA=='};

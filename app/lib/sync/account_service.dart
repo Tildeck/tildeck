@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:sodium/sodium_sumo.dart' show SecureKey;
+
 import '../vault/vault.dart';
 import '../vault/vault_crypto.dart';
 import 'recovery_key.dart';
@@ -14,6 +17,12 @@ class WrongMasterPassword implements Exception {
 /// The account holds a different vault than the one on this device.
 class DifferentVault implements Exception {
   const DifferentVault();
+}
+
+/// The typed recovery key is not a recovery key: a typo, caught by its
+/// checksum before any request.
+class InvalidRecoveryKey implements Exception {
+  const InvalidRecoveryKey();
 }
 
 /// A new device signed in and waits for approval from another device or
@@ -180,6 +189,12 @@ class AccountService {
     );
     if (vault.status == VaultStatus.unlocked) {
       if (signedIn.vaultId != vault.vaultId) throw const DifferentVault();
+      // The master password changed on another device: the typed password
+      // opens the account's wrapped key, which replaces this device's.
+      if (!_sameSealed(signedIn.wrapPw, vault.wrapPw)) {
+        vault.crypto.unwrapVaultKey(keys.keyEncryptionKey, signedIn.wrapPw, signedIn.vaultId).dispose();
+        await vault.replaceWrap(kdf: signedIn.kdf, wrapPw: signedIn.wrapPw);
+      }
       await vault.setAccount(account);
       return;
     }
@@ -192,6 +207,110 @@ class AccountService {
       vaultKey: vaultKey,
       account: account,
     );
+  }
+
+  static bool _sameSealed(Sealed a, Sealed b) => listEquals(a.nonce, b.nonce) && listEquals(a.ciphertext, b.ciphertext);
+
+  /// Changes the master password: a new salt and keys, and the same vault
+  /// key wrapped under them. With an account, the server checks the
+  /// current password first and, unless [signOutOtherDevices] is false,
+  /// signs out every other device; they sign in again with the new password.
+  /// Throws [WrongMasterPassword] or [SyncFailure].
+  Future<void> changePassword({
+    required String current,
+    required String newPassword,
+    bool signOutOtherDevices = true,
+  }) async {
+    final keys = await vault.passwordKeys(current);
+    if (keys == null) throw const WrongMasterPassword();
+    final crypto = vault.crypto;
+    final kdf = crypto.newKdfParams();
+    final next = await crypto.deriveKeys(newPassword, kdf);
+    try {
+      final wrapPw = vault.wrapWith(next.keyEncryptionKey);
+      final account = vault.account;
+      if (account != null) {
+        await engine
+            .serverFor(account.server)
+            .changePassword(
+              account.token,
+              currentAuthKey: keys.authKey.extractBytes(),
+              kdf: kdf,
+              authKey: next.authKey.extractBytes(),
+              wrapPw: wrapPw,
+              keepOtherDevices: !signOutOtherDevices,
+            );
+      }
+      await vault.replaceWrap(kdf: kdf, wrapPw: wrapPw);
+    } finally {
+      keys.dispose();
+      next.dispose();
+    }
+  }
+
+  /// Sets a new master password with the recovery key (docs/security-model.md,
+  /// "Recovery"): every other device is signed out, and this one opens the
+  /// vault. A vault already on this device must be the account's; that is
+  /// checked before anything changes on the server. Throws
+  /// [InvalidRecoveryKey], [DifferentVault], or [SyncFailure].
+  Future<void> recover({
+    required String address,
+    required String email,
+    required String recoveryKey,
+    required String newPassword,
+    required String deviceName,
+  }) async {
+    final crypto = vault.status == VaultStatus.unlocked ? vault.crypto : await VaultCrypto.load();
+    final rk = RecoveryKeyCodec(crypto).decode(recoveryKey);
+    if (rk == null) throw const InvalidRecoveryKey();
+    final recovery = crypto.recoveryKeys(rk);
+    rk.fillRange(0, rk.length, 0);
+    PasswordKeys? next;
+    SecureKey? vaultKey;
+    try {
+      final server = engine.serverFor(address);
+      final rak = recovery.authKey.extractBytes();
+      final (vaultId, wrapRk) = await server.startRecovery(email, rak);
+      if (vault.status != VaultStatus.missing && vault.status != VaultStatus.loading && vaultId != vault.vaultId) {
+        throw const DifferentVault();
+      }
+      try {
+        vaultKey = crypto.unwrapVaultKeyForRecovery(recovery.wrapKey, wrapRk, vaultId);
+      } on DecryptionFailed {
+        throw const SyncFailure(401, 'recovery_failed');
+      }
+      final kdf = crypto.newKdfParams();
+      next = await crypto.deriveKeys(newPassword, kdf);
+      final wrapPw = crypto.wrapVaultKey(next.keyEncryptionKey, vaultKey, vaultId);
+      final deviceId = VaultCrypto.newId();
+      final signedIn = await server.completeRecovery(
+        email: email,
+        recoveryAuthKey: rak,
+        kdf: kdf,
+        authKey: next.authKey.extractBytes(),
+        wrapPw: wrapPw,
+        deviceId: deviceId,
+        deviceName: deviceName,
+      );
+      await vault.recover(
+        vaultId: vaultId,
+        kdf: kdf,
+        wrapPw: wrapPw,
+        vaultKey: vaultKey,
+        account: SyncAccount(
+          server: address,
+          email: email,
+          deviceId: deviceId,
+          deviceName: deviceName,
+          token: signedIn.token,
+        ),
+      );
+      vaultKey = null; // The vault owns it now.
+    } finally {
+      recovery.dispose();
+      next?.dispose();
+      vaultKey?.dispose();
+    }
   }
 
   /// Removes this device from the account and forgets the account here.

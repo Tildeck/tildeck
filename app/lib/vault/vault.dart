@@ -232,6 +232,13 @@ class Vault extends ChangeNotifier {
     } finally {
       keys.dispose();
     }
+    _openWith(vaultKey);
+    return true;
+  }
+
+  /// Decrypts every entry and this device's account with [vaultKey], and
+  /// marks the vault unlocked.
+  void _openWith(SecureKey vaultKey) {
     _entries.clear();
     damaged.clear();
     for (final record in _records.values) {
@@ -260,7 +267,49 @@ class Vault extends ChangeNotifier {
     _vaultKey = vaultKey;
     status = VaultStatus.unlocked;
     notifyListeners();
-    return true;
+  }
+
+  /// Opens the vault after recovery: the vault key came from the recovery
+  /// key, and [kdf] and [wrapPw] belong to the new master password. A vault
+  /// already on this device must be the same vault; with none, it is
+  /// created from the account, as at sign-in.
+  Future<void> recover({
+    required String vaultId,
+    required KdfParams kdf,
+    required Sealed wrapPw,
+    required SecureKey vaultKey,
+    required SyncAccount account,
+  }) async {
+    if (status == VaultStatus.missing) {
+      return adopt(vaultId: vaultId, kdf: kdf, wrapPw: wrapPw, vaultKey: vaultKey, account: account);
+    }
+    if (vaultId != _vaultId) throw StateError('a different vault');
+    _crypto ??= await _cryptoFuture;
+    if (status == VaultStatus.unlocked) {
+      _vaultKey?.dispose();
+      _vaultKey = null;
+    }
+    _kdf = kdf;
+    _wrapPw = wrapPw;
+    _openWith(vaultKey);
+    _setAccount(account);
+    await _save();
+    notifyListeners();
+  }
+
+  /// The vault key sealed under another key-encryption key: the `wrap_pw`
+  /// of a new master password.
+  Sealed wrapWith(SecureKey keyEncryptionKey) => crypto.wrapVaultKey(keyEncryptionKey, _requireUnlocked(), _vaultId!);
+
+  /// Replaces the master password's parameters and wrapped key, after the
+  /// caller checked that [wrapPw] holds this vault's key: a password change
+  /// here or on another device.
+  Future<void> replaceWrap({required KdfParams kdf, required Sealed wrapPw}) async {
+    _requireUnlocked();
+    _kdf = kdf;
+    _wrapPw = wrapPw;
+    notifyListeners();
+    await _save();
   }
 
   /// Forgets the vault key and every decrypted entry.

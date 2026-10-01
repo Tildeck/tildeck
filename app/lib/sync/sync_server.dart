@@ -220,6 +220,67 @@ class SyncServer {
   Future<void> resendVerification(String token) =>
       _call(() => _account.resendVerification(tildeckProtocol: kProtocolVersion, authorization: _bearer(token)));
 
+  static api.NewPassword _newPassword(KdfParams kdf, List<int> authKey, Sealed wrapPw) =>
+      api.NewPassword(kdf: _kdfOut(kdf), authKey: b64(authKey), wrapPw: _sealedOut(wrapPw));
+
+  /// Re-wraps the vault key under a new master password. Other devices are
+  /// signed out unless [keepOtherDevices].
+  Future<void> changePassword(
+    String token, {
+    required List<int> currentAuthKey,
+    required KdfParams kdf,
+    required List<int> authKey,
+    required Sealed wrapPw,
+    required bool keepOtherDevices,
+  }) => _call(
+    () => _account.changePassword(
+      api.PasswordChange(
+        authKey: b64(currentAuthKey),
+        new_: _newPassword(kdf, authKey, wrapPw),
+        keepOtherDevices: keepOtherDevices,
+      ),
+      tildeckProtocol: kProtocolVersion,
+      authorization: _bearer(token),
+    ),
+  );
+
+  /// Proves the recovery key; returns the vault id and the vault key
+  /// wrapped under the recovery key.
+  Future<(String, Sealed)> startRecovery(String email, List<int> recoveryAuthKey) async {
+    final res = await _call(
+      () => _account.startRecovery(
+        api.RecoveryStart(email: email, recoveryAuthKey: b64(recoveryAuthKey)),
+        tildeckProtocol: kProtocolVersion,
+      ),
+    );
+    return (res.vaultId, _sealedIn(res.wrapRk));
+  }
+
+  /// Sets the new master password, signs out every other device, and signs
+  /// in this one.
+  Future<SignedIn> completeRecovery({
+    required String email,
+    required List<int> recoveryAuthKey,
+    required KdfParams kdf,
+    required List<int> authKey,
+    required Sealed wrapPw,
+    required String deviceId,
+    required String deviceName,
+  }) async {
+    final res = await _call(
+      () => _account.completeRecovery(
+        api.RecoveryComplete(
+          email: email,
+          recoveryAuthKey: b64(recoveryAuthKey),
+          new_: _newPassword(kdf, authKey, wrapPw),
+          device: api.DeviceInfo(id: deviceId, name: deviceName),
+        ),
+        tildeckProtocol: kProtocolVersion,
+      ),
+    );
+    return _signedIn(res);
+  }
+
   static StoredRecord _recordIn(api.StoredRecord r) => StoredRecord(
     id: r.id,
     version: r.version,

@@ -92,13 +92,21 @@ class SyncEngine extends ChangeNotifier {
     }
   }
 
-  /// Runs one sync; a request while one runs queues exactly one more.
-  Future<void> sync() async {
-    if (_running) {
+  /// Runs one sync. A request while one runs queues exactly one more, and
+  /// completes when that one has run too.
+  Future<void> sync() {
+    final current = _current;
+    if (current != null) {
       _again = true;
-      return;
+      return current;
     }
-    if (_disposed) return;
+    if (_disposed) return Future.value();
+    return _current = _run().whenComplete(() => _current = null);
+  }
+
+  Future<void>? _current;
+
+  Future<void> _run() async {
     _running = true;
     _changeTimer?.cancel();
     notifyListeners();
