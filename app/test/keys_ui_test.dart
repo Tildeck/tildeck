@@ -32,6 +32,15 @@ class TempFiles implements LocalFiles {
 
   @override
   Future<String?> keep(File downloaded, String name) async => downloaded.path;
+
+  @override
+  bool get folders => false;
+
+  @override
+  Future<Directory> folderTarget(String name) async => Directory('${dir.path}/$name');
+
+  @override
+  Future<Directory?> pickFolderToUpload() async => null;
 }
 
 Future<void> waitFor(WidgetTester tester, bool Function() done) async {

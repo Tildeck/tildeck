@@ -607,5 +607,35 @@
         "type": "String"
       }
     }
-  }
+  },
+  "uploadFolder": "Upload a folder",
+  "selectedCount": "{count} selected",
+  "deleteSeveralBody": "{count, plural, =1{1 item} other{{count} items}} will be deleted from the server, folders with everything in them. This cannot be undone.",
+  "filesProgress": "{done} of {total} files",
+  "transferCancelled": "Cancelled",
+  "@selectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@deleteSeveralBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@filesProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "uploadFiles": "Upload files"
 }

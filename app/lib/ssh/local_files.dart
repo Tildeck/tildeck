@@ -23,6 +23,16 @@ abstract class LocalFiles {
   /// Puts a finished download where the user keeps files. Returns where it
   /// went, for a message, or null when the user cancelled.
   Future<String?> keep(File downloaded, String name);
+
+  /// Whether whole folders can be moved: on the desktop, where folders can
+  /// be chosen and written freely.
+  bool get folders;
+
+  /// A new folder for a downloaded folder, never one that exists.
+  Future<Directory> folderTarget(String name);
+
+  /// A folder to upload, or null when the user cancelled.
+  Future<Directory?> pickFolderToUpload();
 }
 
 /// The platform's pickers. On desktop a download goes straight into the
@@ -39,10 +49,7 @@ class DeviceFiles implements LocalFiles {
 
   @override
   Future<File> downloadTarget(String remoteName) async {
-    // A Linux file name may hold characters Windows refuses in a name.
-    final name = String.fromCharCodes(
-      remoteName.codeUnits.map((c) => c < 32 || r'<>:"/\|?*'.codeUnits.contains(c) ? 0x5f : c),
-    );
+    final name = _localName(remoteName);
     if (Platform.isAndroid) {
       final dir = await getTemporaryDirectory();
       return File('${dir.path}${Platform.pathSeparator}$name');
@@ -50,6 +57,31 @@ class DeviceFiles implements LocalFiles {
     final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
     return _unused(dir, name);
   }
+
+  @override
+  bool get folders => !Platform.isAndroid && !Platform.isIOS;
+
+  @override
+  Future<Directory> folderTarget(String remoteName) async {
+    final name = _localName(remoteName);
+    final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+    final sep = Platform.pathSeparator;
+    var candidate = Directory('${dir.path}$sep$name');
+    for (var i = 2; candidate.existsSync(); i++) {
+      candidate = Directory('${dir.path}$sep$name ($i)');
+    }
+    return candidate;
+  }
+
+  @override
+  Future<Directory?> pickFolderToUpload() async {
+    final path = await FilePicker.getDirectoryPath();
+    return path == null ? null : Directory(path);
+  }
+
+  /// A Linux file name may hold characters Windows refuses in a name.
+  static String _localName(String remoteName) =>
+      String.fromCharCodes(remoteName.codeUnits.map((c) => c < 32 || r'<>:"/\|?*'.codeUnits.contains(c) ? 0x5f : c));
 
   @override
   Future<String?> keep(File downloaded, String name) async {
