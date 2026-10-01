@@ -162,6 +162,23 @@ void main() {
       expect(session.problem, isNull, reason: 'a shell that exits is a normal close');
     });
 
+    test('environment variables reach the shell', () async {
+      final session = TerminalSession(
+        ConnectionTarget(
+          host: host!,
+          port: port,
+          username: user,
+          password: password,
+          environment: const {'TILDECK_GREETING': 'shalom-42'},
+          startupCommand: 'echo "env:\$TILDECK_GREETING"',
+        ),
+      );
+      addTearDown(session.dispose);
+      session.terminal.resize(100, 30);
+      unawaited(session.start(SshConnector(knownHosts: MemoryKnownHosts()), PromptLog().call));
+      await _until(() => session.terminal.buffer.getText().contains('env:shalom-42\n'));
+    });
+
     test('a startup snippet runs when the shell opens, and a snippet runs line by line', () async {
       final session = TerminalSession(
         target(pass: password).withStartupCommand('X=\$((40 + 2))\necho "startup-\$X"\n\n'),

@@ -192,6 +192,21 @@ start_test_sshd() {
     ssh-keygen -q -t ed25519 -N "$KEY_PASS" -f /tmp/encrypted &&
     cat /tmp/plain.pub /tmp/encrypted.pub >> /config/.ssh/authorized_keys &&
     chmod 600 /config/.ssh/authorized_keys' || return 1
+  # Accept the test's environment variables, then reload sshd (SIGHUP re-execs
+  # it with the new configuration) and wait for it to listen again.
+  docker exec "$SSH_CONTAINER" sh -c '
+    echo "AcceptEnv TILDECK_*" >> /config/sshd/sshd_config &&
+    pkill -HUP -f "sshd.pam -D"' || return 1
+  waited=0
+  sleep 1
+  until docker exec "$SSH_CONTAINER" nc -z 127.0.0.1 2222 >/dev/null 2>&1; do
+    sleep 1
+    waited=$((waited + 1))
+    if ((waited >= 30)); then
+      err "The test SSH server did not come back after its reload."
+      return 1
+    fi
+  done
   FLUTTER_DOCKER_ARGS=(
     --network "$SSH_NET"
     -e TILDECK_REQUIRE_SSH_TESTS=1

@@ -332,6 +332,18 @@ class Vault extends ChangeNotifier {
   List<KeyEntry> get keys =>
       _of<KeyEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   List<KnownHostEntry> get knownHosts => _of<KnownHostEntry>().toList();
+  List<GroupEntry> get groups => _of<GroupEntry>().toList();
+
+  /// The shared settings of the group named [name], if it has any.
+  GroupEntry? groupNamed(String name) {
+    final key = name.trim();
+    if (key.isEmpty) return null;
+    for (final g in _of<GroupEntry>()) {
+      if (g.name.trim() == key) return g;
+    }
+    return null;
+  }
+
   List<SnippetEntry> get snippets =>
       _of<SnippetEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   T? entry<T extends VaultEntry>(String? id) => id == null ? null : _entries[id] as T?;

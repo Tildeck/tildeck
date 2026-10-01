@@ -308,5 +308,33 @@
         "type": "int"
       }
     }
+  },
+  "searchHosts": "Search hosts",
+  "clearSearch": "Clear search",
+  "noHostsMatch": "No host matches this search.",
+  "groupSettings": "Group settings",
+  "groupSettingsTitle": "Group: {name}",
+  "groupSettingsIntro": "Hosts in this group use these settings wherever they leave a field empty. A host's own value always wins.",
+  "noneOption": "None",
+  "clearGroupSettings": "Remove the group settings",
+  "fromGroup": "Empty takes the group's: {username}",
+  "tagsLabel": "Tags",
+  "tagsHint": "production, web, eu",
+  "envLabel": "Environment variables",
+  "envHelp": "One per line, as NAME=value. The server accepts only names its AcceptEnv setting allows.",
+  "envInvalid": "Write one variable per line, as NAME=value.",
+  "@groupSettingsTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@fromGroup": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
   }
 }

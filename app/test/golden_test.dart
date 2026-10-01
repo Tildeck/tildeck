@@ -28,6 +28,7 @@ import 'package:tildeck/sync/sync_server.dart';
 import 'package:tildeck/theme.dart';
 import 'package:tildeck/ui/connect_form.dart';
 import 'package:tildeck/ui/files_page.dart';
+import 'package:tildeck/ui/group_editor_page.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
 import 'package:tildeck/ui/snippets_page.dart';
@@ -128,6 +129,7 @@ Future<Vault> sampleVault({required bool unlocked}) async {
       username: 'deploy',
       auth: HostAuth.key,
       keyId: 'k1',
+      tags: ['nginx', 'eu-west'],
     ),
     HostEntry(
       id: 'h2',
@@ -449,6 +451,23 @@ void main() {
       await tester.pumpWidget(screen(locale, mode, SnippetsPage(vault: vault)));
       await tester.pumpAndSettle();
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/snippets_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('group settings $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() async {
+        final v = await sampleVault(unlocked: true);
+        await v.put(
+          const GroupEntry(id: 'g1', name: 'Production', username: 'deploy', keyId: 'k1', env: {'LANG': 'en_US.UTF-8'}),
+        );
+        return v;
+      }))!;
+      await tester.pumpWidget(screen(locale, mode, GroupEditorPage(vault: vault, name: 'Production')));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/group_settings_${locale}_${mode.name}.png'),
+      );
     });
 
     testWidgets('waiting for approval $locale ${mode.name}', (tester) async {

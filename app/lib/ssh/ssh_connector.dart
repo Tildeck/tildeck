@@ -16,6 +16,7 @@ class ConnectionTarget {
     this.privateKey,
     this.passphrase,
     this.startupCommand,
+    this.environment = const {},
   });
 
   final String host;
@@ -30,6 +31,9 @@ class ConnectionTarget {
   /// Sent to the shell once it opens: a startup snippet.
   final String? startupCommand;
 
+  /// Environment variables requested for the shell.
+  final Map<String, String> environment;
+
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
 
   /// The same target with another command to run once the shell opens.
@@ -41,6 +45,7 @@ class ConnectionTarget {
     privateKey: privateKey,
     passphrase: passphrase,
     startupCommand: command,
+    environment: environment,
   );
 }
 
