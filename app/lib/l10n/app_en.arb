@@ -390,5 +390,8 @@
         "type": "int"
       }
     }
-  }
+  },
+  "fillPassword": "Fill saved password",
+  "autocompleteLabel": "Suggestions while typing",
+  "autocompleteHelp": "Commands from the server's own history and from your snippets, and the saved password at a password prompt. The history is read from the server for each session and never stored. Takes effect in new sessions."
 }

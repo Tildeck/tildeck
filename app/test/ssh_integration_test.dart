@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tildeck/ssh/autocomplete.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/ssh/terminal_session.dart';
@@ -160,6 +161,37 @@ void main() {
       session.terminal.textInput('exit\r');
       await _until(() => session.state == SessionState.closed);
       expect(session.problem, isNull, reason: 'a shell that exits is a normal close');
+    });
+
+    test('suggestions come from the server history, and a password prompt is answered', () async {
+      final setup = await SshConnector(
+        knownHosts: MemoryKnownHosts(),
+      ).connect(target(pass: password), promptHostKey: PromptLog().call);
+      await setup.run(r'printf "uptime\nls -la /var/log\nls -la /var/log\n" > ~/.bash_history');
+      setup.close();
+
+      final session = TerminalSession(target(pass: password));
+      addTearDown(session.dispose);
+      session.terminal.resize(100, 30);
+      unawaited(session.start(SshConnector(knownHosts: MemoryKnownHosts()), PromptLog().call));
+      await _until(() => session.history.contains('ls -la /var/log'));
+      expect(session.history.where((c) => c == 'ls -la /var/log'), hasLength(1));
+
+      // Typed, completed from the history, and run.
+      session.terminal.textInput('ls -la /var/l');
+      expect(suggest(session.line.line!, session.history).first.command, 'ls -la /var/log');
+      session.complete('ls -la /var/log');
+      session.terminal.textInput('\r');
+      await _until(() => session.terminal.buffer.getText().contains('total '));
+
+      // A prompt that asks for a password gets the session's password.
+      session.terminal.textInput(
+        r'printf "Password: "; read -rs x; echo; echo "got:$x"'
+        '\r',
+      );
+      await _until(() => session.atPasswordPrompt);
+      session.fillPassword();
+      await _until(() => session.terminal.buffer.getText().contains('got:$password'));
     });
 
     test('environment variables reach the shell', () async {

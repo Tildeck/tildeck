@@ -43,3 +43,6 @@ app/windows/flutter/ephemeral/
 
 # Build output collected by the workflow scripts.
 /out/
+
+# Diff images Flutter writes when a golden test fails.
+/app/test/failures/

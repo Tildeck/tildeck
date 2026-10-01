@@ -309,7 +309,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 | Stage | Scope | Status |
 |---|---|---|
-| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, and connection history done; split view planned; command history waits for a decision |
+| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, and autocomplete done; split view planned |
 | 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Planned |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
@@ -342,8 +342,17 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 - Every session is written to the history when it connects or fails, and its end time when it closes: the saved host, user@host, the times, the device, and whether it failed. The records are encrypted and synced, so the history covers every device, like Termius's session logs. It keeps the newest 200.
 - The hosts list shows the five most recent saved hosts for one-tap reconnecting, and the History page (the clock button) lists every connection with its length; tapping one with a saved host connects again.
-- Command history is not recorded: the app cannot tell a typed command from a password typed at a prompt (`sudo`, `passwd`) whose echo the server turned off, so recording keystrokes would store and sync passwords. Waiting for Shlomi's decision.
+- Command history is not recorded: the app cannot tell a typed command from a password typed at a prompt (`sudo`, `passwd`) whose echo the server turned off, so recording keystrokes would store and sync passwords. Shlomi chose the Termius approach instead (2026-10-01): see Autocomplete.
 - Tests: a session logged on connect and closed off with its length, a failed connection, and the 200 limit. A golden image of the History page.
+
+### Autocomplete (2026-10-01)
+
+- As in Termius, suggestions come from the server's own history, read after connecting over a separate exec channel (bash, zsh, and fish history files) and never stored or synced here, and from the user's snippets. A server that refuses exec channels simply gets no suggestions; the session goes on.
+- The line being typed is followed in memory only, to filter the suggestions, and forgotten at Enter. Anything that changes the line unseen (arrow keys, history recall, Tab completion) stops the suggestions until the next line.
+- A bar above the key bar shows up to four: snippets, then commands that start with the typed text, then ones that contain it. A tap completes the line; the user still presses Enter.
+- At a password prompt (sudo, su, passphrases), the bar offers the password the session signed in with; nothing typed is recorded.
+- A switch on the Terminal appearance page turns suggestions off; it is on by default.
+- Tests: bash, zsh, and fish history parsing; ranking with snippets; following the typed line through Backspace, Ctrl+U, Enter, arrows, and Tab; completion input; password prompt recognition. Against the OpenSSH container: the history read from the server, a line completed from it and run, and a real password prompt answered with the session's password.
 
 ## Required workflow contracts
 
