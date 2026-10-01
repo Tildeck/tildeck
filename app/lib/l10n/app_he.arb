@@ -230,5 +230,7 @@
   "durationSeconds": "{seconds} שנ׳",
   "fillPassword": "מילוי הסיסמה השמורה",
   "autocompleteLabel": "הצעות תוך כדי הקלדה",
-  "autocompleteHelp": "פקודות מההיסטוריה של השרת עצמו ומה-snippets שלך, והסיסמה השמורה כשהשרת מבקש סיסמה. ההיסטוריה נקראת מהשרת בכל session ולא נשמרת. חל על sessions חדשים."
+  "autocompleteHelp": "פקודות מההיסטוריה של השרת עצמו ומה-snippets שלך, והסיסמה השמורה כשהשרת מבקש סיסמה. ההיסטוריה נקראת מהשרת בכל session ולא נשמרת. חל על sessions חדשים.",
+  "splitView": "תצוגה מפוצלת",
+  "unsplitView": "תצוגה יחידה"
 }

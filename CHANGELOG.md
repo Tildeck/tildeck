@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Split view on wide screens: two sessions side by side.
 - Autocomplete from the server's own history and from snippets, and the saved password offered at a password prompt; nothing typed is stored.
 - Connection history across devices, with recent hosts for one-tap reconnecting.
 - Terminal color schemes and font size, kept in step across devices; search in the terminal; renaming a tab.
