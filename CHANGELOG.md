@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Files over SFTP in an open session: browse folders, download, upload, and create a folder.
 - Change the master password in the client, and recover a forgotten one with the recovery key.
 - Invitations: an administrator invites an email address from the admin panel, and registering with the code confirms the address, with or without email configured.
 - The admin panel: first-run setup with a one-time token, administrator sign-in with a password and an authenticator code, users and their devices, settings with values locked by the environment, and the activity log, in English and Hebrew.

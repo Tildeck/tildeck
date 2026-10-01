@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
+import '../ssh/file_browser.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
 import '../theme.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
+import 'files_page.dart';
 import 'host_key_dialog.dart';
 import 'password_pages.dart';
 import 'hosts_page.dart';
@@ -69,6 +71,15 @@ class _SessionsPageState extends State<SessionsPage> {
       ({required target, required presented, required status, previous}) async => mounted
           ? showHostKeyDialog(context, target: target, presented: presented, status: status, previous: previous)
           : false,
+    );
+  }
+
+  void _openFiles(TerminalSession session) {
+    final target = session.target;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FilesPage(browser: FileBrowser(session.openSftp), title: '${target.username}@${target.host}'),
+      ),
     );
   }
 
@@ -141,11 +152,41 @@ class _SessionsPageState extends State<SessionsPage> {
       body: SafeArea(
         child: Column(
           children: [
-            _TabStrip(
-              sessions: _sessions,
-              selected: _selected,
-              onSelect: (i) => setState(() => _selected = i),
-              onClose: _close,
+            Row(
+              children: [
+                Expanded(
+                  child: _TabStrip(
+                    sessions: _sessions,
+                    selected: _selected,
+                    onSelect: (i) => setState(() => _selected = i),
+                    onClose: _close,
+                  ),
+                ),
+                if (_selected >= 0)
+                  ListenableBuilder(
+                    listenable: _sessions[_selected],
+                    builder: (context, _) {
+                      final session = _sessions[_selected];
+                      if (session.state != SessionState.connected) return const SizedBox.shrink();
+                      return Container(
+                        height: 52,
+                        padding: const EdgeInsetsDirectional.only(end: 10),
+                        decoration: BoxDecoration(
+                          color: c.page,
+                          border: Border(bottom: BorderSide(color: c.line)),
+                        ),
+                        child: Center(
+                          child: OutlinedButton.icon(
+                            key: const ValueKey('openFiles'),
+                            onPressed: () => _openFiles(session),
+                            icon: const Icon(Icons.folder_open_rounded, size: 18),
+                            label: Text(t.filesTitle),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
             ),
             Expanded(
               child: IndexedStack(
