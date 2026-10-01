@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dartssh2/dartssh2.dart';
+import 'package:flutter_pty/flutter_pty.dart';
 import 'package:flutter/foundation.dart';
 import 'package:xterm/xterm.dart';
 
 import '../activity.dart';
+import '../local/local_shell.dart';
 import 'autocomplete.dart';
 import 'file_browser.dart';
 import 'ssh_connector.dart';
@@ -64,7 +67,11 @@ class TerminalSession extends ChangeNotifier {
   /// Connects and opens an interactive shell sized to the terminal.
   Future<void> start(SshConnector connector, HostKeyPrompt promptHostKey) async {
     try {
-      final link = isSsh ? await _openSsh(connector, promptHostKey) : await _openTelnet(connector, promptHostKey);
+      final link = switch (target.protocol) {
+        ConnectionProtocol.ssh => await _openSsh(connector, promptHostKey),
+        ConnectionProtocol.telnet => await _openTelnet(connector, promptHostKey),
+        ConnectionProtocol.local => _openLocal(),
+      };
       _link = link;
 
       // Streams can split a multi-byte character; the decoders keep the
@@ -115,6 +122,32 @@ class TerminalSession extends ChangeNotifier {
       resize: shell.resizeTerminal,
       done: shell.done,
       close: shell.close,
+    );
+  }
+
+  _Link _openLocal() {
+    final shell = target.localShell!;
+    final Pty pty;
+    try {
+      pty = Pty.start(
+        shell.executable,
+        arguments: shell.arguments,
+        // The whole environment: Windows shells need far more than the
+        // few variables flutter_pty copies on its own.
+        environment: Platform.environment,
+        workingDirectory: localHome(),
+        columns: terminal.viewWidth,
+        rows: terminal.viewHeight,
+      );
+    } catch (_) {
+      throw const ConnectException(ConnectProblem.localShellFailed);
+    }
+    return _Link(
+      output: pty.output.cast<List<int>>(),
+      write: pty.write,
+      resize: (width, height, _, _) => pty.resize(height, width),
+      done: pty.exitCode,
+      close: pty.kill,
     );
   }
 

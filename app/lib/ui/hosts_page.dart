@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../local/local_shell.dart';
 import '../ssh/ssh_connector.dart';
 import '../theme.dart';
 import '../vault/models.dart';
@@ -39,6 +40,14 @@ List<HostEntry> jumpCandidatesFor(Vault vault, String? hostId) => [
   for (final h in vault.hosts)
     if (h.id != hostId && jumpChainOf(vault, h).every((j) => j.id != hostId)) h,
 ];
+
+String localShellName(AppLocalizations t, LocalShell shell) => switch (shell.kind) {
+  LocalShellKind.pwsh => 'PowerShell',
+  LocalShellKind.windowsPowerShell => 'Windows PowerShell',
+  LocalShellKind.cmd => t.shellCmd,
+  LocalShellKind.wsl => 'WSL',
+  LocalShellKind.posix => t.localTerminal,
+};
 
 Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault, HostEntry host) async {
   // The farthest jump host is connected to first.
@@ -134,13 +143,16 @@ Future<String?> _askPassword(BuildContext context, HostEntry host) {
 }
 
 class HostsPage extends StatefulWidget {
-  const HostsPage({super.key, required this.vault, required this.onConnect, this.onOpenForwards});
+  const HostsPage({super.key, required this.vault, required this.onConnect, this.onOpenForwards, this.localShells});
 
   final Vault vault;
   final void Function(ConnectionTarget target) onConnect;
 
   /// Opens the port forwarding rules; null hides the button.
   final VoidCallback? onOpenForwards;
+
+  /// The shells for local terminals; null looks for them on the desktop.
+  final List<LocalShell>? localShells;
 
   @override
   State<HostsPage> createState() => _HostsPageState();
@@ -160,6 +172,11 @@ class _HostsPageState extends State<HostsPage> {
 
   Vault get vault => widget.vault;
   void Function(ConnectionTarget target) get onConnect => widget.onConnect;
+
+  List<LocalShell> get _shells => widget.localShells ?? _found;
+
+  /// Looked for once: the shells installed do not change while it runs.
+  late final List<LocalShell> _found = localTerminalsSupported ? findLocalShells() : const [];
 
   @override
   void dispose() {
@@ -244,6 +261,22 @@ class _HostsPageState extends State<HostsPage> {
                     Expanded(
                       child: Text(t.hostsTitle, style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
                     ),
+                    if (_shells.isNotEmpty)
+                      PopupMenuButton<LocalShell>(
+                        key: const ValueKey('openLocalTerminal'),
+                        tooltip: t.localTerminal,
+                        icon: const Icon(Icons.terminal_rounded),
+                        onSelected: (shell) =>
+                            widget.onConnect(ConnectionTarget.local(shell, localShellName(t, shell))),
+                        itemBuilder: (_) => [
+                          for (final shell in _shells)
+                            PopupMenuItem(
+                              key: ValueKey('localShell-${shell.kind.name}'),
+                              value: shell,
+                              child: Text(localShellName(t, shell)),
+                            ),
+                        ],
+                      ),
                     if (widget.onOpenForwards != null)
                       IconButton(
                         key: const ValueKey('openForwards'),

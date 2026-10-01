@@ -104,7 +104,8 @@ class _SessionsPageState extends State<SessionsPage> {
         _selected = replacing;
       }
     });
-    recordHistory(widget.vault, session);
+    // A local shell is not a server: it stays out of the synced history.
+    if (target.protocol != ConnectionProtocol.local) recordHistory(widget.vault, session);
     session.start(
       widget.connector,
       // The prompt arrives after network round trips; if the page is gone

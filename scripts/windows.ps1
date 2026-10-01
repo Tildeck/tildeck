@@ -10,6 +10,7 @@
       scripts\windows.ps1           run the client in debug mode (hot reload)
       scripts\windows.ps1 run       the same
       scripts\windows.ps1 build     release build into out\windows\
+      scripts\windows.ps1 test      the Windows-only tests (integration_test\)
       scripts\windows.ps1 check     only check the prerequisites
 
     Requires Flutter on PATH (the same version as the toolchain pin in
@@ -22,7 +23,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('run', 'build', 'check')]
+    [ValidateSet('run', 'build', 'test', 'check')]
     [string]$Command = 'run'
 )
 
@@ -110,6 +111,11 @@ try {
             if (Test-Path $out) { Remove-Item -Recurse -Force $out }
             Copy-Item -Recurse (Join-Path $App 'build\windows\x64\runner\Release') $out
             Write-Step "Built $out\tildeck.exe"
+        }
+        'test' {
+            # What only Windows can show, such as local terminals over ConPTY.
+            Write-Step 'Running the Windows tests ...'
+            Invoke-Flutter @('test', 'integration_test', '-d', 'windows')
         }
     }
 }

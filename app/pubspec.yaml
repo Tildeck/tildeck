@@ -16,6 +16,8 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # Local terminals on the desktop (ConPTY on Windows).
+  flutter_pty: ^0.4.2
   http: ^1.4.0
   intl: any
   # Generated from server/openapi.json by `scripts/local.sh contract`.
@@ -29,6 +31,8 @@ dependencies:
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_lints: ^6.0.0
 
