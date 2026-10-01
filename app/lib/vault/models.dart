@@ -17,6 +17,7 @@ sealed class VaultEntry {
     KnownHostEntry.recordType => KnownHostEntry.fromJson(id, data),
     SnippetEntry.recordType => SnippetEntry.fromJson(id, data),
     GroupEntry.recordType => GroupEntry.fromJson(id, data),
+    PreferencesEntry.recordType => PreferencesEntry.fromJson(id, data),
     _ => null,
   };
 }
@@ -241,3 +242,28 @@ Map<String, String>? parseEnv(String text) {
 }
 
 String formatEnv(Map<String, String> env) => [for (final e in env.entries) '${e.key}=${e.value}'].join('\n');
+
+/// The user's preferences, one record with a fixed id on every device, so
+/// they sync and a change on one device reaches the others.
+class PreferencesEntry extends VaultEntry {
+  const PreferencesEntry({this.terminalTheme, this.fontSize}) : super(id: fixedId);
+
+  static const recordType = 'preferences';
+  static const fixedId = '00000000-0000-4000-8000-000000000001';
+
+  /// A theme id from lib/terminal/terminal_themes.dart; null is the default.
+  final String? terminalTheme;
+  final double? fontSize;
+
+  PreferencesEntry copyWith({String? terminalTheme, double? fontSize}) =>
+      PreferencesEntry(terminalTheme: terminalTheme ?? this.terminalTheme, fontSize: fontSize ?? this.fontSize);
+
+  @override
+  String get type => recordType;
+
+  @override
+  Map<String, Object?> dataJson() => {'terminal_theme': terminalTheme, 'font_size': fontSize};
+
+  static PreferencesEntry fromJson(String id, Map<String, dynamic> d) =>
+      PreferencesEntry(terminalTheme: d['terminal_theme'] as String?, fontSize: (d['font_size'] as num?)?.toDouble());
+}

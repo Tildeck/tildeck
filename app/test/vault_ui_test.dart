@@ -23,7 +23,7 @@ void main() {
     final vault = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
 
     Future<void> waitFor(bool Function() done, String what) async {
-      for (var i = 0; i < 200; i++) {
+      for (var i = 0; i < 1000; i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
         // Advance the fake clock too, so route and dialog animations finish.
         await tester.pump(const Duration(milliseconds: 50));

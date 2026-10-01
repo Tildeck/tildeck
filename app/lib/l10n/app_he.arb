@@ -207,5 +207,19 @@
   "tagsHint": "production, web, eu",
   "envLabel": "משתני סביבה",
   "envHelp": "אחד בכל שורה, בצורה NAME=value. השרת מקבל רק שמות שהגדרת AcceptEnv שלו מתירה.",
-  "envInvalid": "צריך לכתוב משתנה אחד בכל שורה, בצורה NAME=value."
+  "envInvalid": "צריך לכתוב משתנה אחד בכל שורה, בצורה NAME=value.",
+  "terminalSettingsTitle": "מראה הטרמינל",
+  "fontSizeLabel": "גודל הגופן",
+  "fontSizeHelp": "בתוך טרמינל אפשר לשנות גם עם Ctrl ו-+ או -, ו-Ctrl ו-0 מחזיר לברירת המחדל.",
+  "terminalThemeLabel": "ערכת צבעים",
+  "searchTerminal": "חיפוש בטרמינל",
+  "noMatches": "אין תוצאות",
+  "matchOf": "{current} מתוך {total}",
+  "previousMatch": "התוצאה הקודמת",
+  "nextMatch": "התוצאה הבאה",
+  "closeSearch": "סגירת החיפוש",
+  "renameTab": "שינוי שם הטאב",
+  "tabNameLabel": "שם הטאב",
+  "tabNameHelp": "ריק מחזיר את שם החיבור.",
+  "moreActions": "עוד"
 }

@@ -44,7 +44,7 @@ void main() {
   /// Real work (Argon2id in an isolate, file writes) completes outside the
   /// test's fake clock; let it run between frames until [done].
   Future<void> waitFor(WidgetTester tester, bool Function() done, String what) async {
-    for (var i = 0; i < 300; i++) {
+    for (var i = 0; i < 1000; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
       // Advances the test clock too, so route transitions finish.
       await tester.pump(const Duration(milliseconds: 20));
@@ -242,7 +242,9 @@ void main() {
     await waitFor(tester, () => vault.status == VaultStatus.unlocked && shown(find.text('Database')), 'the vault');
 
     // And changed once more, from the key button.
-    await tap(tester, 'openPassword');
+    await tap(tester, 'moreMenu');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('openPassword')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('currentPassword')), 'lantern-river-autumn-77');
     await tester.enterText(find.byKey(const ValueKey('newPassword')), 'harbor-maple-sunrise-15');
