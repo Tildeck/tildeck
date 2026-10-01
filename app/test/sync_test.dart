@@ -25,8 +25,13 @@ class Clock {
   void tick([Duration by = const Duration(minutes: 1)]) => now = now.add(by);
 }
 
+/// Every device a test made: the teardown waits for them to go quiet.
+final devices = <Device>[];
+
 class Device {
-  Device(this.name, this.vault, this.clock, this.engine);
+  Device(this.name, this.vault, this.clock, this.engine) {
+    devices.add(this);
+  }
 
   final String name;
   final Vault vault;
@@ -95,7 +100,16 @@ void main() {
     dir = await Directory.systemTemp.createTemp('tildeck-sync');
     server = FakeSyncServer();
   });
-  tearDown(() => dir.delete(recursive: true));
+  tearDown(() async {
+    // Unlocking starts a sync that may still be saving the vault: let every
+    // device finish before its folder goes.
+    for (final d in devices) {
+      await d.engine.idle;
+      await d.vault.flush();
+    }
+    devices.clear();
+    await dir.delete(recursive: true);
+  });
 
   test('two devices converge: additions, edits, and deletions reach each other', () async {
     final a = await firstDevice();
