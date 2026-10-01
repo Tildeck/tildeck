@@ -535,5 +535,51 @@
         "type": "String"
       }
     }
+  },
+  "renameTitle": "Rename",
+  "renameAction": "Rename",
+  "newNameLabel": "New name",
+  "deleteEntryTitle": "Delete from the server?",
+  "deleteFileBody": "{name} will be deleted from the server. This cannot be undone.",
+  "deleteFolderBody": "The folder {name} and everything in it will be deleted from the server. This cannot be undone.",
+  "entryDeleted": "{name} deleted.",
+  "permissionsTitle": "Permissions",
+  "permissionOwner": "Owner",
+  "permissionGroup": "Group",
+  "permissionOthers": "Others",
+  "permissionRead": "Read",
+  "permissionWrite": "Write",
+  "permissionRun": "Run",
+  "copyPath": "Copy the path",
+  "pathCopied": "Path copied.",
+  "download": "Download",
+  "viewOptions": "View",
+  "showHiddenFiles": "Show hidden files",
+  "sortByName": "Sort by name",
+  "sortBySize": "Sort by size",
+  "sortByModified": "Sort by date",
+  "goToFolder": "Go to a folder",
+  "folderPathLabel": "Path",
+  "open": "Open",
+  "@deleteFileBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@deleteFolderBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@entryDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   }
 }

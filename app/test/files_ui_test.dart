@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tildeck/l10n/app_localizations.dart';
@@ -22,7 +23,14 @@ class RecordingBrowser extends FileBrowser {
     path = '/home/deploy';
     entries = const [
       RemoteEntry(name: 'logs', path: '/home/deploy/logs', isDirectory: true, isLink: false),
-      RemoteEntry(name: 'notes.txt', path: '/home/deploy/notes.txt', isDirectory: false, isLink: false, size: 5),
+      RemoteEntry(
+        name: 'notes.txt',
+        path: '/home/deploy/notes.txt',
+        isDirectory: false,
+        isLink: false,
+        size: 5,
+        permissions: 0x1a4,
+      ),
     ];
     notifyListeners();
   }
@@ -47,6 +55,18 @@ class RecordingBrowser extends FileBrowser {
   Future<void> upload(Stream<List<int>> source, String name, int? size) async {
     uploaded.add((name, utf8.decode(await source.expand((c) => c).toList())));
   }
+
+  final actions = <String>[];
+
+  @override
+  Future<void> rename(RemoteEntry entry, String name) async => actions.add('rename ${entry.name} to $name');
+
+  @override
+  Future<void> delete(RemoteEntry entry) async => actions.add('delete ${entry.name}');
+
+  @override
+  Future<void> setPermissions(RemoteEntry entry, int mode) async =>
+      actions.add('chmod ${entry.name} ${mode.toRadixString(8)}');
 }
 
 class TempFiles implements LocalFiles {
@@ -115,5 +135,65 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('filesUpload')));
     await waitFor(tester, () => browser.uploaded.isNotEmpty);
     expect(browser.uploaded, [('script.sh', 'echo hi\n')]);
+  });
+
+  testWidgets('rename, permissions, copy the path, and delete after asking', (tester) async {
+    final browser = RecordingBrowser();
+    String? clipboard;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') clipboard = (call.arguments as Map)['text'] as String;
+      return null;
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: FilesPage(browser: browser, title: 'deploy@example.com', local: TempFiles(Directory.systemTemp)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    Future<void> menu(String entry, String item) async {
+      await tester.tap(find.byKey(ValueKey('entryMenu-$entry')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(item)));
+      await tester.pumpAndSettle();
+    }
+
+    // Rename: the name is offered, its stem selected.
+    await menu('notes.txt', 'entryRename');
+    final field = tester.widget<TextField>(find.byKey(const ValueKey('folderName')));
+    expect(field.controller!.text, 'notes.txt');
+    expect(field.controller!.selection, const TextSelection(baseOffset: 0, extentOffset: 5));
+    await tester.enterText(find.byKey(const ValueKey('folderName')), 'todo.txt');
+    await tester.tap(find.byKey(const ValueKey('nameDialogOk')));
+    await tester.pumpAndSettle();
+
+    // Permissions: 0644 shown, group write added.
+    await menu('notes.txt', 'entryPermissions');
+    expect(find.text('644  rw-r--r--'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('permission-4')));
+    await tester.pumpAndSettle();
+    expect(find.text('664  rw-rw-r--'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('savePermissions')));
+    await tester.pumpAndSettle();
+
+    await menu('notes.txt', 'entryCopyPath');
+    expect(clipboard, '/home/deploy/notes.txt');
+
+    // Delete asks first; a cancel deletes nothing.
+    await menu('logs', 'entryDelete');
+    expect(find.textContaining('and everything in it'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await menu('logs', 'entryDelete');
+    await tester.tap(find.byKey(const ValueKey('confirmDelete')));
+    await tester.pumpAndSettle();
+
+    expect(browser.actions, ['rename notes.txt to todo.txt', 'chmod notes.txt 664', 'delete logs']);
   });
 }

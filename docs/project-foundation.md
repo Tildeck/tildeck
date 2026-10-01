@@ -425,6 +425,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The test server now trusts a test authority whose key the account can sign with, and turns off OpenSSH's penalties for failed sign-ins (the tests fail some on purpose, all from one address).
 - Tests: reading certificates (principals, validity, the certified key, refusing host certificates and broken ones). On the Keys page: a certificate for another key refused, the key's own kept and shown. Against the OpenSSH container, for Ed25519 and RSA 4096: a key in no authorized_keys refused alone and signing in with its certificate; a certificate for another user, and an expired one, refused.
 
+### Files: operations and a standalone browser (2026-10-02)
+
+- Each file or folder has a menu: download, rename (the name offered with its stem selected; never over another entry, and a name, not a path), permissions (owner, group, and others; read, write, and run; with the octal value and the ls form), copy the path, and delete.
+- Deleting asks first, saying whether a folder goes with everything in it: files on a server have no undo. A folder is deleted depth first; a link is removed, never followed.
+- The list shows each entry's permissions. A View menu shows or hides dotfiles (hidden by default) and sorts by name, size (largest first), or date (newest first), folders always first. Tapping the path opens a folder by path, absolute or relative.
+- A host's menu opens its files directly, on a connection of their own that closes with the page: no terminal needed. A failure to connect shows the same message a session would.
+- Tests: against the OpenSSH container, on a tree made by the shell: hidden files, each sort, going to a path, renaming (and refusing to replace or to take a path), permissions read back by `stat`, deleting a link without its target, and deleting a folder tree. On the page: rename with the stem selected, permissions from 644 to 664, copy the path, and delete after asking, with a cancel deleting nothing.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

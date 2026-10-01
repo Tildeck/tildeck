@@ -1,3 +1,4 @@
+import 'package:dartssh2/dartssh2.dart' show SSHClient;
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -6,7 +7,9 @@ import '../ssh/ssh_connector.dart';
 import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
+import '../ssh/file_browser.dart';
 import 'connect_form.dart';
+import 'files_page.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
 import 'keys_page.dart';
@@ -207,6 +210,20 @@ class _HostsPageState extends State<HostsPage> {
       if (hosts.length == 5) break;
     }
     return hosts;
+  }
+
+  /// The host's files over SFTP, on a connection of their own: no terminal.
+  Future<void> _openFiles(BuildContext context, HostEntry host) async {
+    SSHClient? client;
+    final browser = FileBrowser(() async {
+      final c = client = await widget.connectHost!(context, host);
+      return c.sftp();
+    }, onClose: () => client?.close());
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FilesPage(browser: browser, title: host.label),
+      ),
+    );
   }
 
   Future<void> _connectHost(BuildContext context, HostEntry host) async {
@@ -479,14 +496,23 @@ class _HostsPageState extends State<HostsPage> {
                             ),
                             onTap: () => _connectHost(context, host),
                             trailing: PopupMenuButton<String>(
-                              onSelected: (action) => action == 'edit'
-                                  ? Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => HostEditorPage(vault: vault, host: host),
-                                      ),
-                                    )
-                                  : _delete(context, host),
+                              key: ValueKey('hostMenu-${host.id}'),
+                              onSelected: (action) => switch (action) {
+                                'edit' => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => HostEditorPage(vault: vault, host: host),
+                                  ),
+                                ),
+                                'files' => _openFiles(context, host),
+                                _ => _delete(context, host),
+                              },
                               itemBuilder: (_) => [
+                                if (widget.connectHost != null && !host.isTelnet)
+                                  PopupMenuItem(
+                                    key: const ValueKey('hostFiles'),
+                                    value: 'files',
+                                    child: Text(t.filesTitle),
+                                  ),
                                 PopupMenuItem(value: 'edit', child: Text(t.editAction)),
                                 PopupMenuItem(value: 'delete', child: Text(t.deleteAction)),
                               ],
