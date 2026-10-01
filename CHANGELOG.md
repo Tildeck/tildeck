@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Proxies: reach hosts through a SOCKS5 or HTTP proxy, with a password if it asks for one, chosen per host or per group.
 - Agent forwarding per host: the server can sign in onward with the vault's keys during the session, without the keys leaving the device.
 - Jump hosts: connect to a host through another saved host, or a chain of them, set per host or per group.
 - Port forwarding: local, remote, and dynamic (SOCKS5) rules through saved hosts, synced across devices, turned on and off from their own page.

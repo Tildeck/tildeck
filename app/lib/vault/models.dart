@@ -1,3 +1,5 @@
+import '../ssh/proxy.dart';
+
 /// What the vault stores. Each entry is one encrypted record; the record type
 /// is inside the ciphertext, so storage (and later the sync server) cannot
 /// tell hosts from keys.
@@ -20,6 +22,7 @@ sealed class VaultEntry {
     PreferencesEntry.recordType => PreferencesEntry.fromJson(id, data),
     ConnectionLogEntry.recordType => ConnectionLogEntry.fromJson(id, data),
     PortForwardEntry.recordType => PortForwardEntry.fromJson(id, data),
+    ProxyEntry.recordType => ProxyEntry.fromJson(id, data),
     _ => null,
   };
 }
@@ -44,6 +47,7 @@ class HostEntry extends VaultEntry {
     this.env = const {},
     this.jumpHostId,
     this.agentForwarding = false,
+    this.proxyId,
   });
 
   static const recordType = 'host';
@@ -79,6 +83,10 @@ class HostEntry extends VaultEntry {
   /// for signing in from it onward. The keys never leave this device.
   final bool agentForwarding;
 
+  /// A [ProxyEntry] id: the proxy this host is reached through when it
+  /// connects directly (not through a jump host).
+  final String? proxyId;
+
   @override
   String get type => recordType;
 
@@ -97,6 +105,7 @@ class HostEntry extends VaultEntry {
     'env': env,
     'jump_host_id': jumpHostId,
     'agent_forwarding': agentForwarding,
+    'proxy_id': proxyId,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -114,6 +123,7 @@ class HostEntry extends VaultEntry {
     env: {...?(d['env'] as Map?)?.cast<String, String>()},
     jumpHostId: d['jump_host_id'] as String?,
     agentForwarding: d['agent_forwarding'] as bool? ?? false,
+    proxyId: d['proxy_id'] as String?,
   );
 
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
@@ -208,6 +218,7 @@ class GroupEntry extends VaultEntry {
     this.startupSnippetId,
     this.env = const {},
     this.jumpHostId,
+    this.proxyId,
   });
 
   static const recordType = 'group';
@@ -223,6 +234,9 @@ class GroupEntry extends VaultEntry {
   /// The host the group's hosts connect through, unless they choose one.
   final String? jumpHostId;
 
+  /// The proxy for the group's hosts, unless they choose one.
+  final String? proxyId;
+
   @override
   String get type => recordType;
 
@@ -234,6 +248,7 @@ class GroupEntry extends VaultEntry {
     'startup_snippet_id': startupSnippetId,
     'env': env,
     'jump_host_id': jumpHostId,
+    'proxy_id': proxyId,
   };
 
   static GroupEntry fromJson(String id, Map<String, dynamic> d) => GroupEntry(
@@ -244,7 +259,55 @@ class GroupEntry extends VaultEntry {
     startupSnippetId: d['startup_snippet_id'] as String?,
     env: {...?(d['env'] as Map?)?.cast<String, String>()},
     jumpHostId: d['jump_host_id'] as String?,
+    proxyId: d['proxy_id'] as String?,
   );
+}
+
+/// A SOCKS5 or HTTP proxy that hosts may be reached through.
+class ProxyEntry extends VaultEntry {
+  const ProxyEntry({
+    required super.id,
+    required this.name,
+    this.kind = ProxyKind.socks5,
+    required this.host,
+    required this.port,
+    this.username,
+    this.password,
+  });
+
+  static const recordType = 'proxy';
+
+  final String name;
+  final ProxyKind kind;
+  final String host;
+  final int port;
+  final String? username;
+  final String? password;
+
+  @override
+  String get type => recordType;
+
+  @override
+  Map<String, Object?> dataJson() => {
+    'name': name,
+    'kind': kind.name,
+    'host': host,
+    'port': port,
+    'username': username,
+    'password': password,
+  };
+
+  static ProxyEntry fromJson(String id, Map<String, dynamic> d) => ProxyEntry(
+    id: id,
+    name: d['name'] as String,
+    kind: ProxyKind.values.byName(d['kind'] as String? ?? 'socks5'),
+    host: d['host'] as String,
+    port: d['port'] as int,
+    username: d['username'] as String?,
+    password: d['password'] as String?,
+  );
+
+  ProxyConfig get config => ProxyConfig(kind: kind, host: host, port: port, username: username, password: password);
 }
 
 /// Environment variables written one per line as NAME=value. Null when a

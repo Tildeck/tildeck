@@ -334,6 +334,9 @@ class Vault extends ChangeNotifier {
   List<KnownHostEntry> get knownHosts => _of<KnownHostEntry>().toList();
   List<GroupEntry> get groups => _of<GroupEntry>().toList();
 
+  List<ProxyEntry> get proxies =>
+      _of<ProxyEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
   List<PortForwardEntry> get forwards =>
       _of<PortForwardEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 

@@ -456,5 +456,11 @@
     }
   },
   "agentForwarding": "Agent forwarding",
-  "agentForwardingHelp": "Lets this server sign in onward with your vault's keys while you are connected, like ssh -A. The keys stay on this device, but anyone with root on the server can use them meanwhile: turn it on only for servers you trust."
+  "agentForwardingHelp": "Lets this server sign in onward with your vault's keys while you are connected, like ssh -A. The keys stay on this device, but anyone with root on the server can use them meanwhile: turn it on only for servers you trust.",
+  "proxyLabel": "Proxy",
+  "noProxy": "No proxy",
+  "addProxy": "New proxy",
+  "editProxy": "Edit proxy",
+  "proxyNameHint": "Office proxy",
+  "proxyCredentialsHelp": "Username and password only if the proxy asks for them. They are kept in the vault."
 }
