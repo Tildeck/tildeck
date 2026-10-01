@@ -40,6 +40,15 @@ class FilesPage extends StatefulWidget {
 class _FilesPageState extends State<FilesPage> {
   FileBrowser get browser => widget.browser;
 
+  /// Paths chosen with a long press, for acting on several at once.
+  final _selected = <String>{};
+
+  void _toggle(RemoteEntry entry) => setState(() {
+    if (!_selected.remove(entry.path)) _selected.add(entry.path);
+  });
+
+  List<RemoteEntry> get _chosen => browser.entries.where((e) => _selected.contains(e.path)).toList();
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +65,12 @@ class _FilesPageState extends State<FilesPage> {
 
   Future<void> _download(RemoteEntry entry) async {
     final t = AppLocalizations.of(context);
+    if (entry.isDirectory) {
+      final folder = await widget.local.folderTarget(entry.name);
+      final transfer = await browser.downloadFolder(entry, folder);
+      if (transfer.state == TransferState.done && mounted) _say(t.fileSaved(folder.path));
+      return;
+    }
     final target = await widget.local.downloadTarget(entry.name);
     final transfer = await browser.download(entry, target);
     if (transfer.state != TransferState.done) return;
@@ -68,6 +83,45 @@ class _FilesPageState extends State<FilesPage> {
     for (final file in picked) {
       await browser.upload(file.read(), file.name, file.size);
     }
+  }
+
+  Future<void> _uploadFolder() async {
+    final folder = await widget.local.pickFolderToUpload();
+    if (folder != null) await browser.uploadFolder(folder);
+  }
+
+  /// Downloads the chosen entries; folders only where folders can go.
+  Future<void> _downloadChosen() async {
+    final chosen = _chosen.where((e) => widget.local.folders || !e.isDirectory).toList();
+    setState(_selected.clear);
+    for (final entry in chosen) {
+      await _download(entry);
+    }
+  }
+
+  Future<void> _deleteChosen() async {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    final chosen = _chosen;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.deleteEntryTitle),
+        content: Text(t.deleteSeveralBody(chosen.length)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
+          FilledButton(
+            key: const ValueKey('confirmDelete'),
+            style: FilledButton.styleFrom(backgroundColor: c.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(t.deleteAction),
+          ),
+        ],
+      ),
+    );
+    if (sure != true) return;
+    setState(_selected.clear);
+    await browser.deleteAll(chosen);
   }
 
   Future<void> _newFolder() async {
@@ -171,70 +225,125 @@ class _FilesPageState extends State<FilesPage> {
       builder: (context, _) {
         final ready = browser.path != null;
         return Scaffold(
-          appBar: AppBar(
-            backgroundColor: c.desk,
-            foregroundColor: c.deskInk,
-            title: Text(t.filesTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
-            actions: [
-              IconButton(
-                key: const ValueKey('filesRefresh'),
-                tooltip: t.refresh,
-                color: c.deskMuted,
-                icon: const Icon(Icons.refresh_rounded),
-                onPressed: ready && !browser.loading ? browser.refresh : null,
-              ),
-              PopupMenuButton<String>(
-                key: const ValueKey('filesView'),
-                tooltip: t.viewOptions,
-                iconColor: c.deskMuted,
-                icon: const Icon(Icons.tune_rounded),
-                onSelected: (v) => switch (v) {
-                  'hidden' => browser.setShowHidden(!browser.showHidden),
-                  'name' => browser.setSortBy(SortBy.name),
-                  'size' => browser.setSortBy(SortBy.size),
-                  'modified' => browser.setSortBy(SortBy.modified),
-                  _ => null,
-                },
-                itemBuilder: (_) => [
-                  CheckedPopupMenuItem(
-                    key: const ValueKey('filesShowHidden'),
-                    value: 'hidden',
-                    checked: browser.showHidden,
-                    child: Text(t.showHiddenFiles),
+          appBar: _selected.isNotEmpty
+              ? AppBar(
+                  backgroundColor: c.desk,
+                  foregroundColor: c.deskInk,
+                  leading: IconButton(
+                    key: const ValueKey('selectionClear'),
+                    tooltip: t.cancel,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => setState(_selected.clear),
                   ),
-                  const PopupMenuDivider(),
-                  for (final (value, label) in [
-                    ('name', t.sortByName),
-                    ('size', t.sortBySize),
-                    ('modified', t.sortByModified),
-                  ])
-                    CheckedPopupMenuItem(
-                      key: ValueKey('filesSort-$value'),
-                      value: value,
-                      checked: browser.sortBy.name == value,
-                      child: Text(label),
+                  title: Text(t.selectedCount(_selected.length), key: const ValueKey('selectionCount')),
+                  actions: [
+                    IconButton(
+                      key: const ValueKey('selectionDownload'),
+                      tooltip: t.download,
+                      color: c.deskMuted,
+                      icon: const Icon(Icons.download_rounded),
+                      onPressed: _downloadChosen,
                     ),
-                ],
-              ),
-              IconButton(
-                key: const ValueKey('filesNewFolder'),
-                tooltip: t.newFolder,
-                color: c.deskMuted,
-                icon: const Icon(Icons.create_new_folder_outlined),
-                onPressed: ready ? _newFolder : null,
-              ),
-              const SizedBox(width: 4),
-              Padding(
-                padding: const EdgeInsetsDirectional.only(end: 12),
-                child: FilledButton.icon(
-                  key: const ValueKey('filesUpload'),
-                  onPressed: ready ? _upload : null,
-                  icon: const Icon(Icons.upload_rounded, size: 18),
-                  label: Text(t.upload),
+                    IconButton(
+                      key: const ValueKey('selectionDelete'),
+                      tooltip: t.deleteAction,
+                      color: c.deskMuted,
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      onPressed: _deleteChosen,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                )
+              : AppBar(
+                  backgroundColor: c.desk,
+                  foregroundColor: c.deskInk,
+                  title: Text(t.filesTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  actions: [
+                    IconButton(
+                      key: const ValueKey('filesRefresh'),
+                      tooltip: t.refresh,
+                      color: c.deskMuted,
+                      icon: const Icon(Icons.refresh_rounded),
+                      onPressed: ready && !browser.loading ? browser.refresh : null,
+                    ),
+                    PopupMenuButton<String>(
+                      key: const ValueKey('filesView'),
+                      tooltip: t.viewOptions,
+                      iconColor: c.deskMuted,
+                      icon: const Icon(Icons.tune_rounded),
+                      onSelected: (v) => switch (v) {
+                        'hidden' => browser.setShowHidden(!browser.showHidden),
+                        'name' => browser.setSortBy(SortBy.name),
+                        'size' => browser.setSortBy(SortBy.size),
+                        'modified' => browser.setSortBy(SortBy.modified),
+                        _ => null,
+                      },
+                      itemBuilder: (_) => [
+                        CheckedPopupMenuItem(
+                          key: const ValueKey('filesShowHidden'),
+                          value: 'hidden',
+                          checked: browser.showHidden,
+                          child: Text(t.showHiddenFiles),
+                        ),
+                        const PopupMenuDivider(),
+                        for (final (value, label) in [
+                          ('name', t.sortByName),
+                          ('size', t.sortBySize),
+                          ('modified', t.sortByModified),
+                        ])
+                          CheckedPopupMenuItem(
+                            key: ValueKey('filesSort-$value'),
+                            value: value,
+                            checked: browser.sortBy.name == value,
+                            child: Text(label),
+                          ),
+                      ],
+                    ),
+                    IconButton(
+                      key: const ValueKey('filesNewFolder'),
+                      tooltip: t.newFolder,
+                      color: c.deskMuted,
+                      icon: const Icon(Icons.create_new_folder_outlined),
+                      onPressed: ready ? _newFolder : null,
+                    ),
+                    const SizedBox(width: 4),
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 12),
+                      // Where folders can be chosen, Upload asks which: files
+                      // or a folder. One button, so the bar fits a narrow
+                      // window.
+                      child: widget.local.folders
+                          ? MenuAnchor(
+                              menuChildren: [
+                                MenuItemButton(
+                                  key: const ValueKey('filesUploadFiles'),
+                                  leadingIcon: const Icon(Icons.upload_file_outlined),
+                                  onPressed: _upload,
+                                  child: Text(t.uploadFiles),
+                                ),
+                                MenuItemButton(
+                                  key: const ValueKey('filesUploadFolder'),
+                                  leadingIcon: const Icon(Icons.drive_folder_upload_outlined),
+                                  onPressed: _uploadFolder,
+                                  child: Text(t.uploadFolder),
+                                ),
+                              ],
+                              builder: (context, menu, _) => FilledButton.icon(
+                                key: const ValueKey('filesUpload'),
+                                onPressed: ready ? () => menu.isOpen ? menu.close() : menu.open() : null,
+                                icon: const Icon(Icons.upload_rounded, size: 18),
+                                label: Text(t.upload),
+                              ),
+                            )
+                          : FilledButton.icon(
+                              key: const ValueKey('filesUpload'),
+                              onPressed: ready ? _upload : null,
+                              icon: const Icon(Icons.upload_rounded, size: 18),
+                              label: Text(t.upload),
+                            ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
           body: SafeArea(
             child: Column(
               children: [
@@ -270,10 +379,15 @@ class _FilesPageState extends State<FilesPage> {
                           separatorBuilder: (_, _) => Divider(height: 1, color: c.line),
                           itemBuilder: (context, i) => _EntryTile(
                             entry: browser.entries[i],
+                            selected: _selected.contains(browser.entries[i].path),
+                            folders: widget.local.folders,
                             onAction: (action) => _act(action, browser.entries[i]),
+                            onLongPress: () => _toggle(browser.entries[i]),
                             onTap: () {
                               final e = browser.entries[i];
-                              if (e.isDirectory) {
+                              if (_selected.isNotEmpty) {
+                                _toggle(e);
+                              } else if (e.isDirectory) {
                                 browser.open(e.path);
                               } else {
                                 _download(e);
@@ -351,11 +465,23 @@ class _PathBar extends StatelessWidget {
 }
 
 class _EntryTile extends StatelessWidget {
-  const _EntryTile({required this.entry, required this.onTap, required this.onAction});
+  const _EntryTile({
+    required this.entry,
+    required this.onTap,
+    required this.onAction,
+    required this.onLongPress,
+    required this.selected,
+    required this.folders,
+  });
 
   final RemoteEntry entry;
   final VoidCallback onTap;
   final ValueChanged<String> onAction;
+  final VoidCallback onLongPress;
+  final bool selected;
+
+  /// Whether a folder can be downloaded here.
+  final bool folders;
 
   @override
   Widget build(BuildContext context) {
@@ -383,9 +509,16 @@ class _EntryTile extends StatelessWidget {
     return ListTile(
       key: ValueKey('entry-${entry.name}'),
       onTap: onTap,
+      onLongPress: onLongPress,
+      selected: selected,
+      selectedTileColor: c.brand.withValues(alpha: 0.12),
       leading: Icon(
-        entry.isDirectory ? Icons.folder_rounded : Icons.insert_drive_file_outlined,
-        color: entry.isDirectory ? c.brand : c.muted,
+        selected
+            ? Icons.check_circle_rounded
+            : entry.isDirectory
+            ? Icons.folder_rounded
+            : Icons.insert_drive_file_outlined,
+        color: entry.isDirectory || selected ? c.brand : c.muted,
       ),
       // A name reads left to right, but sits at the start of the row.
       title: Text(
@@ -400,10 +533,10 @@ class _EntryTile extends StatelessWidget {
         key: ValueKey('entryMenu-${entry.name}'),
         onSelected: onAction,
         itemBuilder: (_) => [
-          if (!entry.isDirectory) ...[
+          if (!entry.isDirectory)
             PopupMenuItem(key: const ValueKey('entryEdit'), value: 'edit', child: Text(t.editFile)),
-            PopupMenuItem(value: 'download', child: Text(t.download)),
-          ],
+          if (!entry.isDirectory || folders)
+            PopupMenuItem(key: const ValueKey('entryDownload'), value: 'download', child: Text(t.download)),
           PopupMenuItem(key: const ValueKey('entryRename'), value: 'rename', child: Text(t.renameAction)),
           PopupMenuItem(key: const ValueKey('entryPermissions'), value: 'permissions', child: Text(t.permissionsTitle)),
           PopupMenuItem(key: const ValueKey('entryCopyPath'), value: 'copyPath', child: Text(t.copyPath)),
@@ -484,19 +617,43 @@ class _Transfers extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              if (tr.state == TransferState.running)
-                                LinearProgressIndicator(value: tr.progress, minHeight: 3)
-                              else
+                              if (tr.state == TransferState.running) ...[
+                                LinearProgressIndicator(value: tr.progress, minHeight: 3),
+                                if (tr.files > 1)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      t.filesProgress(tr.filesDone, tr.files),
+                                      style: TextStyle(fontSize: 11, color: c.muted),
+                                    ),
+                                  ),
+                              ] else
                                 Text(
-                                  tr.state == TransferState.done ? t.transferDone : fileProblemText(t, tr.problem!),
+                                  switch (tr.state) {
+                                    TransferState.done => t.transferDone,
+                                    TransferState.cancelled => t.transferCancelled,
+                                    _ => fileProblemText(t, tr.problem!),
+                                  },
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: tr.state == TransferState.done ? c.success : c.danger,
+                                    color: switch (tr.state) {
+                                      TransferState.done => c.success,
+                                      TransferState.cancelled => c.muted,
+                                      _ => c.danger,
+                                    },
                                   ),
                                 ),
                             ],
                           ),
                         ),
+                        if (tr.state == TransferState.running)
+                          IconButton(
+                            key: ValueKey('cancelTransfer-${tr.name}'),
+                            tooltip: t.cancel,
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: tr.cancel,
+                          ),
                       ],
                     ),
                   ),

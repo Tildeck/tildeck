@@ -67,6 +67,9 @@ class RecordingBrowser extends FileBrowser {
   @override
   Future<void> setPermissions(RemoteEntry entry, int mode) async =>
       actions.add('chmod ${entry.name} ${mode.toRadixString(8)}');
+
+  @override
+  Future<void> deleteAll(List<RemoteEntry> list) async => actions.add('delete ${list.map((e) => e.name).join(', ')}');
 }
 
 class TempFiles implements LocalFiles {
@@ -87,6 +90,15 @@ class TempFiles implements LocalFiles {
     kept.add(await downloaded.readAsString());
     return downloaded.path;
   }
+
+  @override
+  bool get folders => true;
+
+  @override
+  Future<Directory> folderTarget(String name) async => Directory('${dir.path}/$name');
+
+  @override
+  Future<Directory?> pickFolderToUpload() async => null;
 }
 
 /// Real file work completes outside the test clock: let it run between
@@ -132,7 +144,11 @@ void main() {
     expect(local.kept, ['hello']);
     expect(find.textContaining('Saved to'), findsOneWidget);
 
+    // Where folders can move, Upload asks: files or a folder.
     await tester.tap(find.byKey(const ValueKey('filesUpload')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('filesUploadFolder')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('filesUploadFiles')));
     await waitFor(tester, () => browser.uploaded.isNotEmpty);
     expect(browser.uploaded, [('script.sh', 'echo hi\n')]);
   });
@@ -196,4 +212,65 @@ void main() {
 
     expect(browser.actions, ['rename notes.txt to todo.txt', 'chmod notes.txt 664', 'delete logs']);
   });
+
+  testWidgets('a long press selects several, and they are deleted together after asking', (tester) async {
+    final browser = RecordingBrowser();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: FilesPage(browser: browser, title: 'deploy@example.com', local: TempFiles(Directory.systemTemp)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.longPress(find.byKey(const ValueKey('entry-logs')));
+    await tester.pumpAndSettle();
+    // While selecting, a tap selects instead of opening.
+    await tester.tap(find.byKey(const ValueKey('entry-notes.txt')));
+    await tester.pumpAndSettle();
+    expect(browser.opened, isEmpty);
+    expect(find.text('2 selected'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('selectionDelete')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2 items will be deleted'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('confirmDelete')));
+    await tester.pumpAndSettle();
+    expect(browser.actions, ['delete logs, notes.txt']);
+    expect(find.text('2 selected'), findsNothing, reason: 'the selection is done');
+  });
+
+  testWidgets('a running transfer is cancelled from the list', (tester) async {
+    final browser = RecordingBrowser();
+    final transfer = _CancelRecorder('backup.tar', TransferDirection.download, 1000)..done = 300;
+    browser.transfers.add(transfer);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: FilesPage(browser: browser, title: 'deploy@example.com', local: TempFiles(Directory.systemTemp)),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('cancelTransfer-backup.tar')));
+    await tester.pump();
+    expect(transfer.cancelled, isTrue);
+  });
+}
+
+class _CancelRecorder extends Transfer {
+  _CancelRecorder(super.name, super.direction, super.total);
+  var cancelled = false;
+
+  @override
+  Future<void> cancel() async => cancelled = true;
 }

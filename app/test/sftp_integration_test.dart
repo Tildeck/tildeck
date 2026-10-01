@@ -194,6 +194,97 @@ void main() {
     });
   });
 
+  group('folders and cancelling', skip: skip, () {
+    late SSHClient client;
+    late Directory local;
+    late String folder;
+    setUp(() async {
+      client = await SshConnector(knownHosts: MemoryKnownHosts()).connect(
+        ConnectionTarget(host: host!, port: port, username: user, password: password),
+        promptHostKey: ({required target, required presented, required status, previous}) async => true,
+      );
+      local = await Directory.systemTemp.createTemp('tildeck-folders');
+      folder = 'tildeck-folders-${Random().nextInt(1 << 32)}';
+      await client.run(
+        'mkdir -p ~/$folder/site/css ~/$folder/site/empty && printf "<h1>hi</h1>" > ~/$folder/site/index.html && '
+        'printf "body{}" > ~/$folder/site/css/app.css && head -c 30000000 /dev/urandom > ~/$folder/huge.bin',
+      );
+    });
+    tearDown(() async {
+      await client.run('rm -rf ~/$folder');
+      client.close();
+      await local.delete(recursive: true);
+    });
+
+    Future<FileBrowser> browse() async {
+      final browser = FileBrowser(client.sftp);
+      addTearDown(browser.dispose);
+      await browser.start();
+      await browser.goTo(folder);
+      return browser;
+    }
+
+    test('a folder goes down and back up with everything in it', () async {
+      final browser = await browse();
+      final site = browser.entries.firstWhere((e) => e.name == 'site');
+      final target = Directory('${local.path}/site');
+      final down = await browser.downloadFolder(site, target);
+      expect(down.state, TransferState.done);
+      expect((down.files, down.filesDone, down.total), (2, 2, 17));
+      expect(await File('${target.path}/index.html').readAsString(), '<h1>hi</h1>');
+      expect(await File('${target.path}/css/app.css').readAsString(), 'body{}');
+      expect(await Directory('${target.path}/empty').exists(), isTrue, reason: 'empty folders come too');
+
+      // Up again, under another name, into a fresh folder on the server.
+      await client.run('mkdir ~/$folder/copy');
+      await browser.open(joinRemote(browser.path!, 'copy'));
+      await browser.uploadFolder(target);
+      expect(browser.transfers.first.state, TransferState.done);
+      final listing = utf8.decode(await client.run('cd ~/$folder/copy && find . | sort'));
+      expect(listing.trim().split('\n'), [
+        '.',
+        './site',
+        './site/css',
+        './site/css/app.css',
+        './site/empty',
+        './site/index.html',
+      ]);
+      await browser.uploadFolder(target);
+      expect(browser.transfers.first.problem, FileProblem.exists, reason: 'never over an existing folder');
+    });
+
+    test(
+      'a cancelled download leaves nothing here, and a cancelled upload nothing there',
+      () async {
+        final browser = await browse();
+        final huge = browser.entries.firstWhere((e) => e.name == 'huge.bin');
+        final target = File('${local.path}/huge.bin');
+        final running = browser.download(huge, target);
+        final transfer = browser.transfers.first;
+        while (transfer.done == 0 && transfer.state == TransferState.running) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        await transfer.cancel();
+        await running;
+        expect(transfer.state, TransferState.cancelled);
+        expect(await target.exists(), isFalse, reason: 'the partial file is removed');
+
+        // Upload a never-ending stream, then cancel it.
+        final endless = Stream<List<int>>.periodic(const Duration(milliseconds: 1), (_) => List.filled(32768, 7));
+        final uploading = browser.upload(endless, 'endless.bin', null);
+        final up = browser.transfers.first;
+        while (up.done < 100000) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        await up.cancel();
+        await uploading;
+        expect(up.state, TransferState.cancelled);
+        expect(utf8.decode(await client.run('ls ~/$folder')), isNot(contains('endless.bin')));
+      },
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
+  });
+
   test('permissions read as ls shows them', () {
     expect(permissionString(0x1ed), 'rwxr-xr-x'); // 0755
     expect(permissionString(0x1a4), 'rw-r--r--'); // 0644

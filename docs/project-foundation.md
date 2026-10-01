@@ -441,6 +441,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Only UTF-8 text up to 2 MB opens: a larger file, a file with a NUL byte, or one in another encoding is refused with a message to download it instead, so nothing is mangled.
 - Tests: against the OpenSSH container: a CRLF file edited and saved with its line ends, a change by someone else refused then saved over when asked, and a large, a binary, and a Latin-1 file refused. On the page: saving after a change on the server asks; leaving unsaved asks, and keeping or discarding works. Golden: the editor in both languages.
 
+### Files: folders, several at once, and cancelling (2026-10-02)
+
+- A running transfer has a cancel button. A cancelled or failed download leaves no partial file here, and a cancelled or failed upload leaves no partial file or folder on the server.
+- On the desktop, a folder downloads with everything in it (into a new folder in Downloads, never over one that exists) and a local folder uploads into the current one (never over an existing entry). A folder transfer is one entry with the overall progress and a count of files. Links and devices are left out of a folder copy; empty folders are kept. Android's file picker has no folder access, so folders move only on the desktop.
+- A long press selects; while selecting, a tap selects too. The selection is downloaded, or deleted after asking, together.
+- Tests: against the OpenSSH container: a folder tree (with an empty folder) down and up again, identical, and refused over an existing folder; a download and an endless upload cancelled midway, leaving nothing behind. On the page: selecting by long press and tap, deleting the selection after asking, and cancelling a running transfer.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

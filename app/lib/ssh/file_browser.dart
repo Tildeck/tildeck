@@ -70,21 +70,46 @@ String permissionString(int mode) {
 
 enum TransferDirection { upload, download }
 
-enum TransferState { running, done, failed }
+enum TransferState { running, done, failed, cancelled }
 
-/// An upload or download and its progress.
+/// An upload or download and its progress: one file, or a folder with
+/// everything in it.
 class Transfer {
   Transfer(this.name, this.direction, this.total);
 
   final String name;
   final TransferDirection direction;
-  final int? total;
+  int? total;
   int done = 0;
   TransferState state = TransferState.running;
   FileProblem? problem;
 
+  /// Files in a folder transfer, and how many are through.
+  int files = 1;
+  int filesDone = 0;
+
+  bool _cancelled = false;
+  final _onCancel = <FutureOr<void> Function()>[];
+
+  /// Stops it; what was partly written is removed.
+  Future<void> cancel() async {
+    if (state != TransferState.running || _cancelled) return;
+    _cancelled = true;
+    for (final stop in _onCancel.toList()) {
+      await stop();
+    }
+  }
+
+  void _checkCancelled() {
+    if (_cancelled) throw const _Cancelled();
+  }
+
   /// From 0 to 1; null while the size is unknown.
   double? get progress => total == null || total == 0 ? null : (done / total!).clamp(0, 1);
+}
+
+class _Cancelled implements Exception {
+  const _Cancelled();
 }
 
 /// Remote paths are POSIX, whatever the local platform.
@@ -323,33 +348,131 @@ class FileBrowser extends ChangeNotifier {
   });
 
   /// Downloads a remote file to [target]. A partial file is removed on
-  /// failure.
+  /// failure or when cancelled.
   Future<Transfer> download(RemoteEntry entry, File target) async {
     final transfer = Transfer(entry.name, TransferDirection.download, entry.size);
     transfers.insert(0, transfer);
     _changed();
+    await _run(
+      transfer,
+      () => _downloadFile(transfer, entry.path, target, 0),
+      cleanup: () async {
+        if (await target.exists()) await target.delete();
+      },
+    );
+    return transfer;
+  }
+
+  /// Downloads a remote folder and everything in it into [target], which
+  /// is created. A partial folder is removed on failure or when cancelled.
+  Future<Transfer> downloadFolder(RemoteEntry entry, Directory target) async {
+    final transfer = Transfer(entry.name, TransferDirection.download, null);
+    transfers.insert(0, transfer);
+    _changed();
+    await _run(
+      transfer,
+      () async {
+        final folders = <String>[];
+        final files = <(String, String, int)>[];
+        await _walk(entry.path, '', folders, files, transfer);
+        transfer
+          ..files = files.length
+          ..total = files.fold<int>(0, (sum, f) => sum + f.$3);
+        String local(String relative) => [target.path, ...relative.split('/')].join(Platform.pathSeparator);
+        await target.create(recursive: true);
+        for (final relative in folders) {
+          await Directory(local(relative)).create(recursive: true);
+        }
+        for (final (remote, relative, _) in files) {
+          transfer._checkCancelled();
+          await _downloadFile(transfer, remote, File(local(relative)), transfer.done);
+          transfer.filesDone++;
+        }
+      },
+      cleanup: () async {
+        if (await target.exists()) await target.delete(recursive: true);
+      },
+    );
+    return transfer;
+  }
+
+  /// Everything under [folder], by path below the top: the folders, and
+  /// the files with their remote paths and sizes. Links and devices are
+  /// left out: a folder copy holds folders and files.
+  Future<void> _walk(
+    String folder,
+    String relative,
+    List<String> folders,
+    List<(String, String, int)> files,
+    Transfer transfer,
+  ) async {
+    transfer._checkCancelled();
+    for (final n in await _sftp!.listdir(folder)) {
+      if (n.filename == '.' || n.filename == '..') continue;
+      final remote = joinRemote(folder, n.filename);
+      final below = relative.isEmpty ? n.filename : '$relative/${n.filename}';
+      final type = n.attr.mode?.type;
+      if (type == SftpFileType.directory) {
+        folders.add(below);
+        await _walk(remote, below, folders, files, transfer);
+      } else if (type == SftpFileType.regularFile) {
+        files.add((remote, below, n.attr.size ?? 0));
+      }
+    }
+  }
+
+  /// Copies one remote file into [target], counting from [base] bytes.
+  Future<void> _downloadFile(Transfer transfer, String remote, File target, int base) async {
+    final file = await _sftp!.open(remote);
     final sink = target.openWrite();
+    final finished = Completer<void>();
+    late final StreamSubscription<Uint8List> reading;
+    Future<void> stop() async {
+      await reading.cancel();
+      if (!finished.isCompleted) finished.completeError(const _Cancelled());
+    }
+
+    transfer._onCancel.add(stop);
     try {
-      await _sftp!.download(
-        entry.path,
-        sink,
-        onProgress: (n) {
-          transfer.done = n;
-          _changed();
-        },
-      );
-      await sink.flush();
-      await sink.close();
-      transfer.state = TransferState.done;
-    } catch (e) {
+      reading = file
+          .read(
+            onProgress: (n) {
+              transfer.done = base + n;
+              _changed();
+            },
+          )
+          .listen(
+            sink.add,
+            onDone: () => finished.isCompleted ? null : finished.complete(),
+            onError: (Object e) => finished.isCompleted ? null : finished.completeError(e),
+            cancelOnError: true,
+          );
+      await finished.future;
+    } finally {
+      transfer._onCancel.remove(stop);
+      await sink.flush().catchError((Object _) {});
       await sink.close().catchError((Object _) {});
-      if (await target.exists()) await target.delete();
+      await file.close().catchError((Object _) {});
+    }
+  }
+
+  /// Runs [work] for [transfer], recording how it ended; [cleanup] removes
+  /// what a failed or cancelled one left behind.
+  Future<void> _run(Transfer transfer, Future<void> Function() work, {required Future<void> Function() cleanup}) async {
+    try {
+      await work();
+      transfer._checkCancelled();
+      transfer.state = TransferState.done;
+    } on _Cancelled {
+      await cleanup().catchError((Object _) {});
+      transfer.state = TransferState.cancelled;
+    } catch (e) {
+      await cleanup().catchError((Object _) {});
       transfer
-        ..state = TransferState.failed
-        ..problem = _problemOf(e);
+        ..state = transfer._cancelled ? TransferState.cancelled : TransferState.failed
+        ..problem = transfer._cancelled ? null : _problemOf(e);
     }
     _changed();
-    return transfer;
   }
 
   /// Uploads [source] into the current folder under [name], never over an
@@ -359,35 +482,100 @@ class FileBrowser extends ChangeNotifier {
     final transfer = Transfer(name, TransferDirection.upload, size);
     transfers.insert(0, transfer);
     _changed();
-    try {
-      final target = joinRemote(folder, _safeName(name));
-      if (await _exists(target)) throw const FileProblemException(FileProblem.exists);
-      final file = await _sftp!.open(
-        target,
-        mode: SftpFileOpenMode.write | SftpFileOpenMode.create | SftpFileOpenMode.exclusive,
-      );
-      try {
-        await file
-            .write(
-              source.map((chunk) => chunk is Uint8List ? chunk : Uint8List.fromList(chunk)),
-              onProgress: (n) {
-                transfer.done = n;
-                _changed();
-              },
-            )
-            .done;
-      } finally {
-        await file.close();
-      }
-      transfer.state = TransferState.done;
-      if (path == folder) await _list(folder);
-    } catch (e) {
-      transfer
-        ..state = TransferState.failed
-        ..problem = _problemOf(e);
-    }
-    _changed();
+    String? created;
+    await _run(
+      transfer,
+      () async {
+        final target = joinRemote(folder, _safeName(name));
+        if (await _exists(target)) throw const FileProblemException(FileProblem.exists);
+        created = target;
+        await _uploadFile(transfer, source, target, 0);
+        if (path == folder) await _list(folder);
+      },
+      cleanup: () async {
+        if (created != null) await _sftp!.remove(created!);
+      },
+    );
   }
+
+  /// Uploads a local folder and everything in it into the current folder,
+  /// never over an existing entry. A partial copy is removed on failure or
+  /// when cancelled.
+  Future<void> uploadFolder(Directory source) async {
+    final folder = path!;
+    final name = source.uri.pathSegments.where((p) => p.isNotEmpty).last;
+    final transfer = Transfer(name, TransferDirection.upload, null);
+    transfers.insert(0, transfer);
+    _changed();
+    String? created;
+    await _run(
+      transfer,
+      () async {
+        final target = joinRemote(folder, _safeName(name));
+        if (await _exists(target)) throw const FileProblemException(FileProblem.exists);
+        final items = await source.list(recursive: true, followLinks: false).toList();
+        final files = items.whereType<File>().toList();
+        transfer
+          ..files = files.length
+          ..total = 0;
+        for (final f in files) {
+          transfer.total = transfer.total! + await f.length();
+        }
+        await _sftp!.mkdir(target);
+        created = target;
+        String remoteOf(FileSystemEntity e) =>
+            joinRemote(target, e.path.substring(source.path.length + 1).replaceAll(Platform.pathSeparator, '/'));
+        for (final dir in items.whereType<Directory>().toList()..sort((a, b) => a.path.length - b.path.length)) {
+          transfer._checkCancelled();
+          await _sftp!.mkdir(remoteOf(dir));
+        }
+        for (final f in files) {
+          transfer._checkCancelled();
+          await _uploadFile(transfer, f.openRead(), remoteOf(f), transfer.done);
+          transfer.filesDone++;
+        }
+        if (path == folder) await _list(folder);
+      },
+      cleanup: () async {
+        if (created != null) await _remove(created!, isDirectory: true);
+        if (path == folder) await _list(folder);
+      },
+    );
+  }
+
+  Future<void> _uploadFile(Transfer transfer, Stream<List<int>> source, String target, int base) async {
+    final file = await _sftp!.open(
+      target,
+      mode: SftpFileOpenMode.write | SftpFileOpenMode.create | SftpFileOpenMode.exclusive,
+    );
+    try {
+      final writer = file.write(
+        source.map((chunk) => chunk is Uint8List ? chunk : Uint8List.fromList(chunk)),
+        onProgress: (n) {
+          transfer.done = base + n;
+          _changed();
+        },
+      );
+      Future<void> stop() => writer.abort();
+      transfer._onCancel.add(stop);
+      try {
+        await writer.done;
+      } finally {
+        transfer._onCancel.remove(stop);
+      }
+      transfer._checkCancelled();
+    } finally {
+      await file.close().catchError((Object _) {});
+    }
+  }
+
+  /// Deletes several entries; stops at the first that fails.
+  Future<void> deleteAll(List<RemoteEntry> list) => _guard(() async {
+    for (final entry in list) {
+      await _remove(entry.path, isDirectory: entry.isDirectory && !entry.isLink);
+    }
+    await _list(path!);
+  });
 
   void clearFinished() {
     transfers.removeWhere((t) => t.state != TransferState.running);
