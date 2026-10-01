@@ -309,7 +309,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 | Stage | Scope | Status |
 |---|---|---|
-| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, and tab names done; split view and history planned |
+| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, and connection history done; split view planned; command history waits for a decision |
 | 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Planned |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
@@ -337,6 +337,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - A tab can be renamed with a double click or a long press; an empty name brings back the connection.
 - The top bar keeps Lock and Sync; terminal appearance, the master password, the language, and the theme moved into a More menu. A golden image caught the bar overflowing a phone's width by 35 pixels once the appearance button was added.
 - The UI tests' waits now allow 20 seconds: with more test files running at once, Argon2id took longer than the old 6 seconds.
+
+### Connection history (2026-10-01)
+
+- Every session is written to the history when it connects or fails, and its end time when it closes: the saved host, user@host, the times, the device, and whether it failed. The records are encrypted and synced, so the history covers every device, like Termius's session logs. It keeps the newest 200.
+- The hosts list shows the five most recent saved hosts for one-tap reconnecting, and the History page (the clock button) lists every connection with its length; tapping one with a saved host connects again.
+- Command history is not recorded: the app cannot tell a typed command from a password typed at a prompt (`sudo`, `passwd`) whose echo the server turned off, so recording keystrokes would store and sync passwords. Waiting for Shlomi's decision.
+- Tests: a session logged on connect and closed off with its length, a failed connection, and the 200 limit. A golden image of the History page.
 
 ## Required workflow contracts
 

@@ -7,6 +7,7 @@ import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'connect_form.dart';
 import 'group_editor_page.dart';
+import 'history_page.dart';
 import 'snippets_page.dart';
 
 /// The home tab: saved hosts by group, and the ways to add one or connect
@@ -46,6 +47,7 @@ Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault,
     passphrase: key?.passphrase,
     startupCommand: vault.entry<SnippetEntry>(host.startupSnippetId ?? group?.startupSnippetId)?.command,
     environment: {...?group?.env, ...host.env},
+    hostId: host.id,
   );
 }
 
@@ -102,6 +104,18 @@ class _HostsPageState extends State<HostsPage> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  /// The saved hosts connected to most recently, each once, newest first.
+  List<HostEntry> _recent() {
+    final seen = <String>{};
+    final hosts = <HostEntry>[];
+    for (final entry in vault.history) {
+      final host = vault.entry<HostEntry>(entry.hostId);
+      if (host != null && seen.add(host.id)) hosts.add(host);
+      if (hosts.length == 5) break;
+    }
+    return hosts;
   }
 
   Future<void> _connectHost(BuildContext context, HostEntry host) async {
@@ -170,6 +184,16 @@ class _HostsPageState extends State<HostsPage> {
                       child: Text(t.hostsTitle, style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
                     ),
                     IconButton(
+                      key: const ValueKey('openHistory'),
+                      tooltip: t.historyTitle,
+                      icon: const Icon(Icons.history_rounded),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => HistoryPage(vault: vault, onReconnect: (h) => _connectHost(context, h)),
+                        ),
+                      ),
+                    ),
+                    IconButton(
                       key: const ValueKey('openSnippets'),
                       tooltip: t.snippetsTitle,
                       icon: const Icon(Icons.code_rounded),
@@ -231,6 +255,27 @@ class _HostsPageState extends State<HostsPage> {
                               }),
                             ),
                     ),
+                  ),
+                ],
+                if (_query.isEmpty && _recent().isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  Text(
+                    t.recentTitle,
+                    style: text.labelLarge?.copyWith(color: c.muted, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final host in _recent())
+                        ActionChip(
+                          key: ValueKey('recent-${host.id}'),
+                          avatar: Icon(Icons.history_rounded, size: 18, color: c.brand),
+                          label: Text(host.name),
+                          onPressed: () => _connectHost(context, host),
+                        ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 20),

@@ -334,6 +334,22 @@ class Vault extends ChangeNotifier {
   List<KnownHostEntry> get knownHosts => _of<KnownHostEntry>().toList();
   List<GroupEntry> get groups => _of<GroupEntry>().toList();
 
+  /// Past connections, newest first.
+  List<ConnectionLogEntry> get history =>
+      _of<ConnectionLogEntry>().toList()..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+
+  /// How many connections the history keeps; older ones are deleted.
+  static const historyLimit = 200;
+
+  /// Records a connection and keeps the history within [historyLimit].
+  Future<void> logConnection(ConnectionLogEntry entry) async {
+    await put(entry);
+    final all = history;
+    for (final old in all.skip(historyLimit)) {
+      await delete(old.id);
+    }
+  }
+
   /// The user's preferences; the defaults until something is chosen.
   PreferencesEntry get preferences => entry<PreferencesEntry>(PreferencesEntry.fixedId) ?? const PreferencesEntry();
 
@@ -597,6 +613,9 @@ class Vault extends ChangeNotifier {
     if (status != VaultStatus.unlocked || key == null) throw StateError('the vault is locked');
     return key;
   }
+
+  /// Completes once every write started so far is on disk.
+  Future<void> flush() => _writes.catchError((Object _) {});
 
   /// Writes are serialized, and each one replaces the file atomically.
   Future<void> _save() {
