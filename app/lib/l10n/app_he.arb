@@ -257,5 +257,11 @@
   "forwardErrorConnect": "החיבור לשרת נכשל.",
   "forwardErrorPort": "הפורט תפוס או אסור כאן.",
   "forwardErrorRefused": "השרת סירב להאזין בפורט הזה.",
-  "forwardErrorFailed": "אי אפשר היה להפעיל את הכלל."
+  "forwardErrorFailed": "אי אפשר היה להפעיל את הכלל.",
+  "jumpHostLabel": "התחברות דרך",
+  "jumpHostHelp": "שרת שמור אחר שדרכו מגיעים לשרת הזה, כמו ⁦ssh -J⁩. הכתובת למעלה היא כפי שהשרת ההוא רואה אותה.",
+  "groupJumpHostHelp": "השרתים בקבוצה מתחברים דרך השרת הזה, אלא אם בחרו אחר. השרת עצמו מתחבר ישירות.",
+  "directConnection": "ישירות",
+  "viaHost": "דרך ⁨{name}⁩",
+  "errConnVia": "ב-⁨{host}⁩: {message}"
 }

@@ -9,6 +9,7 @@ import 'package:tildeck/server_check.dart';
 import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
+import 'package:tildeck/ui/hosts_page.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
@@ -66,7 +67,12 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('hostGroup')), 'Production');
     await tester.enterText(find.byKey(const ValueKey('host')), 'prod-web-01.example.com');
     await tester.enterText(find.byKey(const ValueKey('username')), 'deploy');
-    await tester.ensureVisible(find.byKey(const ValueKey('saveHost')));
+    // The editor's list builds lazily: scroll until the button exists.
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('saveHost')),
+      300,
+      scrollable: find.descendant(of: find.byType(HostEditorPage), matching: find.byType(Scrollable)).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('saveHost')));
     // The editor closes once the host is saved; the list behind it shows it.

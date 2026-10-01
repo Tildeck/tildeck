@@ -26,6 +26,7 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
   late final _env = TextEditingController(text: formatEnv(_existing?.env ?? const {}));
   late String? _keyId = _existing?.keyId;
   late String? _snippetId = _existing?.startupSnippetId;
+  late String? _jumpHostId = _existing?.jumpHostId;
 
   @override
   void dispose() {
@@ -45,6 +46,7 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
         keyId: _keyId,
         startupSnippetId: _snippetId,
         env: parseEnv(_env.text) ?? const {},
+        jumpHostId: _jumpHostId,
       ),
     );
     if (mounted) Navigator.pop(context);
@@ -64,6 +66,8 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
     final snippets = widget.vault.snippets;
     if (_keyId != null && keys.every((k) => k.id != _keyId)) _keyId = null;
     if (_snippetId != null && snippets.every((s) => s.id != _snippetId)) _snippetId = null;
+    final hosts = widget.vault.hosts;
+    if (_jumpHostId != null && hosts.every((h) => h.id != _jumpHostId)) _jumpHostId = null;
 
     return Scaffold(
       // The name keeps its own direction inside a Hebrew title (first-strong
@@ -109,6 +113,22 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
                     for (final s in snippets) DropdownMenuItem(value: s.id, child: Text(s.name)),
                   ],
                   onChanged: (v) => setState(() => _snippetId = v),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String?>(
+                  key: const ValueKey('groupJumpHost'),
+                  initialValue: _jumpHostId,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: t.jumpHostLabel,
+                    helperText: t.groupJumpHostHelp,
+                    helperMaxLines: 3,
+                  ),
+                  items: [
+                    DropdownMenuItem(value: null, child: Text(t.directConnection)),
+                    for (final h in hosts) DropdownMenuItem(value: h.id, child: Text(h.name)),
+                  ],
+                  onChanged: (v) => setState(() => _jumpHostId = v),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(

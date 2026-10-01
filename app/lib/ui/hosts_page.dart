@@ -17,7 +17,50 @@ import 'snippets_page.dart';
 /// when it is not saved), its key, its environment, and its startup
 /// snippet. Empty host settings take the group's. Null when the user
 /// cancels the password prompt.
+/// The hosts [host] connects through, nearest first. A loop (possible only
+/// through edits on two devices) ends the chain where it repeats.
+List<HostEntry> jumpChainOf(Vault vault, HostEntry host) {
+  final chain = <HostEntry>[];
+  final seen = {host.id};
+  var current = host;
+  while (true) {
+    final id = current.jumpHostId ?? vault.groupNamed(current.group)?.jumpHostId;
+    final next = id == null ? null : vault.entry<HostEntry>(id);
+    if (next == null || !seen.add(next.id)) return chain;
+    chain.add(next);
+    current = next;
+  }
+}
+
+/// Hosts that [host] may connect through: any other host whose own chain
+/// does not come back to it.
+List<HostEntry> jumpCandidatesFor(Vault vault, String? hostId) => [
+  for (final h in vault.hosts)
+    if (h.id != hostId && jumpChainOf(vault, h).every((j) => j.id != hostId)) h,
+];
+
 Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault, HostEntry host) async {
+  // The farthest jump host is connected to first.
+  ConnectionTarget? jump;
+  for (final hop in jumpChainOf(vault, host).reversed) {
+    if (!context.mounted) return null;
+    final target = await _targetFor(context, vault, hop, jump);
+    if (target == null) return null;
+    jump = ConnectionTarget(
+      host: target.host,
+      port: target.port,
+      username: target.username,
+      password: target.password,
+      privateKey: target.privateKey,
+      passphrase: target.passphrase,
+      jump: jump,
+    );
+  }
+  if (!context.mounted) return null;
+  return _targetFor(context, vault, host, jump);
+}
+
+Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntry host, ConnectionTarget? jump) async {
   final group = vault.groupNamed(host.group);
   final effective = HostEntry(
     id: host.id,
@@ -48,6 +91,7 @@ Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault,
     startupCommand: vault.entry<SnippetEntry>(host.startupSnippetId ?? group?.startupSnippetId)?.command,
     environment: {...?group?.env, ...host.env},
     hostId: host.id,
+    jump: jump,
   );
 }
 
@@ -343,6 +387,12 @@ class _HostsPageState extends State<HostsPage> {
                                       ? TextAlign.right
                                       : TextAlign.left,
                                 ),
+                                if (jumpChainOf(vault, host) case [final first, ...])
+                                  Text(
+                                    t.viaHost(first.name),
+                                    key: ValueKey('via-${host.id}'),
+                                    style: TextStyle(fontSize: 12, color: c.muted),
+                                  ),
                                 if (host.tags.isNotEmpty)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
@@ -417,6 +467,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late String? _startupSnippetId = widget.host?.startupSnippetId;
   late final _tags = TextEditingController(text: widget.host?.tags.join(', '));
   late final _env = TextEditingController(text: formatEnv(widget.host?.env ?? const {}));
+  late String? _jumpHostId = widget.host?.jumpHostId;
 
   @override
   void dispose() {
@@ -445,6 +496,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
             if (tag.trim().isNotEmpty) tag.trim(),
         ],
         env: parseEnv(_env.text) ?? const {},
+        jumpHostId: _jumpHostId,
       ),
     );
     if (mounted) Navigator.pop(context);
@@ -467,8 +519,11 @@ class _HostEditorPageState extends State<HostEditorPage> {
           if (_startupSnippetId != null && snippets.every((x) => x.id != _startupSnippetId)) {
             _startupSnippetId = null;
           }
+          final jumps = jumpCandidatesFor(widget.vault, widget.host?.id);
+          if (_jumpHostId != null && jumps.every((h) => h.id != _jumpHostId)) _jumpHostId = null;
           // Settings the group provides may be left empty here.
           final group = widget.vault.groupNamed(_group.text);
+          final groupJump = widget.vault.entry<HostEntry>(group?.jumpHostId);
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
@@ -587,6 +642,24 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String?>(
+                      key: const ValueKey('jumpHost'),
+                      initialValue: _jumpHostId,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: t.jumpHostLabel,
+                        helperText: _jumpHostId == null && groupJump != null && groupJump.id != widget.host?.id
+                            ? t.fromGroup(groupJump.name)
+                            : t.jumpHostHelp,
+                        helperMaxLines: 3,
+                      ),
+                      items: [
+                        DropdownMenuItem(value: null, child: Text(t.directConnection)),
+                        for (final h in jumps) DropdownMenuItem(value: h.id, child: Text(h.name)),
+                      ],
+                      onChanged: (v) => setState(() => _jumpHostId = v),
+                    ),
                     const SizedBox(height: 14),
                     TextFormField(
                       key: const ValueKey('hostTags'),

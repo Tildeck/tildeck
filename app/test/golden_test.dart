@@ -142,6 +142,7 @@ Future<Vault> sampleVault({required bool unlocked}) async {
       host: 'db.internal.example.com',
       port: 2222,
       username: 'postgres',
+      jumpHostId: 'h1',
     ),
     HostEntry(id: 'h3', name: 'Home server', group: 'Home', host: '192.168.1.20', username: 'shlomi'),
     HostEntry(id: 'h4', name: 'Build box', host: 'ci.example.com', username: 'runner'),

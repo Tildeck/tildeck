@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Jump hosts: connect to a host through another saved host, or a chain of them, set per host or per group.
 - Port forwarding: local, remote, and dynamic (SOCKS5) rules through saved hosts, synced across devices, turned on and off from their own page.
 - Split view on wide screens: two sessions side by side.
 - Autocomplete from the server's own history and from snippets, and the saved password offered at a password prompt; nothing typed is stored.

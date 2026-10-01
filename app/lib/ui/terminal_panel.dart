@@ -421,6 +421,8 @@ class _StatusBanner extends StatelessWidget {
             ConnectProblem.keyPassphraseWrong => t.errConnKeyPassphraseWrong,
             ConnectProblem.disconnected => t.errConnDisconnected,
           };
+    final via = session.problemVia;
+    final shown = !connecting && session.problem != null && via != null ? t.errConnVia(via, message) : message;
 
     return Material(
       color: c.surface,
@@ -439,7 +441,7 @@ class _StatusBanner extends StatelessWidget {
               ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(message, style: TextStyle(color: c.ink)),
+              child: Text(shown, style: TextStyle(color: c.ink)),
             ),
             if (!connecting) TextButton(onPressed: onReconnect, child: Text(t.reconnect)),
           ],

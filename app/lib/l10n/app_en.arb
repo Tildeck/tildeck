@@ -430,5 +430,29 @@
         "type": "int"
       }
     }
+  },
+  "jumpHostLabel": "Connect through",
+  "jumpHostHelp": "Another saved host to reach this one through, like ssh -J. The address above is as that host sees it.",
+  "groupJumpHostHelp": "Hosts in the group connect through this host unless they choose another. The host itself connects directly.",
+  "directConnection": "Directly",
+  "viaHost": "Through {name}",
+  "errConnVia": "At {host}: {message}",
+  "@viaHost": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@errConnVia": {
+    "description": "A connection failure at a jump host, not the target.",
+    "placeholders": {
+      "host": {
+        "type": "String"
+      },
+      "message": {
+        "type": "String"
+      }
+    }
   }
 }
