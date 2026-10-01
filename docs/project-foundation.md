@@ -310,7 +310,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 | Stage | Scope | Status |
 |---|---|---|
 | 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
-| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Planned |
+| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding done |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
 | Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
@@ -358,6 +358,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 - On a screen at least 840 pixels wide with two or more sessions, the Split button shows the selected session and another one side by side. A click on the other side makes it the active one (its tab is selected and the bar shows its actions); the button returns to a single view, and closing a session keeps the split pointing at the right one.
 - Test: two sessions split, the active side changing on a click, and back to one.
+
+### Port forwarding (2026-10-01)
+
+- Rules are vault records (`port_forward`), encrypted and synced like hosts. Each runs through a saved host, with that host's group settings, and opens its own connection to it, so it works with or without a terminal open.
+- Local (like `ssh -L`): listens on this device and connects from the server to the destination. Remote (like `ssh -R`): listens on the server and connects from this device to the destination. Dynamic (like `ssh -D`): a SOCKS5 proxy on this device whose connections leave from the server.
+- The listen address defaults to 127.0.0.1, so a rule serves only this device unless the user types another address.
+- The Port forwarding page, opened from the hosts screen, turns rules on and off with a switch and shows the address and the connection count, or why a rule could not start: the host could not be reached, the port is taken, or the server refused to listen. A dropped connection turns the rule off. Running rules stop when the app closes.
+- Tests: rules saved and read back; a rule added in the editor with port validation; a start failure shown. Against the OpenSSH container: a local forward reaching the server's own sshd, a remote forward answered by a service on this device, a SOCKS5 handshake and connection, and a taken port reported. The test server now allows TCP forwarding.
 
 ## Required workflow contracts
 

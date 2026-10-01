@@ -19,6 +19,7 @@ sealed class VaultEntry {
     GroupEntry.recordType => GroupEntry.fromJson(id, data),
     PreferencesEntry.recordType => PreferencesEntry.fromJson(id, data),
     ConnectionLogEntry.recordType => ConnectionLogEntry.fromJson(id, data),
+    PortForwardEntry.recordType => PortForwardEntry.fromJson(id, data),
     _ => null,
   };
 }
@@ -343,4 +344,67 @@ class ConnectionLogEntry extends VaultEntry {
     device: d['device'] as String?,
     failed: d['failed'] as bool? ?? false,
   );
+}
+
+enum ForwardKind { local, remote, dynamic }
+
+/// A port forwarding rule through a saved host. Local: listen here on the
+/// bind address and connect from the server to the destination. Remote:
+/// listen on the server and connect from here to the destination. Dynamic:
+/// a SOCKS5 proxy here whose connections leave from the server.
+class PortForwardEntry extends VaultEntry {
+  const PortForwardEntry({
+    required super.id,
+    required this.name,
+    required this.hostId,
+    this.kind = ForwardKind.local,
+    this.bindHost = '127.0.0.1',
+    required this.bindPort,
+    this.destHost = '',
+    this.destPort = 0,
+  });
+
+  static const recordType = 'port_forward';
+
+  final String name;
+  final String hostId;
+  final ForwardKind kind;
+  final String bindHost;
+  final int bindPort;
+
+  /// Unused for dynamic forwarding.
+  final String destHost;
+  final int destPort;
+
+  @override
+  String get type => recordType;
+
+  @override
+  Map<String, Object?> dataJson() => {
+    'name': name,
+    'host_id': hostId,
+    'kind': kind.name,
+    'bind_host': bindHost,
+    'bind_port': bindPort,
+    'dest_host': destHost,
+    'dest_port': destPort,
+  };
+
+  static PortForwardEntry fromJson(String id, Map<String, dynamic> d) => PortForwardEntry(
+    id: id,
+    name: d['name'] as String,
+    hostId: d['host_id'] as String,
+    kind: ForwardKind.values.byName(d['kind'] as String? ?? 'local'),
+    bindHost: d['bind_host'] as String? ?? '127.0.0.1',
+    bindPort: d['bind_port'] as int,
+    destHost: d['dest_host'] as String? ?? '',
+    destPort: d['dest_port'] as int? ?? 0,
+  );
+
+  /// How the rule reads, as in ssh: -L 8080:db:5432, -R, or -D.
+  String get summary => switch (kind) {
+    ForwardKind.local => '$bindPort \u2192 $destHost:$destPort',
+    ForwardKind.remote => 'server:$bindPort \u2192 $destHost:$destPort',
+    ForwardKind.dynamic => 'SOCKS5 $bindHost:$bindPort',
+  };
 }

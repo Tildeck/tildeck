@@ -76,10 +76,13 @@ Future<String?> _askPassword(BuildContext context, HostEntry host) {
 }
 
 class HostsPage extends StatefulWidget {
-  const HostsPage({super.key, required this.vault, required this.onConnect});
+  const HostsPage({super.key, required this.vault, required this.onConnect, this.onOpenForwards});
 
   final Vault vault;
   final void Function(ConnectionTarget target) onConnect;
+
+  /// Opens the port forwarding rules; null hides the button.
+  final VoidCallback? onOpenForwards;
 
   @override
   State<HostsPage> createState() => _HostsPageState();
@@ -183,6 +186,13 @@ class _HostsPageState extends State<HostsPage> {
                     Expanded(
                       child: Text(t.hostsTitle, style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
                     ),
+                    if (widget.onOpenForwards != null)
+                      IconButton(
+                        key: const ValueKey('openForwards'),
+                        tooltip: t.forwardsTitle,
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        onPressed: widget.onOpenForwards,
+                      ),
                     IconButton(
                       key: const ValueKey('openHistory'),
                       tooltip: t.historyTitle,

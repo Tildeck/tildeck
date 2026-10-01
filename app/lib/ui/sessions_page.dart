@@ -1,18 +1,22 @@
+import 'package:dartssh2/dartssh2.dart' show SSHClient;
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
 import '../ssh/file_browser.dart';
 import '../ssh/history_recorder.dart';
+import '../ssh/port_forwarding.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
+import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
 import 'files_page.dart';
 import 'host_key_dialog.dart';
 import 'password_pages.dart';
+import 'port_forwards_page.dart';
 import 'snippets_page.dart';
 import 'terminal_settings_page.dart';
 import 'hosts_page.dart';
@@ -56,12 +60,36 @@ class _SessionsPageState extends State<SessionsPage> {
   bool get _splitShown =>
       _selected >= 0 && _splitWith != null && _splitWith! < _sessions.length && _splitWith != _selected;
 
+  /// Port forwarding rules that run, for as long as the app does.
+  final _forwards = ForwardManager();
+
   @override
   void dispose() {
     for (final session in _sessions) {
       session.dispose();
     }
+    _forwards.dispose();
     super.dispose();
+  }
+
+  /// An authenticated connection to a saved host, for a forwarding rule.
+  Future<SSHClient> _connectFor(BuildContext context, HostEntry host) async {
+    final target = await connectionTargetFor(context, widget.vault, host);
+    if (target == null) throw const ForwardException(ForwardProblem.connectFailed);
+    return widget.connector.connect(
+      target,
+      promptHostKey: ({required target, required presented, required status, previous}) async => mounted
+          ? showHostKeyDialog(context, target: target, presented: presented, status: status, previous: previous)
+          : false,
+    );
+  }
+
+  void _openForwards() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PortForwardsPage(vault: widget.vault, manager: _forwards, connect: _connectFor),
+      ),
+    );
   }
 
   void _open(ConnectionTarget target, {int? replacing}) {
@@ -327,7 +355,7 @@ class _SessionsPageState extends State<SessionsPage> {
                   : IndexedStack(
                       index: _selected + 1,
                       children: [
-                        HostsPage(vault: widget.vault, onConnect: _open),
+                        HostsPage(vault: widget.vault, onConnect: _open, onOpenForwards: _openForwards),
                         for (final (i, _) in _sessions.indexed) _panel(i),
                       ],
                     ),

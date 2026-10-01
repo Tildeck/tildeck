@@ -20,6 +20,7 @@ import 'package:tildeck/server_check.dart';
 import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/ssh/file_browser.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
+import 'package:tildeck/ssh/port_forwarding.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/ssh/terminal_session.dart';
 import 'package:tildeck/sync/account_service.dart';
@@ -32,6 +33,7 @@ import 'package:tildeck/ui/group_editor_page.dart';
 import 'package:tildeck/ui/history_page.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
+import 'package:tildeck/ui/port_forwards_page.dart';
 import 'package:tildeck/ui/snippets_page.dart';
 import 'package:tildeck/ui/terminal_settings_page.dart';
 import 'package:tildeck/ui/account_page.dart';
@@ -590,6 +592,79 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 300));
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/sync_waiting_${locale}_${mode.name}.png'));
+    });
+  }
+
+  for (final (locale, mode) in [('en', ThemeMode.light), ('he', ThemeMode.dark)]) {
+    Future<Vault> withRules() async {
+      final vault = await sampleVault(unlocked: true);
+      for (final rule in const [
+        PortForwardEntry(
+          id: 'f1',
+          name: 'Postgres',
+          hostId: 'h2',
+          bindPort: 5433,
+          destHost: 'localhost',
+          destPort: 5432,
+        ),
+        PortForwardEntry(
+          id: 'f2',
+          name: 'Share my dev server',
+          hostId: 'h1',
+          kind: ForwardKind.remote,
+          bindPort: 8080,
+          destHost: '127.0.0.1',
+          destPort: 3000,
+        ),
+        PortForwardEntry(id: 'f3', name: 'Browse from home', hostId: 'h3', kind: ForwardKind.dynamic, bindPort: 1080),
+      ]) {
+        await vault.put(rule);
+      }
+      return vault;
+    }
+
+    testWidgets('port forwarding $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(withRules))!;
+      final manager = ForwardManager();
+      addTearDown(manager.dispose);
+      // A rule whose host could not be reached shows why.
+      await tester.runAsync(
+        () => manager.start(vault.forwards.firstWhere((r) => r.id == 'f2'), () => throw const SocketException('down')),
+      );
+      await tester.pumpWidget(
+        screen(
+          locale,
+          mode,
+          PortForwardsPage(vault: vault, manager: manager, connect: (_, _) => throw UnimplementedError()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(manager.problemOf('f2'), ForwardProblem.connectFailed);
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/forwards_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('port forwarding rule $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(withRules))!;
+      final manager = ForwardManager();
+      addTearDown(manager.dispose);
+      await tester.pumpWidget(
+        screen(
+          locale,
+          mode,
+          PortForwardsPage(vault: vault, manager: manager, connect: (_, _) => throw UnimplementedError()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(PopupMenuButton<String>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(PopupMenuItem<String>).first);
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/forward_editor_${locale}_${mode.name}.png'),
+      );
     });
   }
 }
