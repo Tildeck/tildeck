@@ -8,8 +8,8 @@ import '../vault/vault.dart';
 import 'connect_form.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
-import 'snippets_page.dart';
 import 'proxy_editor.dart';
+import 'snippets_page.dart';
 
 /// The home tab: saved hosts by group, and the ways to add one or connect
 /// without saving.
@@ -70,6 +70,7 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
     group: host.group,
     host: host.host,
     port: host.port,
+    protocol: host.protocol,
     username: host.username.trim().isEmpty ? (group?.username ?? '') : host.username,
     auth: host.auth,
     password: host.password,
@@ -77,7 +78,10 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
   );
   String? password;
   KeyEntry? key;
-  if (effective.auth == HostAuth.password) {
+  if (host.isTelnet) {
+    // Telnet signs in inside the terminal; a saved password is offered there.
+    password = host.password;
+  } else if (effective.auth == HostAuth.password) {
     password = effective.password ?? await _askPassword(context, effective);
     if (password == null) return null;
   } else {
@@ -90,15 +94,18 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
     password: password,
     privateKey: key?.privateKey,
     passphrase: key?.passphrase,
-    startupCommand: vault.entry<SnippetEntry>(host.startupSnippetId ?? group?.startupSnippetId)?.command,
-    environment: {...?group?.env, ...host.env},
+    startupCommand: host.isTelnet
+        ? null
+        : vault.entry<SnippetEntry>(host.startupSnippetId ?? group?.startupSnippetId)?.command,
+    environment: host.isTelnet ? const {} : {...?group?.env, ...host.env},
     hostId: host.id,
     jump: jump,
-    agentKeys: host.agentForwarding
+    agentKeys: host.agentForwarding && !host.isTelnet
         ? [for (final k in vault.keys) (privateKey: k.privateKey, passphrase: k.passphrase)]
         : null,
     // Only the hop that connects directly uses it; the connector decides.
     proxy: vault.entry<ProxyEntry>(host.proxyId ?? group?.proxyId)?.config,
+    protocol: host.protocol,
   );
 }
 
@@ -477,6 +484,8 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late String? _jumpHostId = widget.host?.jumpHostId;
   late bool _agentForwarding = widget.host?.agentForwarding ?? false;
   late String? _proxyId = widget.host?.proxyId;
+  late ConnectionProtocol _protocol = widget.host?.protocol ?? ConnectionProtocol.ssh;
+  bool get _telnet => _protocol == ConnectionProtocol.telnet;
 
   @override
   void dispose() {
@@ -496,9 +505,10 @@ class _HostEditorPageState extends State<HostEditorPage> {
         host: _host.text.trim(),
         port: int.parse(_port.text.trim()),
         username: _username.text.trim(),
-        auth: _auth,
-        password: _auth == HostAuth.password && _savePassword ? _password.text : null,
-        keyId: _auth == HostAuth.key ? _keyId : null,
+        auth: _telnet ? HostAuth.password : _auth,
+        password: (_telnet || _auth == HostAuth.password) && _savePassword ? _password.text : null,
+        keyId: !_telnet && _auth == HostAuth.key ? _keyId : null,
+        protocol: _protocol,
         startupSnippetId: _startupSnippetId,
         tags: [
           for (final tag in _tags.text.split(','))
@@ -559,6 +569,27 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       decoration: InputDecoration(labelText: t.groupLabel, hintText: t.groupHint),
                     ),
                     const SizedBox(height: 14),
+                    SegmentedButton<ConnectionProtocol>(
+                      key: const ValueKey('hostProtocol'),
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(value: ConnectionProtocol.ssh, label: Text('SSH')),
+                        ButtonSegment(value: ConnectionProtocol.telnet, label: Text('Telnet')),
+                      ],
+                      selected: {_protocol},
+                      onSelectionChanged: (s) => setState(() {
+                        _protocol = s.first;
+                        // Move a default port along with the protocol.
+                        final port = _port.text.trim();
+                        if (port == '22' && _telnet) _port.text = '23';
+                        if (port == '23' && !_telnet) _port.text = '22';
+                      }),
+                    ),
+                    if (_telnet) ...[
+                      const SizedBox(height: 8),
+                      Text(t.telnetWarning, style: TextStyle(color: c.danger, fontSize: 12.5, height: 1.4)),
+                    ],
+                    const SizedBox(height: 14),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -596,32 +627,40 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       controller: _username,
                       textDirection: TextDirection.ltr,
                       autocorrect: false,
-                      validator: group?.username?.isNotEmpty == true ? null : required,
+                      validator: _telnet || group?.username?.isNotEmpty == true ? null : required,
                       decoration: InputDecoration(
-                        labelText: t.usernameLabel,
+                        labelText: _telnet ? t.usernameOptional : t.usernameLabel,
                         helperText: group?.username?.isNotEmpty == true ? t.fromGroup(group!.username!) : null,
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    SegmentedButton<HostAuth>(
-                      segments: [
-                        ButtonSegment(
-                          value: HostAuth.password,
-                          label: Text(t.authPassword),
-                          icon: const Icon(Icons.password),
-                        ),
-                        ButtonSegment(value: HostAuth.key, label: Text(t.authPrivateKey), icon: const Icon(Icons.key)),
-                      ],
-                      selected: {_auth},
-                      onSelectionChanged: (s) => setState(() => _auth = s.first),
-                    ),
+                    SizedBox(height: _telnet ? 8 : 18),
+                    if (!_telnet)
+                      SegmentedButton<HostAuth>(
+                        segments: [
+                          ButtonSegment(
+                            value: HostAuth.password,
+                            label: Text(t.authPassword),
+                            icon: const Icon(Icons.password),
+                          ),
+                          ButtonSegment(
+                            value: HostAuth.key,
+                            label: Text(t.authPrivateKey),
+                            icon: const Icon(Icons.key),
+                          ),
+                        ],
+                        selected: {_auth},
+                        onSelectionChanged: (s) => setState(() => _auth = s.first),
+                      ),
                     const SizedBox(height: 14),
-                    if (_auth == HostAuth.password) ...[
+                    if (_telnet || _auth == HostAuth.password) ...[
                       SwitchListTile(
                         key: const ValueKey('savePassword'),
                         contentPadding: EdgeInsets.zero,
                         title: Text(t.savePassword),
-                        subtitle: Text(t.askPasswordEachTime, style: TextStyle(color: c.muted)),
+                        subtitle: Text(
+                          _telnet ? t.telnetPasswordHelp : t.askPasswordEachTime,
+                          style: TextStyle(color: c.muted),
+                        ),
                         value: _savePassword,
                         onChanged: (v) => setState(() => _savePassword = v),
                       ),
@@ -681,14 +720,15 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       onChanged: (v) => setState(() => _proxyId = v),
                     ),
                     const SizedBox(height: 6),
-                    SwitchListTile(
-                      key: const ValueKey('agentForwarding'),
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(t.agentForwarding),
-                      subtitle: Text(t.agentForwardingHelp, style: TextStyle(color: c.muted)),
-                      value: _agentForwarding,
-                      onChanged: (v) => setState(() => _agentForwarding = v),
-                    ),
+                    if (!_telnet)
+                      SwitchListTile(
+                        key: const ValueKey('agentForwarding'),
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(t.agentForwarding),
+                        subtitle: Text(t.agentForwardingHelp, style: TextStyle(color: c.muted)),
+                        value: _agentForwarding,
+                        onChanged: (v) => setState(() => _agentForwarding = v),
+                      ),
                     const SizedBox(height: 14),
                     TextFormField(
                       key: const ValueKey('hostTags'),
@@ -696,34 +736,36 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       decoration: InputDecoration(labelText: t.tagsLabel, hintText: t.tagsHint),
                     ),
                     const SizedBox(height: 14),
-                    TextFormField(
-                      key: const ValueKey('hostEnv'),
-                      controller: _env,
-                      minLines: 2,
-                      maxLines: 6,
-                      textDirection: TextDirection.ltr,
-                      autocorrect: false,
-                      style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13),
-                      validator: (v) => parseEnv(v ?? '') == null ? t.envInvalid : null,
-                      decoration: InputDecoration(
-                        labelText: t.envLabel,
-                        hintText: 'LANG=en_US.UTF-8',
-                        helperText: t.envHelp,
-                        helperMaxLines: 3,
-                        alignLabelWithHint: true,
+                    if (!_telnet)
+                      TextFormField(
+                        key: const ValueKey('hostEnv'),
+                        controller: _env,
+                        minLines: 2,
+                        maxLines: 6,
+                        textDirection: TextDirection.ltr,
+                        autocorrect: false,
+                        style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13),
+                        validator: (v) => parseEnv(v ?? '') == null ? t.envInvalid : null,
+                        decoration: InputDecoration(
+                          labelText: t.envLabel,
+                          hintText: 'LANG=en_US.UTF-8',
+                          helperText: t.envHelp,
+                          helperMaxLines: 3,
+                          alignLabelWithHint: true,
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 14),
-                    DropdownButtonFormField<String?>(
-                      key: const ValueKey('startupSnippet'),
-                      initialValue: _startupSnippetId,
-                      decoration: InputDecoration(labelText: t.startupSnippetLabel, helperText: t.startupSnippetHelp),
-                      items: [
-                        DropdownMenuItem(value: null, child: Text(t.noStartupSnippet)),
-                        for (final x in snippets) DropdownMenuItem(value: x.id, child: Text(x.name)),
-                      ],
-                      onChanged: (v) => setState(() => _startupSnippetId = v),
-                    ),
+                    if (!_telnet)
+                      DropdownButtonFormField<String?>(
+                        key: const ValueKey('startupSnippet'),
+                        initialValue: _startupSnippetId,
+                        decoration: InputDecoration(labelText: t.startupSnippetLabel, helperText: t.startupSnippetHelp),
+                        items: [
+                          DropdownMenuItem(value: null, child: Text(t.noStartupSnippet)),
+                          for (final x in snippets) DropdownMenuItem(value: x.id, child: Text(x.name)),
+                        ],
+                        onChanged: (v) => setState(() => _startupSnippetId = v),
+                      ),
                     const SizedBox(height: 24),
                     FilledButton(key: const ValueKey('saveHost'), onPressed: _save, child: Text(t.save)),
                   ],

@@ -1,4 +1,5 @@
 import '../ssh/proxy.dart';
+import '../ssh/ssh_connector.dart' show ConnectionProtocol;
 
 /// What the vault stores. Each entry is one encrypted record; the record type
 /// is inside the ciphertext, so storage (and later the sync server) cannot
@@ -48,6 +49,7 @@ class HostEntry extends VaultEntry {
     this.jumpHostId,
     this.agentForwarding = false,
     this.proxyId,
+    this.protocol = ConnectionProtocol.ssh,
   });
 
   static const recordType = 'host';
@@ -87,6 +89,11 @@ class HostEntry extends VaultEntry {
   /// connects directly (not through a jump host).
   final String? proxyId;
 
+  /// SSH, or Telnet for devices that have nothing else.
+  final ConnectionProtocol protocol;
+
+  bool get isTelnet => protocol == ConnectionProtocol.telnet;
+
   @override
   String get type => recordType;
 
@@ -106,6 +113,7 @@ class HostEntry extends VaultEntry {
     'jump_host_id': jumpHostId,
     'agent_forwarding': agentForwarding,
     'proxy_id': proxyId,
+    'protocol': protocol.name,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -124,9 +132,13 @@ class HostEntry extends VaultEntry {
     jumpHostId: d['jump_host_id'] as String?,
     agentForwarding: d['agent_forwarding'] as bool? ?? false,
     proxyId: d['proxy_id'] as String?,
+    protocol: ConnectionProtocol.values.byName(d['protocol'] as String? ?? 'ssh'),
   );
 
-  String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
+  String get label {
+    final address = port == (isTelnet ? 23 : 22) ? host : '$host:$port';
+    return username.isEmpty ? address : '$username@$address';
+  }
 }
 
 /// A private key, stored only inside the vault.

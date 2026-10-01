@@ -32,6 +32,7 @@ import 'package:tildeck/ui/connect_form.dart';
 import 'package:tildeck/ui/files_page.dart';
 import 'package:tildeck/ui/group_editor_page.dart';
 import 'package:tildeck/ui/history_page.dart';
+import 'package:tildeck/ui/hosts_page.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
 import 'package:tildeck/ui/port_forwards_page.dart';
@@ -498,6 +499,24 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('deleteProxy')), findsOneWidget);
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/proxy_editor_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('telnet host $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() => sampleVault(unlocked: true)))!;
+      const router = HostEntry(
+        id: 't1',
+        name: 'Core switch',
+        group: 'Network',
+        host: '10.0.0.2',
+        port: 23,
+        username: 'admin',
+        protocol: ConnectionProtocol.telnet,
+      );
+      await tester.pumpWidget(screen(locale, mode, HostEditorPage(vault: vault, host: router)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('agentForwarding')), findsNothing, reason: 'SSH only');
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/telnet_host_${locale}_${mode.name}.png'));
     });
 
     testWidgets('terminal appearance $locale ${mode.name}', (tester) async {

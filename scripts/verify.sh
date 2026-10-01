@@ -35,6 +35,7 @@ PG_CONTAINER="tildeck-$RUN_ID-db"
 CONTRACT_DIR="out/$RUN_ID-contract"
 SSH_NET="tildeck-$RUN_ID-ssh"
 SSH_CONTAINER="tildeck-$RUN_ID-sshd"
+TELNET_CONTAINER="tildeck-$RUN_ID-telnetd"
 SERVER_TEST_IMAGE="tildeck-server:verify"
 SERVER_RUNTIME_IMAGE="tildeck-server:verify-runtime"
 
@@ -46,6 +47,7 @@ cleanup() {
   docker rm -f -v "$PG_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
   docker rm -f -v "$SSH_CONTAINER" >/dev/null 2>&1 || true
+  docker rm -f -v "$TELNET_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$SSH_NET" >/dev/null 2>&1 || true
   rm -rf "${ROOT:?}/$CONTRACT_DIR"
 }
@@ -224,9 +226,27 @@ start_test_sshd() {
   )
 }
 
+# A throwaway Telnet server on the same network: BusyBox telnetd, which
+# gives a shell without signing in. Only the Telnet tests talk to it.
+start_test_telnetd() {
+  local waited=0
+  docker run -d --name "$TELNET_CONTAINER" --network "$SSH_NET" \
+    "$(toolchain_image telnet)" telnetd -F -p 2323 -l /bin/sh >/dev/null || return 1
+  until docker exec "$TELNET_CONTAINER" nc -z 127.0.0.1 2323 >/dev/null 2>&1; do
+    sleep 1
+    waited=$((waited + 1))
+    if ((waited >= 30)); then
+      err "The test Telnet server did not start within 30s."
+      return 1
+    fi
+  done
+  FLUTTER_DOCKER_ARGS+=(-e "TILDECK_TEST_TELNET_HOST=$TELNET_CONTAINER" -e TILDECK_TEST_TELNET_PORT=2323)
+}
+
 verify_app() {
-  section "app: a throwaway OpenSSH server for the SSH tests"
+  section "app: throwaway OpenSSH and Telnet servers for the connection tests"
   start_test_sshd || return 1
+  start_test_telnetd || return 1
 
   section "app: format, analyze, tests and golden images, debug APK"
   # Formatting covers the code this repository owns; generated code (the API

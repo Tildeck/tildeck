@@ -9,6 +9,7 @@ import '../activity.dart';
 import 'autocomplete.dart';
 import 'file_browser.dart';
 import 'ssh_connector.dart';
+import 'telnet.dart';
 
 enum SessionState { connecting, connected, closed }
 
@@ -54,24 +55,22 @@ class TerminalSession extends ChangeNotifier {
   String? problemVia;
 
   SSHClient? _client;
-  SSHSession? _shell;
+  _Link? _link;
   final _subscriptions = <StreamSubscription<String>>[];
+
+  /// Files and the server's history come over SSH only.
+  bool get isSsh => target.protocol == ConnectionProtocol.ssh;
 
   /// Connects and opens an interactive shell sized to the terminal.
   Future<void> start(SshConnector connector, HostKeyPrompt promptHostKey) async {
     try {
-      final client = await connector.connect(target, promptHostKey: promptHostKey);
-      _client = client;
-      final shell = await client.shell(
-        pty: SSHPtyConfig(type: 'xterm-256color', width: terminal.viewWidth, height: terminal.viewHeight),
-        environment: target.environment.isEmpty ? null : target.environment,
-      );
-      _shell = shell;
+      final link = isSsh ? await _openSsh(connector, promptHostKey) : await _openTelnet(connector, promptHostKey);
+      _link = link;
 
       // Streams can split a multi-byte character; the decoders keep the
       // partial bytes until the rest arrives.
       _subscriptions.add(
-        shell.stdout.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((data) {
+        link.output.transform(const Utf8Decoder(allowMalformed: true)).listen((data) {
           terminal.write(data);
           _checkPrompt();
         }),
@@ -81,18 +80,19 @@ class TerminalSession extends ChangeNotifier {
         userActivity.ping();
         line.feed(data);
         if (autocomplete) notifyListeners();
-        shell.write(utf8.encode(applyCtrl(data)));
+        link.write(utf8.encode(applyCtrl(data)));
       };
       terminal.onResize = (width, height, pixelWidth, pixelHeight) =>
-          shell.resizeTerminal(width, height, pixelWidth, pixelHeight);
+          link.resize(width, height, pixelWidth, pixelHeight);
 
       state = SessionState.connected;
       notifyListeners();
-      if (autocomplete) unawaited(_loadHistory(client));
+      final client = _client;
+      if (autocomplete && client != null) unawaited(_loadHistory(client));
       final startup = target.startupCommand;
       if (startup != null && startup.trim().isNotEmpty) run(startup);
 
-      await shell.done;
+      await link.done;
       _close(null);
     } on ConnectException catch (e) {
       problemVia = e.via;
@@ -100,6 +100,34 @@ class TerminalSession extends ChangeNotifier {
     } catch (_) {
       _close(ConnectProblem.disconnected);
     }
+  }
+
+  Future<_Link> _openSsh(SshConnector connector, HostKeyPrompt promptHostKey) async {
+    final client = await connector.connect(target, promptHostKey: promptHostKey);
+    _client = client;
+    final shell = await client.shell(
+      pty: SSHPtyConfig(type: 'xterm-256color', width: terminal.viewWidth, height: terminal.viewHeight),
+      environment: target.environment.isEmpty ? null : target.environment,
+    );
+    return _Link(
+      output: shell.stdout.cast<List<int>>(),
+      write: shell.write,
+      resize: shell.resizeTerminal,
+      done: shell.done,
+      close: shell.close,
+    );
+  }
+
+  Future<_Link> _openTelnet(SshConnector connector, HostKeyPrompt promptHostKey) async {
+    final socket = await connector.openSocket(target, promptHostKey: promptHostKey);
+    final telnet = TelnetChannel(socket, width: terminal.viewWidth, height: terminal.viewHeight);
+    return _Link(
+      output: telnet.output.cast<List<int>>(),
+      write: telnet.write,
+      resize: (width, height, _, _) => telnet.resize(width, height),
+      done: telnet.done,
+      close: telnet.close,
+    );
   }
 
   /// An SFTP channel on this session's connection, for browsing files: no
@@ -204,7 +232,7 @@ class TerminalSession extends ChangeNotifier {
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
-    _shell?.close();
+    _link?.close();
     _client?.close();
     _close(null);
   }
@@ -214,4 +242,21 @@ class TerminalSession extends ChangeNotifier {
     disconnect();
     super.dispose();
   }
+}
+
+/// What a session types into and reads from, whatever carries it.
+class _Link {
+  const _Link({
+    required this.output,
+    required this.write,
+    required this.resize,
+    required this.done,
+    required this.close,
+  });
+
+  final Stream<List<int>> output;
+  final void Function(Uint8List data) write;
+  final void Function(int width, int height, int pixelWidth, int pixelHeight) resize;
+  final Future<void> done;
+  final void Function() close;
 }
