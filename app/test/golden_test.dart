@@ -35,6 +35,7 @@ import 'package:tildeck/ui/group_editor_page.dart';
 import 'package:tildeck/ui/history_page.dart';
 import 'package:tildeck/ui/hosts_page.dart';
 import 'package:tildeck/ui/keys_page.dart';
+import 'package:tildeck/ui/known_hosts_page.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
 import 'package:tildeck/ui/port_forwards_page.dart';
@@ -529,6 +530,31 @@ void main() {
       await tester.enterText(find.byKey(const ValueKey('editorText')), '${file.text}# edited\n');
       await tester.pumpAndSettle();
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/file_editor_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('known hosts $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() async {
+        final v = await sampleVault(unlocked: true);
+        final known = VaultKnownHosts(v);
+        await known.trust(
+          'prod-web-01.example.com',
+          22,
+          const KnownHost(type: 'ssh-ed25519', fingerprint: 'SHA256:3kDbQ0yq8pZs1m8o5kqf2m5bN7r0A9dEo6wQz1cX4sY'),
+        );
+        await known.trust(
+          'db.internal.example.com',
+          2222,
+          const KnownHost(
+            type: 'ecdsa-sha2-nistp256',
+            fingerprint: 'SHA256:Vt9QwLr2bH6cN1xZs0pK4yF8mE3uJ7aG5dR2oW9nT1k',
+          ),
+        );
+        return v;
+      }))!;
+      await tester.pumpWidget(screen(locale, mode, KnownHostsPage(vault: vault)));
+      await tester.pumpAndSettle();
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/known_hosts_${locale}_${mode.name}.png'));
     });
 
     testWidgets('keys $locale ${mode.name}', (tester) async {

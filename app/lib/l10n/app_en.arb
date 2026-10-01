@@ -637,5 +637,11 @@
       }
     }
   },
-  "uploadFiles": "Upload files"
+  "uploadFiles": "Upload files",
+  "knownHostsTitle": "Known hosts",
+  "knownHostsIntro": "Servers whose keys you trusted, with the fingerprint each one showed. A server that later shows another key is stopped with a warning. Removing one makes the next connection ask again, as for a new server.",
+  "noKnownHosts": "No trusted servers yet. A server's key is added the first time you connect and trust it.",
+  "knownHostRemoved": "The key is no longer trusted.",
+  "forgetKnownHost": "Stop trusting this key",
+  "searchServers": "Search servers"
 }

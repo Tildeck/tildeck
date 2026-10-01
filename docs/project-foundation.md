@@ -447,6 +447,10 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - On the desktop, a folder downloads with everything in it (into a new folder in Downloads, never over one that exists) and a local folder uploads into the current one (never over an existing entry). A folder transfer is one entry with the overall progress and a count of files. Links and devices are left out of a folder copy; empty folders are kept. Android's file picker has no folder access, so folders move only on the desktop.
 - A long press selects; while selecting, a tap selects too. The selection is downloaded, or deleted after asking, together.
 - Tests: against the OpenSSH container: a folder tree (with an empty folder) down and up again, identical, and refused over an existing folder; a download and an endless upload cancelled midway, leaving nothing behind. On the page: selecting by long press and tap, deleting the selection after asking, and cancelling a running transfer.
+### Known hosts (2026-10-02)
+
+- The Keys page opens Known hosts: every server whose key the vault trusts, with the key type and the whole fingerprint, searchable once there are more than a few. Removing one (with undo) makes the next connection ask again, as for a new server.
+- Tests: the list (port 22 not written), and a removed key checked as unknown, then trusted again after undo. Golden: the page in both languages.
 
 ## Required workflow contracts
 
