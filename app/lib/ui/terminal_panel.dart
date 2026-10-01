@@ -420,6 +420,7 @@ class _StatusBanner extends StatelessWidget {
             ConnectProblem.keyPassphraseRequired => t.errConnKeyPassphraseRequired,
             ConnectProblem.keyPassphraseWrong => t.errConnKeyPassphraseWrong,
             ConnectProblem.disconnected => t.errConnDisconnected,
+            ConnectProblem.localShellFailed => t.errLocalShell,
           };
     final via = session.problemVia;
     final shown = !connecting && session.problem != null && via != null ? t.errConnVia(via, message) : message;

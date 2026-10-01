@@ -465,5 +465,8 @@
   "proxyCredentialsHelp": "Username and password only if the proxy asks for them. They are kept in the vault.",
   "telnetWarning": "Telnet is not encrypted: anyone on the network can read the session, passwords included. Use it only for devices that have nothing else, on a network you trust.",
   "usernameOptional": "Username (optional)",
-  "telnetPasswordHelp": "The device asks for it in the terminal; a saved password is offered at its prompt."
+  "telnetPasswordHelp": "The device asks for it in the terminal; a saved password is offered at its prompt.",
+  "localTerminal": "Local terminal",
+  "shellCmd": "Command Prompt",
+  "errLocalShell": "The shell could not start on this computer."
 }

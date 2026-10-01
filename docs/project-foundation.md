@@ -310,7 +310,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 | Stage | Scope | Status |
 |---|---|---|
 | 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
-| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding, jump hosts, agent forwarding, proxies, and Telnet done |
+| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Done: port forwarding, jump hosts, agent forwarding, proxies, Telnet, and a local terminal on the desktop |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
 | Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
@@ -399,6 +399,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The client offers its terminal type (TTYPE) and window size (NAWS, sent again on every resize), lets the server echo and suppress go-ahead, and refuses every other option, answering only on a change so negotiation cannot loop. Byte 255 is doubled and a bare CR is sent as CR NUL (RFC 854).
 - `scripts/verify.sh --area app` also starts BusyBox telnetd (`telnet` in `scripts/toolchain/Dockerfile`), which gives a shell without signing in.
 - Tests: negotiation against a fake server (supported and refused options, no loops, terminal type, window size with a 255 in it, a command split across reads, typing escaped, the end of the connection). Against BusyBox telnetd: a shell with the window size it was told, again after a resize, Telnet through an SSH jump host, and a closed port. BusyBox does not ask for the terminal type, so that part is covered by the fake server only.
+
+### Local terminal (2026-10-01)
+
+- On the desktop, a terminal button on the hosts screen opens a local shell in a tab, like a session. On Windows it offers the shells it finds: PowerShell 7 (on PATH or where it installs), Windows PowerShell, Command Prompt, and WSL; elsewhere the user's login shell. Phones have none.
+- The shell runs in a pseudo-terminal through `flutter_pty` (ConPTY on Windows), started in the user's home folder with the whole environment (the package alone copies only a few variables, too few for Windows shells), and resized with the terminal.
+- A local shell is not a server: it stays out of the synced connection history, and offers no files or server history.
+- `scripts/windows.ps1 test` runs the Windows-only tests in `app/integration_test/`, and the Windows CI job runs them after the build.
+- Tests: shell detection on Windows (order, PATH and install folder, letter case, missing ones) and elsewhere; the hosts screen opening the chosen shell, and no button on a phone. On Windows over ConPTY: Windows PowerShell answering, in the home folder, at the terminal width and again after a resize, and ending on `exit`; Command Prompt seeing the whole environment.
 
 ## Required workflow contracts
 

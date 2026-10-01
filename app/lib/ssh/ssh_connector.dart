@@ -4,10 +4,11 @@ import 'dart:io';
 
 import 'package:dartssh2/dartssh2.dart';
 
+import '../local/local_shell.dart';
 import 'known_hosts.dart';
 import 'proxy.dart';
 
-enum ConnectionProtocol { ssh, telnet }
+enum ConnectionProtocol { ssh, telnet, local }
 
 /// Where to connect and how to authenticate.
 class ConnectionTarget {
@@ -25,7 +26,13 @@ class ConnectionTarget {
     this.agentKeys,
     this.proxy,
     this.protocol = ConnectionProtocol.ssh,
+    this.localShell,
+    this.localName,
   });
+
+  /// A local terminal: [host] and [username] are unused.
+  const ConnectionTarget.local(LocalShell shell, String name)
+    : this(host: 'localhost', username: '', protocol: ConnectionProtocol.local, localShell: shell, localName: name);
 
   final String host;
   final int port;
@@ -61,7 +68,12 @@ class ConnectionTarget {
   /// and [password] is offered at its prompt.
   final ConnectionProtocol protocol;
 
+  /// The shell a local terminal runs, and its name for the tab.
+  final LocalShell? localShell;
+  final String? localName;
+
   String get label {
+    if (protocol == ConnectionProtocol.local) return localName ?? localShell?.executable ?? '';
     final defaultPort = protocol == ConnectionProtocol.telnet ? 23 : 22;
     final address = port == defaultPort ? host : '$host:$port';
     return username.isEmpty ? address : '$username@$address';
@@ -82,6 +94,8 @@ class ConnectionTarget {
     agentKeys: agentKeys,
     proxy: proxy,
     protocol: protocol,
+    localShell: localShell,
+    localName: localName,
   );
 }
 
@@ -95,6 +109,9 @@ enum ConnectProblem {
   keyPassphraseRequired,
   keyPassphraseWrong,
   disconnected,
+
+  /// A local terminal's shell could not start.
+  localShellFailed,
 }
 
 class ConnectException implements Exception {
