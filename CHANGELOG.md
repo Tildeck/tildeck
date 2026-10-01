@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Known hosts: see the trusted server keys with their fingerprints, and stop trusting one.
 - Files: cancel a transfer, download and upload whole folders on the desktop, and select several entries to download or delete together.
 - Edit text files on the server, with a warning when the file changed there since it was opened.
 - Files: rename, permissions, copy the path, and delete (folders with their contents, after asking); hidden files and sorting; go to a path; and a host's files opened directly from its menu, without a terminal.

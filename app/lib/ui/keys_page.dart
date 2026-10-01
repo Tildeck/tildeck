@@ -13,6 +13,7 @@ import '../ssh/ssh_connector.dart';
 import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
+import 'known_hosts_page.dart';
 import 'terminal_panel.dart' show connectProblemText;
 
 /// Opens an authenticated connection to a saved host, as a session would.
@@ -175,7 +176,19 @@ class _KeysPageState extends State<KeysPage> {
     final t = AppLocalizations.of(context);
     final c = context.colors;
     return Scaffold(
-      appBar: AppBar(title: Text(t.keysTitle)),
+      appBar: AppBar(
+        title: Text(t.keysTitle),
+        actions: [
+          TextButton.icon(
+            key: const ValueKey('openKnownHosts'),
+            icon: const Icon(Icons.verified_user_outlined, size: 18),
+            label: Text(t.knownHostsTitle),
+            onPressed: () =>
+                Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => KnownHostsPage(vault: vault))),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         key: const ValueKey('addKey'),
         icon: const Icon(Icons.add),
