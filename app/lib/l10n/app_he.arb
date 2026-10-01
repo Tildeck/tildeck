@@ -263,5 +263,7 @@
   "groupJumpHostHelp": "השרתים בקבוצה מתחברים דרך השרת הזה, אלא אם בחרו אחר. השרת עצמו מתחבר ישירות.",
   "directConnection": "ישירות",
   "viaHost": "דרך ⁨{name}⁩",
-  "errConnVia": "ב-⁨{host}⁩: {message}"
+  "errConnVia": "ב-⁨{host}⁩: {message}",
+  "agentForwarding": "Agent forwarding",
+  "agentForwardingHelp": "מאפשר לשרת הזה להתחבר הלאה עם המפתחות שבכספת בזמן החיבור, כמו ⁦ssh -A⁩. המפתחות נשארים במכשיר, אבל כל מי שיש לו root בשרת יכול להשתמש בהם בינתיים: כדאי להפעיל רק לשרתים שסומכים עליהם."
 }

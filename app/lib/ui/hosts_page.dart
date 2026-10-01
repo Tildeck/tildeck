@@ -92,6 +92,9 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
     environment: {...?group?.env, ...host.env},
     hostId: host.id,
     jump: jump,
+    agentKeys: host.agentForwarding
+        ? [for (final k in vault.keys) (privateKey: k.privateKey, passphrase: k.passphrase)]
+        : null,
   );
 }
 
@@ -468,6 +471,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late final _tags = TextEditingController(text: widget.host?.tags.join(', '));
   late final _env = TextEditingController(text: formatEnv(widget.host?.env ?? const {}));
   late String? _jumpHostId = widget.host?.jumpHostId;
+  late bool _agentForwarding = widget.host?.agentForwarding ?? false;
 
   @override
   void dispose() {
@@ -497,6 +501,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
         ],
         env: parseEnv(_env.text) ?? const {},
         jumpHostId: _jumpHostId,
+        agentForwarding: _agentForwarding,
       ),
     );
     if (mounted) Navigator.pop(context);
@@ -659,6 +664,15 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         for (final h in jumps) DropdownMenuItem(value: h.id, child: Text(h.name)),
                       ],
                       onChanged: (v) => setState(() => _jumpHostId = v),
+                    ),
+                    const SizedBox(height: 6),
+                    SwitchListTile(
+                      key: const ValueKey('agentForwarding'),
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t.agentForwarding),
+                      subtitle: Text(t.agentForwardingHelp, style: TextStyle(color: c.muted)),
+                      value: _agentForwarding,
+                      onChanged: (v) => setState(() => _agentForwarding = v),
                     ),
                     const SizedBox(height: 14),
                     TextFormField(

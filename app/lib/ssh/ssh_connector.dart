@@ -19,6 +19,7 @@ class ConnectionTarget {
     this.environment = const {},
     this.hostId,
     this.jump,
+    this.agentKeys,
   });
 
   final String host;
@@ -43,6 +44,10 @@ class ConnectionTarget {
   /// tunneled inside it, so the address is as that server sees it.
   final ConnectionTarget? jump;
 
+  /// Keys offered to the server through agent forwarding; null turns it
+  /// off. Keys that cannot be read (a passphrase not saved) are left out.
+  final List<({String privateKey, String? passphrase})>? agentKeys;
+
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
 
   /// The same target with another command to run once the shell opens.
@@ -57,6 +62,7 @@ class ConnectionTarget {
     environment: environment,
     hostId: hostId,
     jump: jump,
+    agentKeys: agentKeys,
   );
 }
 
@@ -150,6 +156,10 @@ class SshConnector {
           : (request) => [for (final _ in request.prompts) target.password!],
       handshakeTimeout: timeout,
       authTimeout: timeout,
+      // Like ssh(1): a refused environment variable, agent forwarding, or pty
+      // is skipped, and only a refused shell or command fails the session.
+      pipelineChannelRequests: true,
+      agentHandler: target.agentKeys == null ? null : SSHKeyPairAgent(_agentIdentities(target.agentKeys!)),
       onVerifyHostKey: (type, fingerprintBytes) async {
         final presented = KnownHost(type: type, fingerprint: utf8.decode(fingerprintBytes));
         final status = await knownHosts.check(target.host, target.port, presented);
@@ -176,6 +186,18 @@ class SshConnector {
       if (e is SSHAuthError) throw const ConnectException(ConnectProblem.authFailed);
       if (e is TimeoutException) throw const ConnectException(ConnectProblem.timeout);
       throw ConnectException(ConnectProblem.disconnected, '$e');
+    }
+  }
+
+  static List<SSHKeyPair> _agentIdentities(List<({String privateKey, String? passphrase})> keys) => [
+    for (final k in keys) ...?_readable(k.privateKey, k.passphrase),
+  ];
+
+  static List<SSHKeyPair>? _readable(String key, String? passphrase) {
+    try {
+      return SSHKeyPair.fromPem(key.trim(), (passphrase?.isEmpty ?? true) ? null : passphrase);
+    } catch (_) {
+      return null;
     }
   }
 

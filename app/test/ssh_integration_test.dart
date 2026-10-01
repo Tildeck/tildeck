@@ -194,14 +194,15 @@ void main() {
       await _until(() => session.terminal.buffer.getText().contains('got:$password'));
     });
 
-    test('environment variables reach the shell', () async {
+    test('environment variables reach the shell, and a refused one does not stop it', () async {
       final session = TerminalSession(
         ConnectionTarget(
           host: host!,
           port: port,
           username: user,
           password: password,
-          environment: const {'TILDECK_GREETING': 'shalom-42'},
+          // The server accepts only TILDECK_*: the other one is refused and skipped.
+          environment: const {'NOT_ACCEPTED': 'x', 'TILDECK_GREETING': 'shalom-42'},
           startupCommand: 'echo "env:\$TILDECK_GREETING"',
         ),
       );
