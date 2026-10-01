@@ -161,6 +161,19 @@ void main() {
       await _until(() => session.state == SessionState.closed);
       expect(session.problem, isNull, reason: 'a shell that exits is a normal close');
     });
+
+    test('a startup snippet runs when the shell opens, and a snippet runs line by line', () async {
+      final session = TerminalSession(
+        target(pass: password).withStartupCommand('X=\$((40 + 2))\necho "startup-\$X"\n\n'),
+      );
+      addTearDown(session.dispose);
+      session.terminal.resize(100, 30);
+      unawaited(session.start(SshConnector(knownHosts: MemoryKnownHosts()), PromptLog().call));
+
+      await _until(() => session.terminal.buffer.getText().contains('startup-42\n'));
+      session.run('cd /tmp\r\npwd');
+      await _until(() => session.terminal.buffer.getText().contains('/tmp\n'));
+    });
   });
 }
 

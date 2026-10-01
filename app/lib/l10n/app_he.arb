@@ -179,5 +179,19 @@
   "fileErrorNotFound": "זה כבר לא שם. כדאי לרענן את התיקייה.",
   "fileErrorExists": "כבר יש כאן משהו בשם הזה. שום דבר לא הוחלף.",
   "fileErrorDisconnected": "החיבור נסגר. צריך להתחבר מחדש ולפתוח שוב את הקבצים.",
-  "fileErrorFailed": "השרת לא הצליח לעשות את זה."
+  "fileErrorFailed": "השרת לא הצליח לעשות את זה.",
+  "snippetsTitle": "Snippets",
+  "addSnippet": "Snippet חדש",
+  "editSnippet": "עריכת snippet",
+  "noSnippetsYet": "עוד אין snippets. אפשר לשמור פקודות שמריצים הרבה, ואז להריץ אותן ב-session, על כמה שרתים בבת אחת, או כשהשרת מתחבר.",
+  "snippetNameLabel": "שם",
+  "snippetNameHint": "הפעלה מחדש של שרת ה-web",
+  "snippetCommandLabel": "פקודה",
+  "snippetCommandHelp": "כל שורה נשלחת כמו שהוקלדה, ואחריה Enter.",
+  "runOnHosts": "הרצה על כמה שרתים",
+  "runOnHostsTitle": "להריץ את \"{name}\" על",
+  "runOnHostsButton": "{count, plural, =1{הרצה על שרת אחד} other{הרצה על {count} שרתים}}",
+  "startupSnippetLabel": "Snippet בפתיחה",
+  "startupSnippetHelp": "רץ ב-shell מיד כשה-session נפתח.",
+  "noStartupSnippet": "בלי"
 }

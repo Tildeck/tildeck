@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
@@ -174,6 +175,53 @@ void main() {
     expect(record['version'], 2);
     expect(record['dirty'], isTrue);
     expect(record.containsKey('ct'), isFalse);
+  });
+
+  test("snippets and a host's startup snippet are kept in the vault", () async {
+    final vault = await newVault();
+    const snippet = SnippetEntry(id: 'snip-1', name: 'Restart web', command: 'sudo systemctl restart nginx');
+    await vault.put(snippet);
+    await vault.put(
+      HostEntry(id: 'host-2', name: 'Web', host: 'web.example.com', username: 'ops', startupSnippetId: 'snip-1'),
+    );
+    expect(vaultFile.readAsStringSync().contains('systemctl'), isFalse, reason: 'snippets are encrypted too');
+    final again = await reopen();
+    expect(await again.unlock(password), isTrue);
+    expect(again.snippets.single.command, snippet.command);
+    expect(again.hosts.single.startupSnippetId, 'snip-1');
+  });
+
+  test('a record of a type from a newer version is kept, not shown, and not called damaged', () async {
+    final vault = await newVault();
+    await vault.put(host);
+    final j = readFile();
+    final crypto = await VaultCrypto.load();
+    final kdf = KdfParams.fromJson(j['kdf'] as Map<String, dynamic>);
+    final keys = await crypto.deriveKeys(password, kdf);
+    final vaultKey = crypto.unwrapVaultKey(
+      keys.keyEncryptionKey,
+      Sealed.fromJson(j['wrap_pw'] as Map<String, dynamic>),
+      j['vault_id'] as String,
+    );
+    keys.dispose();
+    final plain = utf8.encode(
+      jsonEncode({
+        'v': 1,
+        'type': 'port_forward',
+        'data': {'local': 8080},
+      }),
+    );
+    final sealed = crypto.encryptRecord(vaultKey, j['vault_id'] as String, 'future-1', 1, Uint8List.fromList(plain));
+    vaultKey.dispose();
+    (j['records'] as List).add({'id': 'future-1', 'version': 1, 'deleted': false, ...sealed.toJson(), 'dirty': false});
+    writeFile(j);
+
+    final again = await reopen();
+    expect(await again.unlock(password), isTrue);
+    expect(again.damaged, isEmpty);
+    expect(again.hosts.single.name, host.name);
+    await again.put(HostEntry(id: 'host-3', name: 'Another', host: 'b.example.com', username: 'ops'));
+    expect(recordOf(readFile(), 'future-1')['ct'], sealed.toJson()['ct'], reason: 'kept untouched');
   });
 
   test('host keys live in the vault; the old plain file is imported once', () async {

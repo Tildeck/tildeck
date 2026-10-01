@@ -11,6 +11,7 @@ import 'account_page.dart';
 import 'files_page.dart';
 import 'host_key_dialog.dart';
 import 'password_pages.dart';
+import 'snippets_page.dart';
 import 'hosts_page.dart';
 import 'terminal_panel.dart';
 
@@ -72,6 +73,23 @@ class _SessionsPageState extends State<SessionsPage> {
           ? showHostKeyDialog(context, target: target, presented: presented, status: status, previous: previous)
           : false,
     );
+  }
+
+  /// Runs a snippet here, or opens a session on each chosen host and runs
+  /// it there.
+  Future<void> _runSnippet(TerminalSession session) async {
+    final choice = await showSnippetPicker(context, widget.vault);
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case RunHere(:final snippet):
+        session.run(snippet.command);
+      case RunOnHosts(:final snippet, :final hosts):
+        for (final host in hosts) {
+          if (!mounted) return;
+          final target = await connectionTargetFor(context, widget.vault, host);
+          if (target != null) _open(target.withStartupCommand(snippet.command));
+        }
+    }
   }
 
   void _openFiles(TerminalSession session) {
@@ -175,13 +193,22 @@ class _SessionsPageState extends State<SessionsPage> {
                           color: c.page,
                           border: Border(bottom: BorderSide(color: c.line)),
                         ),
-                        child: Center(
-                          child: OutlinedButton.icon(
-                            key: const ValueKey('openFiles'),
-                            onPressed: () => _openFiles(session),
-                            icon: const Icon(Icons.folder_open_rounded, size: 18),
-                            label: Text(t.filesTitle),
-                          ),
+                        child: Row(
+                          children: [
+                            OutlinedButton.icon(
+                              key: const ValueKey('openSnippetPicker'),
+                              onPressed: () => _runSnippet(session),
+                              icon: const Icon(Icons.code_rounded, size: 18),
+                              label: Text(t.snippetsTitle),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              key: const ValueKey('openFiles'),
+                              onPressed: () => _openFiles(session),
+                              icon: const Icon(Icons.folder_open_rounded, size: 18),
+                              label: Text(t.filesTitle),
+                            ),
+                          ],
                         ),
                       );
                     },

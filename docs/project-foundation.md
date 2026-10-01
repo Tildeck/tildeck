@@ -303,6 +303,26 @@ Approved by Shlomi on 2026-09-30: the working version is the full first-release 
 - Contract rules learned from the Dart generator (CI caught it: the generated client did not compile): no response unions (sign-in returns one `SigninResult` with a `status`), no `Literal` fields with a default value, and no FastAPI validation error schema. Malformed requests answer `422` with the stable `invalid_request` error body, and the contract documents that body instead.
 - To try the account flow end to end later, the server needs an SMTP provider configured (in `.env` or the panel) and `PUBLIC_URL` set to the address behind the HTTPS proxy.
 
+## Termius parity plan
+
+Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was tried and accepted: Tildeck takes on every capability Termius offers, built our own way (no Termius code, design, or brand). Order is ours to choose; each piece is a pull request merged on a green CI `summary` check.
+
+| Stage | Scope | Status |
+|---|---|---|
+| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets done; the rest planned |
+| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Planned |
+| 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
+| 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
+| Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
+| Not now | Teams: shared and multiple vaults, access control, shared session logs (Shlomi, 2026-10-01: not now, maybe later) | Deferred |
+
+### Snippets (2026-10-01)
+
+- A snippet is a vault record (name and command), so it is encrypted and syncs like a host. The Snippets page (the code button on the hosts list) adds, edits, and deletes them.
+- In a connected session, the Snippets button next to the tabs runs a snippet there, or opens a session on each chosen host and runs it in each. A host can have a startup snippet that runs as soon as its shell opens. Each line is sent as typed, followed by Enter.
+- A record of a type this version does not know (from a newer version, through sync) is now kept untouched and hidden instead of being reported as damaged.
+- Tests: snippets and startup snippets kept encrypted in the vault; an unknown record type kept and not damaged; against the OpenSSH container, a startup snippet runs when the shell opens and a two-line snippet runs line by line. Golden images of the Snippets page in English and Hebrew.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

@@ -6,9 +6,58 @@ import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'connect_form.dart';
+import 'snippets_page.dart';
 
 /// The home tab: saved hosts by group, and the ways to add one or connect
 /// without saving.
+
+/// What it takes to connect to a saved host: its password (asked now
+/// when it is not saved), its key, and its startup snippet. Null when the
+/// user cancels the password prompt.
+Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault, HostEntry host) async {
+  String? password;
+  KeyEntry? key;
+  if (host.auth == HostAuth.password) {
+    password = host.password ?? await _askPassword(context, host);
+    if (password == null) return null;
+  } else {
+    key = vault.entry<KeyEntry>(host.keyId);
+  }
+  return ConnectionTarget(
+    host: host.host,
+    port: host.port,
+    username: host.username,
+    password: password,
+    privateKey: key?.privateKey,
+    passphrase: key?.passphrase,
+    startupCommand: vault.entry<SnippetEntry>(host.startupSnippetId)?.command,
+  );
+}
+
+Future<String?> _askPassword(BuildContext context, HostEntry host) {
+  final t = AppLocalizations.of(context);
+  final controller = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(t.passwordFor(host.label)),
+      content: TextField(
+        key: const ValueKey('askPassword'),
+        controller: controller,
+        obscureText: true,
+        autofocus: true,
+        textDirection: TextDirection.ltr,
+        onSubmitted: (v) => Navigator.pop(context, v),
+        decoration: InputDecoration(labelText: t.passwordLabel),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: Text(t.connectButton)),
+      ],
+    ),
+  ).whenComplete(controller.dispose);
+}
+
 class HostsPage extends StatelessWidget {
   const HostsPage({super.key, required this.vault, required this.onConnect});
 
@@ -16,48 +65,8 @@ class HostsPage extends StatelessWidget {
   final void Function(ConnectionTarget target) onConnect;
 
   Future<void> _connectHost(BuildContext context, HostEntry host) async {
-    String? password;
-    KeyEntry? key;
-    if (host.auth == HostAuth.password) {
-      password = host.password ?? await _askPassword(context, host);
-      if (password == null) return;
-    } else {
-      key = vault.entry<KeyEntry>(host.keyId);
-    }
-    onConnect(
-      ConnectionTarget(
-        host: host.host,
-        port: host.port,
-        username: host.username,
-        password: password,
-        privateKey: key?.privateKey,
-        passphrase: key?.passphrase,
-      ),
-    );
-  }
-
-  Future<String?> _askPassword(BuildContext context, HostEntry host) {
-    final t = AppLocalizations.of(context);
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.passwordFor(host.label)),
-        content: TextField(
-          key: const ValueKey('askPassword'),
-          controller: controller,
-          obscureText: true,
-          autofocus: true,
-          textDirection: TextDirection.ltr,
-          onSubmitted: (v) => Navigator.pop(context, v),
-          decoration: InputDecoration(labelText: t.passwordLabel),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: Text(t.connectButton)),
-        ],
-      ),
-    ).whenComplete(controller.dispose);
+    final target = await connectionTargetFor(context, vault, host);
+    if (target != null) onConnect(target);
   }
 
   Future<void> _delete(BuildContext context, HostEntry host) async {
@@ -115,6 +124,14 @@ class HostsPage extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(t.hostsTitle, style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    ),
+                    IconButton(
+                      key: const ValueKey('openSnippets'),
+                      tooltip: t.snippetsTitle,
+                      icon: const Icon(Icons.code_rounded),
+                      onPressed: () => Navigator.of(
+                        context,
+                      ).push(MaterialPageRoute<void>(builder: (_) => SnippetsPage(vault: vault))),
                     ),
                     IconButton(
                       tooltip: t.keysTitle,
@@ -227,6 +244,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late HostAuth _auth = widget.host?.auth ?? HostAuth.password;
   late bool _savePassword = widget.host?.password != null;
   late String? _keyId = widget.host?.keyId;
+  late String? _startupSnippetId = widget.host?.startupSnippetId;
 
   @override
   void dispose() {
@@ -249,6 +267,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
         auth: _auth,
         password: _auth == HostAuth.password && _savePassword ? _password.text : null,
         keyId: _auth == HostAuth.key ? _keyId : null,
+        startupSnippetId: _startupSnippetId,
       ),
     );
     if (mounted) Navigator.pop(context);
@@ -267,6 +286,10 @@ class _HostEditorPageState extends State<HostEditorPage> {
         builder: (context, _) {
           final keys = widget.vault.keys;
           if (_keyId != null && keys.every((k) => k.id != _keyId)) _keyId = null;
+          final snippets = widget.vault.snippets;
+          if (_startupSnippetId != null && snippets.every((x) => x.id != _startupSnippetId)) {
+            _startupSnippetId = null;
+          }
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
@@ -381,6 +404,17 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String?>(
+                      key: const ValueKey('startupSnippet'),
+                      initialValue: _startupSnippetId,
+                      decoration: InputDecoration(labelText: t.startupSnippetLabel, helperText: t.startupSnippetHelp),
+                      items: [
+                        DropdownMenuItem(value: null, child: Text(t.noStartupSnippet)),
+                        for (final x in snippets) DropdownMenuItem(value: x.id, child: Text(x.name)),
+                      ],
+                      onChanged: (v) => setState(() => _startupSnippetId = v),
+                    ),
                     const SizedBox(height: 24),
                     FilledButton(key: const ValueKey('saveHost'), onPressed: _save, child: Text(t.save)),
                   ],

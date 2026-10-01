@@ -15,6 +15,7 @@ class ConnectionTarget {
     this.password,
     this.privateKey,
     this.passphrase,
+    this.startupCommand,
   });
 
   final String host;
@@ -26,7 +27,21 @@ class ConnectionTarget {
   final String? privateKey;
   final String? passphrase;
 
+  /// Sent to the shell once it opens: a startup snippet.
+  final String? startupCommand;
+
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
+
+  /// The same target with another command to run once the shell opens.
+  ConnectionTarget withStartupCommand(String? command) => ConnectionTarget(
+    host: host,
+    port: port,
+    username: username,
+    password: password,
+    privateKey: privateKey,
+    passphrase: passphrase,
+    startupCommand: command,
+  );
 }
 
 /// Why a connection failed. Each one maps to a localized message.

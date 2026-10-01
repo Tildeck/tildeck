@@ -55,6 +55,8 @@ class TerminalSession extends ChangeNotifier {
 
       state = SessionState.connected;
       notifyListeners();
+      final startup = target.startupCommand;
+      if (startup != null && startup.trim().isNotEmpty) run(startup);
 
       await shell.done;
       _close(null);
@@ -92,6 +94,17 @@ class TerminalSession extends ChangeNotifier {
     final code = data.toUpperCase().codeUnitAt(0);
     // Ctrl+A to Ctrl+Z and Ctrl+[ \ ] ^ _ are the ASCII control codes 1 to 31.
     return code >= 0x40 && code <= 0x5f ? String.fromCharCode(code & 0x1f) : data;
+  }
+
+  /// Runs a snippet: each line is sent as typed and followed by Enter.
+  void run(String command) {
+    if (state != SessionState.connected) return;
+    final lines = command.replaceAll('\r\n', '\n').split('\n');
+    while (lines.isNotEmpty && lines.last.trim().isEmpty) {
+      lines.removeLast();
+    }
+    if (lines.isEmpty) return;
+    terminal.textInput('${lines.join('\r')}\r');
   }
 
   /// Text typed or pasted by the user, sent as if from the keyboard.

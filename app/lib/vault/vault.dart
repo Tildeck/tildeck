@@ -246,7 +246,8 @@ class Vault extends ChangeNotifier {
       final doc = _decrypt(record, vaultKey);
       try {
         if (doc == null) throw const FormatException('not decryptable');
-        _entries[record.id] = _entryOf(record.id, doc);
+        final entry = _entryOf(record.id, doc);
+        if (entry != null) _entries[record.id] = entry;
       } on FormatException {
         damaged.add(record.id);
       }
@@ -331,6 +332,8 @@ class Vault extends ChangeNotifier {
   List<KeyEntry> get keys =>
       _of<KeyEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   List<KnownHostEntry> get knownHosts => _of<KnownHostEntry>().toList();
+  List<SnippetEntry> get snippets =>
+      _of<SnippetEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   T? entry<T extends VaultEntry>(String? id) => id == null ? null : _entries[id] as T?;
 
   /// Adds or replaces an entry as a change for the server.
@@ -511,7 +514,12 @@ class Vault extends ChangeNotifier {
       return;
     }
     try {
-      _entries[remote.id] = _entryOf(remote.id, remoteDoc);
+      final entry = _entryOf(remote.id, remoteDoc);
+      if (entry == null) {
+        _entries.remove(remote.id);
+      } else {
+        _entries[remote.id] = entry;
+      }
     } on FormatException {
       _entries.remove(remote.id);
       damaged.add(remote.id);
@@ -563,7 +571,7 @@ class Vault extends ChangeNotifier {
     }
   }
 
-  static VaultEntry _entryOf(String id, Map<String, dynamic> doc) {
+  static VaultEntry? _entryOf(String id, Map<String, dynamic> doc) {
     final type = doc['type'], data = doc['data'];
     if (type is! String || data is! Map<String, dynamic>) throw const FormatException('not a vault entry');
     return VaultEntry.fromJson(id, type, data);
