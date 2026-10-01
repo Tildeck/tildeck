@@ -309,7 +309,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 | Stage | Scope | Status |
 |---|---|---|
-| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, and autocomplete done; split view planned |
+| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
 | 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Planned |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
@@ -353,6 +353,11 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - At a password prompt (sudo, su, passphrases), the bar offers the password the session signed in with; nothing typed is recorded.
 - A switch on the Terminal appearance page turns suggestions off; it is on by default.
 - Tests: bash, zsh, and fish history parsing; ranking with snippets; following the typed line through Backspace, Ctrl+U, Enter, arrows, and Tab; completion input; password prompt recognition. Against the OpenSSH container: the history read from the server, a line completed from it and run, and a real password prompt answered with the session's password.
+
+### Split view (2026-10-01)
+
+- On a screen at least 840 pixels wide with two or more sessions, the Split button shows the selected session and another one side by side. A click on the other side makes it the active one (its tab is selected and the bar shows its actions); the button returns to a single view, and closing a session keeps the split pointing at the right one.
+- Test: two sessions split, the active side changing on a click, and back to one.
 
 ## Required workflow contracts
 

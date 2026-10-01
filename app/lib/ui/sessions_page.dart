@@ -48,6 +48,14 @@ class _SessionsPageState extends State<SessionsPage> {
   /// -1 is the hosts tab.
   int _selected = -1;
 
+  /// A second session shown beside the selected one, on a wide screen.
+  int? _splitWith;
+
+  static const _splitMinWidth = 840.0;
+
+  bool get _splitShown =>
+      _selected >= 0 && _splitWith != null && _splitWith! < _sessions.length && _splitWith != _selected;
+
   @override
   void dispose() {
     for (final session in _sessions) {
@@ -79,6 +87,49 @@ class _SessionsPageState extends State<SessionsPage> {
     );
   }
 
+  /// Splits the view with the most recent other session, or unsplits it.
+  void _toggleSplit() {
+    setState(() {
+      if (_splitShown) {
+        _splitWith = null;
+      } else {
+        _splitWith = _sessions.length - 1 == _selected ? _sessions.length - 2 : _sessions.length - 1;
+      }
+    });
+  }
+
+  /// One side of the split. A click on the other side makes it the active
+  /// one, whose tab is selected and whose actions the bar shows.
+  Widget _pane(int i, {required bool active}) => Listener(
+    onPointerDown: active
+        ? null
+        : (_) => setState(() {
+            _splitWith = _selected;
+            _selected = i;
+          }),
+    child: _panel(i),
+  );
+
+  Widget _panel(int i) {
+    final session = _sessions[i];
+    return ListenableBuilder(
+      key: ObjectKey(session),
+      listenable: widget.vault,
+      builder: (context, _) {
+        final prefs = widget.vault.preferences;
+        return TerminalPanel(
+          session: session,
+          showKeyBar: widget.showKeyBar,
+          onReconnect: () => _open(session.target, replacing: i),
+          theme: themeById(prefs.terminalTheme).theme,
+          fontSize: prefs.fontSize ?? defaultFontSize,
+          onFontSize: (size) => widget.vault.put(prefs.copyWith(fontSize: size)),
+          snippets: {for (final x in widget.vault.snippets) x.name: x.command},
+        );
+      },
+    );
+  }
+
   /// Runs a snippet here, or opens a session on each chosen host and runs
   /// it there.
   Future<void> _runSnippet(TerminalSession session) async {
@@ -107,6 +158,11 @@ class _SessionsPageState extends State<SessionsPage> {
 
   void _close(int index) {
     setState(() {
+      if (_splitWith == index) {
+        _splitWith = null;
+      } else if (_splitWith != null && _splitWith! > index) {
+        _splitWith = _splitWith! - 1;
+      }
       _sessions.removeAt(index).dispose();
       // Keep showing the same session when a tab before it closes; when the
       // shown tab closes, show its left neighbour (or the new connection tab).
@@ -214,7 +270,9 @@ class _SessionsPageState extends State<SessionsPage> {
                     listenable: _sessions[_selected],
                     builder: (context, _) {
                       final session = _sessions[_selected];
-                      if (session.state != SessionState.connected) return const SizedBox.shrink();
+                      final connected = session.state == SessionState.connected;
+                      final canSplit = _sessions.length > 1 && MediaQuery.sizeOf(context).width >= _splitMinWidth;
+                      if (!connected && !canSplit) return const SizedBox.shrink();
                       return Container(
                         height: 52,
                         padding: const EdgeInsetsDirectional.only(end: 10),
@@ -224,19 +282,32 @@ class _SessionsPageState extends State<SessionsPage> {
                         ),
                         child: Row(
                           children: [
-                            OutlinedButton.icon(
-                              key: const ValueKey('openSnippetPicker'),
-                              onPressed: () => _runSnippet(session),
-                              icon: const Icon(Icons.code_rounded, size: 18),
-                              label: Text(t.snippetsTitle),
-                            ),
-                            const SizedBox(width: 8),
-                            OutlinedButton.icon(
-                              key: const ValueKey('openFiles'),
-                              onPressed: () => _openFiles(session),
-                              icon: const Icon(Icons.folder_open_rounded, size: 18),
-                              label: Text(t.filesTitle),
-                            ),
+                            if (canSplit) ...[
+                              IconButton(
+                                key: const ValueKey('splitView'),
+                                tooltip: _splitShown ? t.unsplitView : t.splitView,
+                                isSelected: _splitShown,
+                                icon: const Icon(Icons.vertical_split_outlined),
+                                selectedIcon: const Icon(Icons.vertical_split),
+                                onPressed: _toggleSplit,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            if (connected) ...[
+                              OutlinedButton.icon(
+                                key: const ValueKey('openSnippetPicker'),
+                                onPressed: () => _runSnippet(session),
+                                icon: const Icon(Icons.code_rounded, size: 18),
+                                label: Text(t.snippetsTitle),
+                              ),
+                              const SizedBox(width: 8),
+                              OutlinedButton.icon(
+                                key: const ValueKey('openFiles'),
+                                onPressed: () => _openFiles(session),
+                                icon: const Icon(Icons.folder_open_rounded, size: 18),
+                                label: Text(t.filesTitle),
+                              ),
+                            ],
                           ],
                         ),
                       );
@@ -245,29 +316,21 @@ class _SessionsPageState extends State<SessionsPage> {
               ],
             ),
             Expanded(
-              child: IndexedStack(
-                index: _selected + 1,
-                children: [
-                  HostsPage(vault: widget.vault, onConnect: _open),
-                  for (final (i, session) in _sessions.indexed)
-                    ListenableBuilder(
-                      key: ObjectKey(session),
-                      listenable: widget.vault,
-                      builder: (context, _) {
-                        final prefs = widget.vault.preferences;
-                        return TerminalPanel(
-                          session: session,
-                          showKeyBar: widget.showKeyBar,
-                          onReconnect: () => _open(session.target, replacing: i),
-                          theme: themeById(prefs.terminalTheme).theme,
-                          fontSize: prefs.fontSize ?? defaultFontSize,
-                          onFontSize: (size) => widget.vault.put(prefs.copyWith(fontSize: size)),
-                          snippets: {for (final x in widget.vault.snippets) x.name: x.command},
-                        );
-                      },
+              child: _splitShown && MediaQuery.sizeOf(context).width >= _splitMinWidth
+                  ? Row(
+                      children: [
+                        Expanded(child: _pane(_selected, active: true)),
+                        VerticalDivider(width: 2, thickness: 2, color: c.brand.withValues(alpha: 0.5)),
+                        Expanded(child: _pane(_splitWith!, active: false)),
+                      ],
+                    )
+                  : IndexedStack(
+                      index: _selected + 1,
+                      children: [
+                        HostsPage(vault: widget.vault, onConnect: _open),
+                        for (final (i, _) in _sessions.indexed) _panel(i),
+                      ],
                     ),
-                ],
-              ),
             ),
           ],
         ),
