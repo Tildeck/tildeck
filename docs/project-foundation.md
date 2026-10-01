@@ -310,7 +310,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 | Stage | Scope | Status |
 |---|---|---|
 | 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
-| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding, jump hosts, agent forwarding, and proxies done |
+| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding, jump hosts, agent forwarding, proxies, and Telnet done |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
 | Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
@@ -390,6 +390,15 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The target's name goes to the proxy unresolved (SOCKS5 by name, HTTP CONNECT by authority), so names only the proxy can resolve work.
 - Failures name the proxy when it is the proxy: unreachable, or a refused or missing password. A target the proxy cannot reach is reported as the target being unreachable.
 - Tests: both protocols against small proxies in the test, with and without a password: relaying both ways including bytes that arrive with the handshake, a wrong or missing password, a target the proxy cannot reach, a proxy that is not there. Against the OpenSSH container: SSH through each kind with a password, a refused proxy password named, and the proxy used only for the first hop through a jump host. A proxy added from the host editor, chosen, and used to connect.
+
+### Telnet (2026-10-01)
+
+- A host is SSH or Telnet, chosen in the host editor (Telnet moves a default port 22 to 23). The editor warns that Telnet is not encrypted, makes the username optional, and hides what only SSH has: keys, environment variables, agent forwarding, a startup snippet. Files are offered only in SSH sessions.
+- Telnet signs in inside the terminal. A saved password is offered at the device's password prompt, as in SSH sessions; nothing is typed for the user.
+- The connection opens the way SSH does, so jump hosts and proxies work for Telnet too.
+- The client offers its terminal type (TTYPE) and window size (NAWS, sent again on every resize), lets the server echo and suppress go-ahead, and refuses every other option, answering only on a change so negotiation cannot loop. Byte 255 is doubled and a bare CR is sent as CR NUL (RFC 854).
+- `scripts/verify.sh --area app` also starts BusyBox telnetd (`telnet` in `scripts/toolchain/Dockerfile`), which gives a shell without signing in.
+- Tests: negotiation against a fake server (supported and refused options, no loops, terminal type, window size with a 255 in it, a command split across reads, typing escaped, the end of the connection). Against BusyBox telnetd: a shell with the window size it was told, again after a resize, Telnet through an SSH jump host, and a closed port. BusyBox does not ask for the terminal type, so that part is covered by the fake server only.
 
 ## Required workflow contracts
 

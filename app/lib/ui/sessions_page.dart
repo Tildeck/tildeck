@@ -328,13 +328,15 @@ class _SessionsPageState extends State<SessionsPage> {
                                 icon: const Icon(Icons.code_rounded, size: 18),
                                 label: Text(t.snippetsTitle),
                               ),
-                              const SizedBox(width: 8),
-                              OutlinedButton.icon(
-                                key: const ValueKey('openFiles'),
-                                onPressed: () => _openFiles(session),
-                                icon: const Icon(Icons.folder_open_rounded, size: 18),
-                                label: Text(t.filesTitle),
-                              ),
+                              if (session.isSsh) ...[
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  key: const ValueKey('openFiles'),
+                                  onPressed: () => _openFiles(session),
+                                  icon: const Icon(Icons.folder_open_rounded, size: 18),
+                                  label: Text(t.filesTitle),
+                                ),
+                              ],
                             ],
                           ],
                         ),

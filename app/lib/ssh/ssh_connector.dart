@@ -7,6 +7,8 @@ import 'package:dartssh2/dartssh2.dart';
 import 'known_hosts.dart';
 import 'proxy.dart';
 
+enum ConnectionProtocol { ssh, telnet }
+
 /// Where to connect and how to authenticate.
 class ConnectionTarget {
   const ConnectionTarget({
@@ -22,6 +24,7 @@ class ConnectionTarget {
     this.jump,
     this.agentKeys,
     this.proxy,
+    this.protocol = ConnectionProtocol.ssh,
   });
 
   final String host;
@@ -54,7 +57,15 @@ class ConnectionTarget {
   /// to directly; through a jump host, the jump host's own setting counts.
   final ProxyConfig? proxy;
 
-  String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
+  /// Telnet has no sign-in of its own: the server asks in the terminal,
+  /// and [password] is offered at its prompt.
+  final ConnectionProtocol protocol;
+
+  String get label {
+    final defaultPort = protocol == ConnectionProtocol.telnet ? 23 : 22;
+    final address = port == defaultPort ? host : '$host:$port';
+    return username.isEmpty ? address : '$username@$address';
+  }
 
   /// The same target with another command to run once the shell opens.
   ConnectionTarget withStartupCommand(String? command) => ConnectionTarget(
@@ -70,6 +81,7 @@ class ConnectionTarget {
     jump: jump,
     agentKeys: agentKeys,
     proxy: proxy,
+    protocol: protocol,
   );
 }
 
@@ -114,9 +126,24 @@ class SshConnector {
   final KnownHosts knownHosts;
   final Duration timeout;
 
-  Future<SSHClient> connect(ConnectionTarget target, {required HostKeyPrompt promptHostKey}) async {
+  Future<SSHClient> connect(ConnectionTarget target, {required HostKeyPrompt promptHostKey}) =>
+      _throughJump(target, promptHostKey, (via) => _connect(target, promptHostKey, via), (c) => c.done);
+
+  /// A plain connection to the target's port, through its jump hosts or
+  /// proxy like an SSH one: for protocols other than SSH.
+  Future<SSHSocket> openSocket(ConnectionTarget target, {required HostKeyPrompt promptHostKey}) =>
+      _throughJump(target, promptHostKey, (via) => _socketFor(target, via), (s) => s.done);
+
+  /// Opens [open] directly, or inside a connection to the target's jump
+  /// host, which then lives as long as what was opened ([doneOf]).
+  Future<T> _throughJump<T>(
+    ConnectionTarget target,
+    HostKeyPrompt promptHostKey,
+    Future<T> Function(SSHClient? via) open,
+    Future<void> Function(T) doneOf,
+  ) async {
     final jump = target.jump;
-    if (jump == null) return _connect(target, promptHostKey, null);
+    if (jump == null) return open(null);
     final SSHClient via;
     try {
       via = await connect(jump, promptHostKey: promptHostKey);
@@ -124,10 +151,9 @@ class SshConnector {
       throw ConnectException(e.problem, e.detail, e.via ?? jump.label);
     }
     try {
-      final client = await _connect(target, promptHostKey, via);
-      // The tunnel lives as long as the connection inside it.
-      unawaited(client.done.catchError((_) {}).whenComplete(via.close));
-      return client;
+      final opened = await open(via);
+      unawaited(doneOf(opened).catchError((_) {}).whenComplete(via.close));
+      return opened;
     } catch (_) {
       via.close();
       rethrow;
@@ -136,7 +162,11 @@ class SshConnector {
 
   Future<SSHClient> _connect(ConnectionTarget target, HostKeyPrompt promptHostKey, SSHClient? via) async {
     final identities = _identities(target);
+    final socket = await _socketFor(target, via);
+    return _handshake(target, promptHostKey, identities, socket);
+  }
 
+  Future<SSHSocket> _socketFor(ConnectionTarget target, SSHClient? via) async {
     final SSHSocket socket;
     final proxy = target.proxy;
     try {
@@ -161,7 +191,15 @@ class SshConnector {
       // The jump host could not reach the target.
       throw ConnectException(ConnectProblem.unreachable, e.description);
     }
+    return socket;
+  }
 
+  Future<SSHClient> _handshake(
+    ConnectionTarget target,
+    HostKeyPrompt promptHostKey,
+    List<SSHKeyPair>? identities,
+    SSHSocket socket,
+  ) async {
     var hostKeyRejected = false;
     final client = SSHClient(
       socket,
