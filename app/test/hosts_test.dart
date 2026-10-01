@@ -16,6 +16,10 @@ const web = HostEntry(
   tags: ['nginx', 'eu-west'],
 );
 
+extension on HostEntry {
+  HostEntry copyWithJump(String? jumpHostId) => HostEntry.fromJson(id, {...dataJson(), 'jump_host_id': jumpHostId});
+}
+
 void main() {
   test('search matches every word, in name, address, user, group, or tag', () {
     expect(hostMatches(web, ''), isTrue);
@@ -92,5 +96,66 @@ void main() {
       keyId: 'k1',
     );
     expect((await connectionTargetFor(context, vault, own))!.username, 'root');
+  });
+
+  testWidgets('a host connects through its jump host or the group one, and loops end the chain', (tester) async {
+    final dir = (await tester.runAsync(() => Directory.systemTemp.createTemp('tildeck-jump')))!;
+    addTearDown(() => dir.delete(recursive: true));
+    const bastion = HostEntry(
+      id: 'b',
+      name: 'Bastion',
+      group: 'Production',
+      host: 'bastion.example.com',
+      username: 'jump',
+      password: 'bastion-pw',
+    );
+    const edge = HostEntry(id: 'e', name: 'Edge', host: 'edge.example.com', username: 'edge', password: 'edge-pw');
+    const db = HostEntry(id: 'd', name: 'Db', group: 'Production', host: '10.0.0.5', username: 'pg', password: 'db-pw');
+    final vault = (await tester.runAsync(() async {
+      final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
+      await v.load();
+      await v.create('orange-kettle-winter-42');
+      for (final h in [bastion, edge, db]) {
+        await v.put(h);
+      }
+      await v.put(const GroupEntry(id: 'g', name: 'Production', jumpHostId: 'b'));
+      return v;
+    }))!;
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (c) {
+            context = c;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+
+    // The group's jump host, and the jump host itself connects directly.
+    expect(jumpChainOf(vault, db).map((h) => h.id), ['b']);
+    expect(jumpChainOf(vault, bastion), isEmpty);
+    final target = (await connectionTargetFor(context, vault, db))!;
+    expect(target.host, '10.0.0.5');
+    expect(target.jump?.host, 'bastion.example.com');
+    expect(target.jump?.password, 'bastion-pw');
+    expect(target.jump?.jump, isNull);
+
+    // A chain: the bastion is reached through the edge.
+    await tester.runAsync(() => vault.put(bastion.copyWithJump('e')));
+    expect(jumpChainOf(vault, db).map((h) => h.id), ['b', 'e']);
+    final chained = (await connectionTargetFor(context, vault, db))!;
+    expect(chained.jump?.host, 'bastion.example.com');
+    expect(chained.jump?.jump?.host, 'edge.example.com');
+
+    // The edge may not go through the bastion or the db: that would loop.
+    expect(jumpCandidatesFor(vault, 'e').map((h) => h.id), isEmpty);
+    expect(jumpCandidatesFor(vault, 'd').map((h) => h.id), ['b', 'e']);
+
+    // A loop made anyway (edits on two devices) ends where it repeats.
+    await tester.runAsync(() => vault.put(edge.copyWithJump('b')));
+    expect(jumpChainOf(vault, db).map((h) => h.id), ['b', 'e']);
+    expect(jumpChainOf(vault, vault.entry<HostEntry>('e')!).map((h) => h.id), ['b']);
   });
 }

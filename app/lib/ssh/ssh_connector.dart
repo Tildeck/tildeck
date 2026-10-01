@@ -18,6 +18,7 @@ class ConnectionTarget {
     this.startupCommand,
     this.environment = const {},
     this.hostId,
+    this.jump,
   });
 
   final String host;
@@ -38,6 +39,10 @@ class ConnectionTarget {
   /// The saved host this target came from, for the history.
   final String? hostId;
 
+  /// The server to connect through; the connection to this target is
+  /// tunneled inside it, so the address is as that server sees it.
+  final ConnectionTarget? jump;
+
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
 
   /// The same target with another command to run once the shell opens.
@@ -51,6 +56,7 @@ class ConnectionTarget {
     startupCommand: command,
     environment: environment,
     hostId: hostId,
+    jump: jump,
   );
 }
 
@@ -67,9 +73,12 @@ enum ConnectProblem {
 }
 
 class ConnectException implements Exception {
-  const ConnectException(this.problem, [this.detail]);
+  const ConnectException(this.problem, [this.detail, this.via]);
   final ConnectProblem problem;
   final String? detail;
+
+  /// The jump host the failure happened at, when not the target itself.
+  final String? via;
 
   @override
   String toString() => 'ConnectException($problem${detail == null ? '' : ': $detail'})';
@@ -93,15 +102,40 @@ class SshConnector {
   final Duration timeout;
 
   Future<SSHClient> connect(ConnectionTarget target, {required HostKeyPrompt promptHostKey}) async {
+    final jump = target.jump;
+    if (jump == null) return _connect(target, promptHostKey, null);
+    final SSHClient via;
+    try {
+      via = await connect(jump, promptHostKey: promptHostKey);
+    } on ConnectException catch (e) {
+      throw ConnectException(e.problem, e.detail, e.via ?? jump.label);
+    }
+    try {
+      final client = await _connect(target, promptHostKey, via);
+      // The tunnel lives as long as the connection inside it.
+      unawaited(client.done.catchError((_) {}).whenComplete(via.close));
+      return client;
+    } catch (_) {
+      via.close();
+      rethrow;
+    }
+  }
+
+  Future<SSHClient> _connect(ConnectionTarget target, HostKeyPrompt promptHostKey, SSHClient? via) async {
     final identities = _identities(target);
 
     final SSHSocket socket;
     try {
-      socket = await SSHSocket.connect(target.host, target.port, timeout: timeout);
+      socket = via == null
+          ? await SSHSocket.connect(target.host, target.port, timeout: timeout)
+          : await via.forwardLocal(target.host, target.port).timeout(timeout);
     } on TimeoutException {
       throw const ConnectException(ConnectProblem.timeout);
     } on SocketException catch (e) {
       throw ConnectException(ConnectProblem.unreachable, e.message);
+    } on SSHChannelOpenError catch (e) {
+      // The jump host could not reach the target.
+      throw ConnectException(ConnectProblem.unreachable, e.description);
     }
 
     var hostKeyRejected = false;

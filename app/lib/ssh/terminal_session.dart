@@ -50,6 +50,9 @@ class TerminalSession extends ChangeNotifier {
 
   ConnectProblem? problem;
 
+  /// The jump host [problem] happened at, when not the target itself.
+  String? problemVia;
+
   SSHClient? _client;
   SSHSession? _shell;
   final _subscriptions = <StreamSubscription<String>>[];
@@ -92,6 +95,7 @@ class TerminalSession extends ChangeNotifier {
       await shell.done;
       _close(null);
     } on ConnectException catch (e) {
+      problemVia = e.via;
       _close(e.problem);
     } catch (_) {
       _close(ConnectProblem.disconnected);

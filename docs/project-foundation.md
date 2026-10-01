@@ -310,7 +310,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 | Stage | Scope | Status |
 |---|---|---|
 | 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
-| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding done |
+| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding and jump hosts done |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
 | Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
@@ -366,6 +366,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The listen address defaults to 127.0.0.1, so a rule serves only this device unless the user types another address.
 - The Port forwarding page, opened from the hosts screen, turns rules on and off with a switch and shows the address and the connection count, or why a rule could not start: the host could not be reached, the port is taken, or the server refused to listen. A dropped connection turns the rule off. Running rules stop when the app closes.
 - Tests: rules saved and read back; a rule added in the editor with port validation; a start failure shown. Against the OpenSSH container: a local forward reaching the server's own sshd, a remote forward answered by a service on this device, a SOCKS5 handshake and connection, and a taken port reported. The test server now allows TCP forwarding.
+
+### Jump hosts (2026-10-01)
+
+- A host may connect through another saved host (like `ssh -J`), set in the host editor as "Connect through". A group may set one for its hosts; a host's own choice wins, and the jump host itself connects directly. A jump host with its own jump host makes a chain.
+- The connection to the target is tunneled inside the connection to the jump host (a direct-tcpip channel), so the target's address is as the jump host sees it. Each host key is checked under its own address, and closing the session closes the tunnel under it.
+- The editor offers only hosts whose own chain does not lead back, so a loop cannot be chosen; one made anyway by edits on two devices ends the chain where it repeats.
+- A failure at a jump host names it: "At deploy@bastion: the server rejected the username or the credentials."
+- Tests: chains, group inheritance, loop-free choices, and loops ending. Against the OpenSSH container, which is its own jump host: one hop, two hops, closing both connections together, a failure at the jump host named, and a target the jump host cannot reach.
 
 ## Required workflow contracts
 

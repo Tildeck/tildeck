@@ -42,6 +42,7 @@ class HostEntry extends VaultEntry {
     this.startupSnippetId,
     this.tags = const [],
     this.env = const {},
+    this.jumpHostId,
   });
 
   static const recordType = 'host';
@@ -69,6 +70,10 @@ class HostEntry extends VaultEntry {
   /// only those its AcceptEnv allows).
   final Map<String, String> env;
 
+  /// Another saved host to connect through (like ssh -J). That host may
+  /// have its own, which makes a chain.
+  final String? jumpHostId;
+
   @override
   String get type => recordType;
 
@@ -85,6 +90,7 @@ class HostEntry extends VaultEntry {
     'startup_snippet_id': startupSnippetId,
     'tags': tags,
     'env': env,
+    'jump_host_id': jumpHostId,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -100,6 +106,7 @@ class HostEntry extends VaultEntry {
     startupSnippetId: d['startup_snippet_id'] as String?,
     tags: [...?(d['tags'] as List?)?.cast<String>()],
     env: {...?(d['env'] as Map?)?.cast<String, String>()},
+    jumpHostId: d['jump_host_id'] as String?,
   );
 
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
@@ -193,6 +200,7 @@ class GroupEntry extends VaultEntry {
     this.keyId,
     this.startupSnippetId,
     this.env = const {},
+    this.jumpHostId,
   });
 
   static const recordType = 'group';
@@ -205,6 +213,9 @@ class GroupEntry extends VaultEntry {
   final String? startupSnippetId;
   final Map<String, String> env;
 
+  /// The host the group's hosts connect through, unless they choose one.
+  final String? jumpHostId;
+
   @override
   String get type => recordType;
 
@@ -215,6 +226,7 @@ class GroupEntry extends VaultEntry {
     'key_id': keyId,
     'startup_snippet_id': startupSnippetId,
     'env': env,
+    'jump_host_id': jumpHostId,
   };
 
   static GroupEntry fromJson(String id, Map<String, dynamic> d) => GroupEntry(
@@ -224,6 +236,7 @@ class GroupEntry extends VaultEntry {
     keyId: d['key_id'] as String?,
     startupSnippetId: d['startup_snippet_id'] as String?,
     env: {...?(d['env'] as Map?)?.cast<String, String>()},
+    jumpHostId: d['jump_host_id'] as String?,
   );
 }
 
