@@ -207,7 +207,7 @@ void main() {
     final plain = utf8.encode(
       jsonEncode({
         'v': 1,
-        'type': 'port_forward',
+        'type': 'a_type_from_the_future',
         'data': {'local': 8080},
       }),
     );

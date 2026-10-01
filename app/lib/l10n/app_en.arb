@@ -395,5 +395,40 @@
   "autocompleteLabel": "Suggestions while typing",
   "autocompleteHelp": "Commands from the server's own history and from your snippets, and the saved password at a password prompt. The history is read from the server for each session and never stored. Takes effect in new sessions.",
   "splitView": "Split view",
-  "unsplitView": "Single view"
+  "unsplitView": "Single view",
+  "forwardsTitle": "Port forwarding",
+  "addForward": "New rule",
+  "editForward": "Edit rule",
+  "noForwardsYet": "No rules yet. Forward a port of a server to this device, a port of this device to a server, or browse through a server with a SOCKS proxy.",
+  "forwardsNeedHost": "Save a host first: a rule runs through a saved host.",
+  "forwardLocal": "Local",
+  "forwardRemote": "Remote",
+  "forwardDynamic": "Dynamic",
+  "forwardLocalHelp": "Listens on this device, and connects from the server to the destination (like ssh -L).",
+  "forwardRemoteHelp": "Listens on the server, and connects from this device to the destination (like ssh -R).",
+  "forwardDynamicHelp": "A SOCKS5 proxy on this device whose connections leave from the server (like ssh -D).",
+  "forwardNameLabel": "Name",
+  "forwardNameHint": "Production database",
+  "forwardHostLabel": "Through host",
+  "forwardListenAddress": "Listen address",
+  "forwardServerAddress": "Address on the server",
+  "forwardDestination": "Destination",
+  "forwardOnServer": "server",
+  "forwardListening": "Listening on {address}, {count, plural, =0{no connections yet} =1{1 connection} other{{count} connections}}",
+  "forwardStopped": "Off",
+  "forwardHostMissing": "Host deleted",
+  "forwardErrorConnect": "Could not connect to the host.",
+  "forwardErrorPort": "The port is taken or not allowed here.",
+  "forwardErrorRefused": "The server refused to listen on that port.",
+  "forwardErrorFailed": "The rule could not start.",
+  "@forwardListening": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }
