@@ -18,6 +18,7 @@ sealed class VaultEntry {
     SnippetEntry.recordType => SnippetEntry.fromJson(id, data),
     GroupEntry.recordType => GroupEntry.fromJson(id, data),
     PreferencesEntry.recordType => PreferencesEntry.fromJson(id, data),
+    ConnectionLogEntry.recordType => ConnectionLogEntry.fromJson(id, data),
     _ => null,
   };
 }
@@ -266,4 +267,67 @@ class PreferencesEntry extends VaultEntry {
 
   static PreferencesEntry fromJson(String id, Map<String, dynamic> d) =>
       PreferencesEntry(terminalTheme: d['terminal_theme'] as String?, fontSize: (d['font_size'] as num?)?.toDouble());
+}
+
+/// One connection, for the history: where, when, from which device, and
+/// how it ended. Encrypted and synced like every record.
+class ConnectionLogEntry extends VaultEntry {
+  const ConnectionLogEntry({
+    required super.id,
+    required this.label,
+    required this.startedAt,
+    this.hostId,
+    this.endedAt,
+    this.device,
+    this.failed = false,
+  });
+
+  static const recordType = 'connection';
+
+  /// The saved host, when the connection came from one.
+  final String? hostId;
+
+  /// user@host:port at the time.
+  final String label;
+  final DateTime startedAt;
+  final DateTime? endedAt;
+
+  /// The device name, when this device has a sync account.
+  final String? device;
+
+  /// The connection did not open, or it ended with an error.
+  final bool failed;
+
+  ConnectionLogEntry ended(DateTime at, {required bool failed}) => ConnectionLogEntry(
+    id: id,
+    label: label,
+    startedAt: startedAt,
+    hostId: hostId,
+    endedAt: at,
+    device: device,
+    failed: failed,
+  );
+
+  @override
+  String get type => recordType;
+
+  @override
+  Map<String, Object?> dataJson() => {
+    'host_id': hostId,
+    'label': label,
+    'started_at': startedAt.toUtc().toIso8601String(),
+    'ended_at': endedAt?.toUtc().toIso8601String(),
+    'device': device,
+    'failed': failed,
+  };
+
+  static ConnectionLogEntry fromJson(String id, Map<String, dynamic> d) => ConnectionLogEntry(
+    id: id,
+    hostId: d['host_id'] as String?,
+    label: d['label'] as String,
+    startedAt: DateTime.parse(d['started_at'] as String),
+    endedAt: d['ended_at'] == null ? null : DateTime.parse(d['ended_at'] as String),
+    device: d['device'] as String?,
+    failed: d['failed'] as bool? ?? false,
+  );
 }

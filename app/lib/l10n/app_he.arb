@@ -221,5 +221,11 @@
   "renameTab": "שינוי שם הטאב",
   "tabNameLabel": "שם הטאב",
   "tabNameHelp": "ריק מחזיר את שם החיבור.",
-  "moreActions": "עוד"
+  "moreActions": "עוד",
+  "historyTitle": "היסטוריה",
+  "historyEmpty": "עוד אין חיבורים.",
+  "recentTitle": "אחרונים",
+  "durationHours": "{hours} שע׳ {minutes} דק׳",
+  "durationMinutes": "{minutes} דק׳",
+  "durationSeconds": "{seconds} שנ׳"
 }

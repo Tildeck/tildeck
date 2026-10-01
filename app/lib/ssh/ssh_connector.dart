@@ -17,6 +17,7 @@ class ConnectionTarget {
     this.passphrase,
     this.startupCommand,
     this.environment = const {},
+    this.hostId,
   });
 
   final String host;
@@ -34,6 +35,9 @@ class ConnectionTarget {
   /// Environment variables requested for the shell.
   final Map<String, String> environment;
 
+  /// The saved host this target came from, for the history.
+  final String? hostId;
+
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
 
   /// The same target with another command to run once the shell opens.
@@ -46,6 +50,7 @@ class ConnectionTarget {
     passphrase: passphrase,
     startupCommand: command,
     environment: environment,
+    hostId: hostId,
   );
 }
 

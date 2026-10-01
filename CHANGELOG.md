@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Connection history across devices, with recent hosts for one-tap reconnecting.
 - Terminal color schemes and font size, kept in step across devices; search in the terminal; renaming a tab.
 - Host tags and search, group settings that hosts inherit (username, key, startup snippet, environment variables), and environment variables per host.
 - Snippets: saved commands to run in a session, on several hosts at once, or when a host's session starts.

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
 import '../ssh/file_browser.dart';
+import '../ssh/history_recorder.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
 import '../terminal/terminal_themes.dart';
@@ -67,6 +68,7 @@ class _SessionsPageState extends State<SessionsPage> {
         _selected = replacing;
       }
     });
+    recordHistory(widget.vault, session);
     session.start(
       widget.connector,
       // The prompt arrives after network round trips; if the page is gone

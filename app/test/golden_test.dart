@@ -29,6 +29,7 @@ import 'package:tildeck/theme.dart';
 import 'package:tildeck/ui/connect_form.dart';
 import 'package:tildeck/ui/files_page.dart';
 import 'package:tildeck/ui/group_editor_page.dart';
+import 'package:tildeck/ui/history_page.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
 import 'package:tildeck/ui/snippets_page.dart';
@@ -508,6 +509,47 @@ void main() {
         find.byType(MaterialApp),
         matchesGoldenFile('goldens/terminal_search_${locale}_${mode.name}.png'),
       );
+    });
+
+    testWidgets('history $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() async {
+        final v = await sampleVault(unlocked: true);
+        final at = DateTime.utc(2026, 9, 30, 9);
+        await v.put(
+          ConnectionLogEntry(
+            id: v.newId(),
+            hostId: 'h1',
+            label: 'deploy@prod-web-01.example.com',
+            startedAt: at,
+            endedAt: at.add(const Duration(hours: 1, minutes: 12)),
+            device: 'Office PC',
+          ),
+        );
+        await v.put(
+          ConnectionLogEntry(
+            id: v.newId(),
+            hostId: 'h2',
+            label: 'postgres@db.internal.example.com:2222',
+            startedAt: at.add(const Duration(hours: 3)),
+            endedAt: at.add(const Duration(hours: 3, minutes: 4)),
+            device: 'Pixel 9',
+          ),
+        );
+        await v.put(
+          ConnectionLogEntry(
+            id: v.newId(),
+            label: 'root@10.0.0.7',
+            startedAt: at.add(const Duration(hours: 5)),
+            endedAt: at.add(const Duration(hours: 5, seconds: 3)),
+            failed: true,
+          ),
+        );
+        return v;
+      }))!;
+      await tester.pumpWidget(screen(locale, mode, HistoryPage(vault: vault, onReconnect: (_) {})));
+      await tester.pumpAndSettle();
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/history_${locale}_${mode.name}.png'));
     });
 
     testWidgets('waiting for approval $locale ${mode.name}', (tester) async {

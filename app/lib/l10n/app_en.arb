@@ -360,5 +360,35 @@
       }
     }
   },
-  "moreActions": "More"
+  "moreActions": "More",
+  "historyTitle": "History",
+  "historyEmpty": "No connections yet.",
+  "recentTitle": "Recent",
+  "durationHours": "{hours} h {minutes} min",
+  "durationMinutes": "{minutes} min",
+  "durationSeconds": "{seconds} s",
+  "@durationHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "@durationSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  }
 }
