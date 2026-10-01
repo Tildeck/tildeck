@@ -33,6 +33,7 @@ import 'package:tildeck/ui/files_page.dart';
 import 'package:tildeck/ui/group_editor_page.dart';
 import 'package:tildeck/ui/history_page.dart';
 import 'package:tildeck/ui/hosts_page.dart';
+import 'package:tildeck/ui/keys_page.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
 import 'package:tildeck/ui/port_forwards_page.dart';
@@ -499,6 +500,37 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('deleteProxy')), findsOneWidget);
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/proxy_editor_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('keys $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() async {
+        final v = await sampleVault(unlocked: true);
+        await v.put(
+          const KeyEntry(
+            id: 'k1',
+            name: 'Laptop Ed25519',
+            privateKey: 'x',
+            keyType: 'ssh-ed25519',
+            fingerprint: 'SHA256:3kDbQ0yq8pZs1m8o5kqf2m5bN7r0A9dEo6wQz1cX4sY',
+            publicKey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ laptop',
+          ),
+        );
+        await v.put(
+          const KeyEntry(
+            id: 'k2',
+            name: 'Old servers',
+            privateKey: 'x',
+            keyType: 'ssh-rsa',
+            fingerprint: 'SHA256:Vt9QwLr2bH6cN1xZs0pK4yF8mE3uJ7aG5dR2oW9nT1k',
+            publicKey: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ old',
+          ),
+        );
+        return v;
+      }))!;
+      await tester.pumpWidget(screen(locale, mode, KeysPage(vault: vault)));
+      await tester.pumpAndSettle();
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/keys_${locale}_${mode.name}.png'));
     });
 
     testWidgets('telnet host $locale ${mode.name}', (tester) async {
