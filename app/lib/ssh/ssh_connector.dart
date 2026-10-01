@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dartssh2/dartssh2.dart';
 
 import '../local/local_shell.dart';
+import 'certificates.dart';
 import 'known_hosts.dart';
 import 'proxy.dart';
 
@@ -19,6 +20,7 @@ class ConnectionTarget {
     this.password,
     this.privateKey,
     this.passphrase,
+    this.certificate,
     this.startupCommand,
     this.environment = const {},
     this.hostId,
@@ -42,6 +44,9 @@ class ConnectionTarget {
   /// A private key in PEM or OpenSSH format.
   final String? privateKey;
   final String? passphrase;
+
+  /// An OpenSSH certificate for [privateKey]: signs in with it first.
+  final String? certificate;
 
   /// Sent to the shell once it opens: a startup snippet.
   final String? startupCommand;
@@ -87,6 +92,7 @@ class ConnectionTarget {
     password: password,
     privateKey: privateKey,
     passphrase: passphrase,
+    certificate: certificate,
     startupCommand: command,
     environment: environment,
     hostId: hostId,
@@ -214,7 +220,7 @@ class SshConnector {
   Future<SSHClient> _handshake(
     ConnectionTarget target,
     HostKeyPrompt promptHostKey,
-    List<SSHKeyPair>? identities,
+    List<SSHIdentity>? identities,
     SSHSocket socket,
   ) async {
     var hostKeyRejected = false;
@@ -274,7 +280,16 @@ class SshConnector {
     }
   }
 
-  static List<SSHKeyPair>? _identities(ConnectionTarget target) {
+  /// The key, after its certificate when it has one: a server that does
+  /// not trust the certificate's authority may still accept the key.
+  static List<SSHIdentity>? _identities(ConnectionTarget target) {
+    final pairs = _keyPairs(target);
+    if (pairs == null) return null;
+    final certificate = target.certificate == null ? null : readCertificate(target.certificate!);
+    return [if (certificate != null) certificateIdentity(certificate, pairs.first), ...pairs];
+  }
+
+  static List<SSHKeyPair>? _keyPairs(ConnectionTarget target) {
     final key = target.privateKey?.trim();
     if (key == null || key.isEmpty) return null;
     final passphrase = (target.passphrase?.isEmpty ?? true) ? null : target.passphrase;

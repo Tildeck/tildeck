@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:dartssh2/dartssh2.dart' show SSHClient;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart' show DateFormat;
 
 import '../l10n/app_localizations.dart';
+import '../ssh/certificates.dart';
 import '../ssh/keys.dart';
 import '../ssh/local_files.dart';
 import '../ssh/ssh_connector.dart';
@@ -136,6 +138,38 @@ class _KeysPageState extends State<KeysPage> {
     return name.isEmpty ? 'id_$kind' : 'id_${kind}_$name';
   }
 
+  /// [details] and, under them, what the key's certificate allows.
+  Widget _withCertificate(BuildContext context, KeyEntry key, Widget details) {
+    final certificate = key.certificate == null ? null : readCertificate(key.certificate!);
+    if (certificate == null) return details;
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    // With the year: an expiry date without one is ambiguous.
+    final date = DateFormat.yMMMd(Localizations.localeOf(context).toLanguageTag()).format;
+    // Usernames keep their own order inside a Hebrew sentence.
+    final principals = certificate.principals.isEmpty
+        ? t.certificateAnyUser
+        : '\u2066${certificate.principals.join(', ')}\u2069';
+    final expired = certificate.expiredAt(DateTime.now());
+    final text = expired
+        ? t.certificateExpired(date(certificate.validBefore!.toLocal()))
+        : certificate.validBefore == null
+        ? t.certificateForever(principals)
+        : t.certificateValid(principals, date(certificate.validBefore!.toLocal()));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        details,
+        const SizedBox(height: 2),
+        Text(
+          text,
+          key: ValueKey('certificate-${key.name}'),
+          style: TextStyle(fontSize: 12, color: expired ? c.danger : c.success),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -170,14 +204,18 @@ class _KeysPageState extends State<KeysPage> {
                       title: Text(key.name),
                       subtitle: info == null
                           ? Text(t.keyUnreadable, style: TextStyle(color: c.danger))
-                          : Text(
-                              // The whole fingerprint: it is what is compared.
-                              '${info.type}\n${info.fingerprint}',
-                              textDirection: TextDirection.ltr,
-                              textAlign: Directionality.of(context) == TextDirection.rtl
-                                  ? TextAlign.right
-                                  : TextAlign.left,
-                              style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11.5, height: 1.4),
+                          : _withCertificate(
+                              context,
+                              key,
+                              Text(
+                                // The whole fingerprint: it is what is compared.
+                                '${info.type}\n${info.fingerprint}',
+                                textDirection: TextDirection.ltr,
+                                textAlign: Directionality.of(context) == TextDirection.rtl
+                                    ? TextAlign.right
+                                    : TextAlign.left,
+                                style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11.5, height: 1.4),
+                              ),
                             ),
                       trailing: PopupMenuButton<String>(
                         key: ValueKey('keyMenu-${key.name}'),
@@ -190,6 +228,13 @@ class _KeysPageState extends State<KeysPage> {
                               await _install(key, info!);
                             case 'export':
                               await _export(key);
+                            case 'certificate':
+                              await showDialog<void>(
+                                context: context,
+                                builder: (_) => _AddCertificate(vault: vault, keyEntry: key, files: widget.files),
+                              );
+                            case 'removeCertificate':
+                              await vault.put(key.withCertificate(null));
                             case 'delete':
                               if (vault.hosts.any((h) => h.keyId == key.id) ||
                                   vault.groups.any((g) => g.keyId == key.id)) {
@@ -213,6 +258,18 @@ class _KeysPageState extends State<KeysPage> {
                                 child: Text(t.installKey),
                               ),
                             PopupMenuItem(key: const ValueKey('exportKey'), value: 'export', child: Text(t.exportKey)),
+                            if (key.certificate == null)
+                              PopupMenuItem(
+                                key: const ValueKey('addCertificate'),
+                                value: 'certificate',
+                                child: Text(t.addCertificate),
+                              )
+                            else
+                              PopupMenuItem(
+                                key: const ValueKey('removeCertificate'),
+                                value: 'removeCertificate',
+                                child: Text(t.removeCertificate),
+                              ),
                           ],
                           PopupMenuItem(value: 'delete', child: Text(t.deleteAction)),
                         ],
@@ -588,6 +645,106 @@ class _InstallKeyState extends State<_InstallKey> {
               ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
               : Text(t.installKeyButton),
         ),
+      ],
+    );
+  }
+}
+
+/// Adds an OpenSSH certificate to a key, pasted or from its -cert.pub file.
+class _AddCertificate extends StatefulWidget {
+  const _AddCertificate({required this.vault, required this.keyEntry, required this.files});
+
+  final Vault vault;
+  final KeyEntry keyEntry;
+  final LocalFiles files;
+
+  @override
+  State<_AddCertificate> createState() => _AddCertificateState();
+}
+
+class _AddCertificateState extends State<_AddCertificate> {
+  final _text = TextEditingController();
+  String? _problem;
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fromFile() async {
+    final picked = await widget.files.pickToUpload();
+    if (picked.isEmpty) return;
+    final text = await utf8.decoder.bind(picked.first.read()).join();
+    setState(() {
+      _text.text = text.trim();
+      _problem = null;
+    });
+  }
+
+  Future<void> _save() async {
+    final t = AppLocalizations.of(context);
+    final key = widget.keyEntry;
+    final certificate = readCertificate(_text.text);
+    if (certificate == null) {
+      setState(() => _problem = t.certificateUnreadable);
+      return;
+    }
+    if (!certificateMatches(certificate, key.privateKey, passphrase: key.passphrase)) {
+      setState(() => _problem = t.certificateOtherKey);
+      return;
+    }
+    await widget.vault.put(key.withCertificate(_text.text.trim()));
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    return AlertDialog(
+      title: Text(t.addCertificate),
+      content: SizedBox(
+        width: 480,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t.certificateHelp, style: TextStyle(color: c.muted, height: 1.4)),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('certificateText'),
+              controller: _text,
+              minLines: 3,
+              maxLines: 6,
+              textDirection: TextDirection.ltr,
+              autocorrect: false,
+              enableSuggestions: false,
+              style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12),
+              onChanged: (_) => setState(() => _problem = null),
+              decoration: InputDecoration(labelText: t.certificateLabel, alignLabelWithHint: true),
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                key: const ValueKey('certificateFromFile'),
+                icon: const Icon(Icons.folder_open_outlined),
+                label: Text(t.keyFromFile),
+                onPressed: _fromFile,
+              ),
+            ),
+            if (_problem != null)
+              Text(
+                _problem!,
+                key: const ValueKey('certificateProblem'),
+                style: TextStyle(color: c.danger),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
+        FilledButton(key: const ValueKey('saveCertificate'), onPressed: _save, child: Text(t.save)),
       ],
     );
   }

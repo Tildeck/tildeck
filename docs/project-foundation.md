@@ -311,7 +311,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 |---|---|---|
 | 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
 | 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Done: port forwarding, jump hosts, agent forwarding, proxies, Telnet, and a local terminal on the desktop |
-| 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Key generation, import, and export done; SSH certificates, two-factor sign-in, and biometric unlock next |
+| 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Key generation, import, export, and SSH certificates done; two-factor sign-in and biometric unlock next |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
 | Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
 | Not now | Teams: shared and multiple vaults, access control, shared session logs (Shlomi, 2026-10-01: not now, maybe later) | Deferred |
@@ -416,6 +416,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The host editor can generate a key as well as import one.
 - The public key's comment is reduced to characters that need no shell quoting, and the install command refuses a line with quotes or line breaks.
 - Tests: generation, reading, fingerprints, export with and without a passphrase, refusing what is not a key, and the install command's quoting. On the Keys page: generate, copy the public key, export with a passphrase, and import from a file that needs its passphrase. Against the OpenSSH container, for Ed25519 and RSA 4096: the new key refused before, installed with the password (twice, kept once), then signing in alone; `ssh-keygen -lf` showing the same fingerprint; and `ssh-keygen -y` opening the exported file with its passphrase and refusing a wrong one.
+
+### SSH certificates (2026-10-02)
+
+- A key may carry an OpenSSH user certificate (its `-cert.pub` line), added from the key's menu by pasting it or from the file. A certificate that is not a user certificate, or is for another key, is refused when it is added.
+- When the key signs in, the certificate is offered first and the bare key after it, so a server that does not trust the certificate's authority may still accept the key. The certificate's algorithm follows the key's signature (an RSA key, which signs with rsa-sha2-256, offers rsa-sha2-256-cert-v01).
+- The Keys page shows who a certificate is for and until when, and marks an expired one.
+- The test server now trusts a test authority whose key the account can sign with, and turns off OpenSSH's penalties for failed sign-ins (the tests fail some on purpose, all from one address).
+- Tests: reading certificates (principals, validity, the certified key, refusing host certificates and broken ones). On the Keys page: a certificate for another key refused, the key's own kept and shown. Against the OpenSSH container, for Ed25519 and RSA 4096: a key in no authorized_keys refused alone and signing in with its certificate; a certificate for another user, and an expired one, refused.
 
 ## Required workflow contracts
 

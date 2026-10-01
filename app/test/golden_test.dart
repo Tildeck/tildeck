@@ -46,6 +46,7 @@ import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 import 'package:xterm/xterm.dart' show TerminalView;
 
+import 'fake_certificates.dart';
 import 'fake_sync_server.dart';
 
 Future<void> loadFonts() async {
@@ -118,6 +119,13 @@ TerminalSession sampleSession() {
   );
   return session;
 }
+
+/// A certificate for deploy and root, valid until the start of 2030.
+final sampleCertificate = certificateFor(
+  'ssh-ed25519 ${base64.encode([0, 0, 0, 11, ...'ssh-ed25519'.codeUnits, 0, 0, 0, 32, ...List.filled(32, 1)])}',
+  principals: ['deploy', 'root'],
+  before: 1893456000,
+);
 
 /// A vault with sample hosts in two groups, unlocked or locked.
 Future<Vault> sampleVault({required bool unlocked}) async {
@@ -507,13 +515,14 @@ void main() {
       final vault = (await tester.runAsync(() async {
         final v = await sampleVault(unlocked: true);
         await v.put(
-          const KeyEntry(
+          KeyEntry(
             id: 'k1',
             name: 'Laptop Ed25519',
             privateKey: 'x',
             keyType: 'ssh-ed25519',
             fingerprint: 'SHA256:3kDbQ0yq8pZs1m8o5kqf2m5bN7r0A9dEo6wQz1cX4sY',
             publicKey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ laptop',
+            certificate: sampleCertificate,
           ),
         );
         await v.put(

@@ -14,6 +14,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'fake_certificates.dart';
+
 /// Files in a temporary folder, and one file to pick for import.
 class TempFiles implements LocalFiles {
   TempFiles(this.dir, {this.toPick});
@@ -126,5 +128,23 @@ void main() {
     final imported = vault.entry<KeyEntry>(vault.keys.firstWhere((k) => k.name == 'id_ed25519_work').id)!;
     expect(imported.fingerprint, readKey(other)!.fingerprint);
     expect(imported.passphrase, 'pp');
+
+    // A certificate for another key is refused; the key's own is kept and shown.
+    await tester.tap(find.byKey(const ValueKey('keyMenu-Laptop')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('addCertificate')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('certificateText')), certificateFor(readKey(other)!.publicKey));
+    await tester.tap(find.byKey(const ValueKey('saveCertificate')));
+    await tester.pumpAndSettle();
+    expect(find.text('This certificate is for a different key.'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('certificateText')), certificateFor(key.publicKey!));
+    await tester.tap(find.byKey(const ValueKey('saveCertificate')));
+    await waitFor(tester, () => find.byKey(const ValueKey('saveCertificate')).evaluate().isEmpty);
+    expect(vault.entry<KeyEntry>(key.id)!.certificate, isNotNull);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('certificate-Laptop'))).data,
+      'Certificate for \u2066deploy\u2069, no end date',
+    );
   });
 }
