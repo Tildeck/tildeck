@@ -88,6 +88,64 @@ void main() {
       await browser.open('/root');
       expect(browser.problem, FileProblem.denied);
     });
+
+    test('rename, permissions, hidden files, sorting, going to a path, and deleting a folder tree', () async {
+      // A tree made by the shell: a folder inside, a hidden file, a link.
+      await client.run(
+        'mkdir -p ~/$folder/tree/inner && printf 12345 > ~/$folder/big.txt && printf 1 > ~/$folder/a.txt && '
+        'printf x > ~/$folder/tree/inner/deep.txt && touch ~/$folder/.hidden && '
+        'ln -s ~/$folder/tree ~/$folder/link-to-tree && touch -d 2020-01-01 ~/$folder/a.txt',
+      );
+      final browser = FileBrowser(client.sftp);
+      addTearDown(browser.dispose);
+      await browser.start();
+      await browser.goTo(folder);
+      expect(browser.problem, isNull);
+      expect(browser.path, endsWith('/$folder'));
+
+      List<String> names() => browser.entries.map((e) => e.name).toList();
+      expect(names(), ['link-to-tree', 'tree', 'a.txt', 'big.txt'], reason: 'folders first; dotfiles hidden');
+      browser.setShowHidden(true);
+      expect(names(), contains('.hidden'));
+      browser.setShowHidden(false);
+      browser.setSortBy(SortBy.size);
+      expect(names().sublist(2), ['big.txt', 'a.txt'], reason: 'largest first');
+      browser.setSortBy(SortBy.modified);
+      expect(names().last, 'a.txt', reason: 'oldest last');
+
+      RemoteEntry entry(String name) => browser.entries.firstWhere((e) => e.name == name);
+      await browser.rename(entry('a.txt'), 'b.txt');
+      expect(names(), contains('b.txt'));
+      await browser.rename(entry('b.txt'), 'big.txt');
+      expect(browser.problem, FileProblem.exists, reason: 'a rename never replaces another file');
+      await browser.rename(entry('b.txt'), '../escape.txt');
+      expect(browser.problem, FileProblem.failed, reason: 'a name, not a path');
+
+      await browser.setPermissions(entry('big.txt'), 0x1c0); // 0700
+      expect(entry('big.txt').permissions, 0x1c0);
+      expect(permissionString(entry('big.txt').permissions!), 'rwx------');
+      expect((await client.run('stat -c %a ~/$folder/big.txt').then(utf8.decode)).trim(), '700');
+
+      // Deleting the link removes the link, not what it points to.
+      await browser.delete(entry('link-to-tree'));
+      expect(names(), isNot(contains('link-to-tree')));
+      expect((await client.run('cat ~/$folder/tree/inner/deep.txt').then(utf8.decode)), 'x');
+
+      await browser.delete(entry('tree'));
+      expect(browser.problem, isNull);
+      expect(names(), ['big.txt', 'b.txt'], reason: 'still by date: the renamed file kept its old one');
+      expect((await client.run('ls -A ~/$folder').then(utf8.decode)).split('\n').where((l) => l.isNotEmpty).toSet(), {
+        '.hidden',
+        'b.txt',
+        'big.txt',
+      });
+    });
+  });
+
+  test('permissions read as ls shows them', () {
+    expect(permissionString(0x1ed), 'rwxr-xr-x'); // 0755
+    expect(permissionString(0x1a4), 'rw-r--r--'); // 0644
+    expect(permissionString(0), '---------');
   });
 
   test('remote paths are POSIX on every platform', () {

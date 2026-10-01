@@ -198,6 +198,7 @@ class SampleBrowser extends FileBrowser {
         isLink: false,
         size: 48213,
         modified: at,
+        permissions: 0x1a4,
       ),
       RemoteEntry(
         name: 'app-v1.4.2.tar.gz',
@@ -206,6 +207,7 @@ class SampleBrowser extends FileBrowser {
         isLink: false,
         size: 18874368,
         modified: at,
+        permissions: 0x1ed,
       ),
     ];
     transfers

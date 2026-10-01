@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 
+import 'ssh_connector.dart' show ConnectException, ConnectProblem;
+
 /// Why a file operation failed. Each maps to a localized message.
 enum FileProblem { noSftp, denied, notFound, exists, failed, disconnected }
 
@@ -21,6 +23,7 @@ class RemoteEntry {
     required this.isLink,
     this.size,
     this.modified,
+    this.permissions,
   });
 
   final String name;
@@ -29,6 +32,23 @@ class RemoteEntry {
   final bool isLink;
   final int? size;
   final DateTime? modified;
+
+  /// The permission bits (0o755 and the like), when the server says.
+  final int? permissions;
+
+  bool get isHidden => name.startsWith('.');
+}
+
+enum SortBy { name, size, modified }
+
+/// Permission bits as ls shows them: rwxr-xr-x.
+String permissionString(int mode) {
+  const letters = 'rwxrwxrwx';
+  final out = StringBuffer();
+  for (var i = 0; i < 9; i++) {
+    out.write(mode & (1 << (8 - i)) != 0 ? letters[i] : '-');
+  }
+  return out.toString();
 }
 
 enum TransferDirection { upload, download }
@@ -62,16 +82,35 @@ String parentOf(String path) {
 /// Browses the files of an SSH server over SFTP on an open connection, and
 /// moves files to and from it. Folders come first, then files, by name.
 class FileBrowser extends ChangeNotifier {
-  FileBrowser(this._open);
+  FileBrowser(this._open, {this.onClose});
 
   /// Opens the SFTP channel on the session's connection.
   final Future<SftpClient> Function() _open;
   SftpClient? _sftp;
 
+  /// Called when the browser is done: closes a connection opened for it
+  /// alone.
+  final VoidCallback? onClose;
+
   String? path;
-  List<RemoteEntry> entries = const [];
+
+  /// Everything in the folder, hidden or not, in the order chosen.
+  List<RemoteEntry> _all = const [];
+
+  /// What is shown: dotfiles only when asked for.
+  List<RemoteEntry> get entries => showHidden ? _all : _all.where((e) => !e.isHidden).toList();
+
+  /// For a browser that lists by itself, such as a test's.
+  @protected
+  set entries(List<RemoteEntry> list) => _all = _sorted(list);
+
+  bool showHidden = false;
+  SortBy sortBy = SortBy.name;
   bool loading = false;
   FileProblem? problem;
+
+  /// Why the connection for a browser of its own could not be made.
+  ConnectProblem? connectProblem;
   final transfers = <Transfer>[];
   bool _disposed = false;
 
@@ -105,6 +144,7 @@ class FileBrowser extends ChangeNotifier {
             isLink: true,
             size: target.size,
             modified: entry.modified,
+            permissions: entry.permissions,
           );
         } on SftpStatusError {
           // A broken link stays a file that cannot be downloaded.
@@ -112,13 +152,73 @@ class FileBrowser extends ChangeNotifier {
       }
       list.add(entry);
     }
-    list.sort((a, b) {
-      if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
     path = folder;
-    entries = list;
+    _all = _sorted(list);
   }
+
+  /// Folders first, then by the chosen order; newest and largest first.
+  List<RemoteEntry> _sorted(List<RemoteEntry> list) {
+    int byName(RemoteEntry a, RemoteEntry b) => a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    return [...list]..sort((a, b) {
+      if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
+      final order = switch (sortBy) {
+        SortBy.name => 0,
+        SortBy.size => (b.size ?? 0).compareTo(a.size ?? 0),
+        SortBy.modified => (b.modified ?? DateTime(0)).compareTo(a.modified ?? DateTime(0)),
+      };
+      return order != 0 ? order : byName(a, b);
+    });
+  }
+
+  void setShowHidden(bool value) {
+    showHidden = value;
+    _changed();
+  }
+
+  void setSortBy(SortBy value) {
+    sortBy = value;
+    _all = _sorted(_all);
+    _changed();
+  }
+
+  /// Opens a folder typed by the user; relative to the current one.
+  Future<void> goTo(String typed) {
+    final trimmed = typed.trim();
+    final target = trimmed.startsWith('/') ? trimmed : joinRemote(path ?? '/', trimmed);
+    return open(target.length > 1 && target.endsWith('/') ? target.substring(0, target.length - 1) : target);
+  }
+
+  /// Renames [entry] in its folder, never over another entry.
+  Future<void> rename(RemoteEntry entry, String name) => _guard(() async {
+    final target = joinRemote(parentOf(entry.path), _safeName(name));
+    if (target == entry.path) return;
+    if (await _exists(target)) throw const FileProblemException(FileProblem.exists);
+    await _sftp!.rename(entry.path, target);
+    await _list(path!);
+  });
+
+  /// Deletes [entry]; a folder with everything in it. Links are removed,
+  /// never followed.
+  Future<void> delete(RemoteEntry entry) => _guard(() async {
+    await _remove(entry.path, isDirectory: entry.isDirectory && !entry.isLink);
+    await _list(path!);
+  });
+
+  Future<void> _remove(String target, {required bool isDirectory}) async {
+    if (!isDirectory) return _sftp!.remove(target);
+    for (final n in await _sftp!.listdir(target)) {
+      if (n.filename == '.' || n.filename == '..') continue;
+      final type = n.attr.mode?.type;
+      await _remove(joinRemote(target, n.filename), isDirectory: type == SftpFileType.directory);
+    }
+    await _sftp!.rmdir(target);
+  }
+
+  /// Sets the permission bits of [entry].
+  Future<void> setPermissions(RemoteEntry entry, int mode) => _guard(() async {
+    await _sftp!.setStat(entry.path, SftpFileAttrs(mode: SftpFileMode.value(mode & 0x1ff)));
+    await _list(path!);
+  });
 
   static RemoteEntry _entry(String folder, SftpName n) {
     final type = n.attr.mode?.type;
@@ -130,6 +230,7 @@ class FileBrowser extends ChangeNotifier {
       isLink: type == SftpFileType.symbolicLink,
       size: n.attr.size,
       modified: mtime == null ? null : DateTime.fromMillisecondsSinceEpoch(mtime * 1000),
+      permissions: n.attr.mode == null ? null : n.attr.mode!.value & 0x1ff,
     );
   }
 
@@ -235,9 +336,13 @@ class FileBrowser extends ChangeNotifier {
   Future<void> _guard(Future<void> Function() action) async {
     loading = true;
     problem = null;
+    connectProblem = null;
     _changed();
     try {
       await action();
+    } on ConnectException catch (e) {
+      connectProblem = e.problem;
+      problem = FileProblem.disconnected;
     } catch (e) {
       problem = _problemOf(e);
     } finally {
@@ -265,6 +370,7 @@ class FileBrowser extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _sftp?.close();
+    onClose?.call();
     super.dispose();
   }
 }
