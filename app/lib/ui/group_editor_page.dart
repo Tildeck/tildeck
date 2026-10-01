@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
+import 'proxy_editor.dart';
 
 /// Settings every host in a group inherits when it leaves them empty: the
 /// username, the key, environment variables, and a startup snippet.
@@ -27,6 +28,7 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
   late String? _keyId = _existing?.keyId;
   late String? _snippetId = _existing?.startupSnippetId;
   late String? _jumpHostId = _existing?.jumpHostId;
+  late String? _proxyId = _existing?.proxyId;
 
   @override
   void dispose() {
@@ -47,6 +49,7 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
         startupSnippetId: _snippetId,
         env: parseEnv(_env.text) ?? const {},
         jumpHostId: _jumpHostId,
+        proxyId: _proxyId,
       ),
     );
     if (mounted) Navigator.pop(context);
@@ -68,6 +71,7 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
     if (_snippetId != null && snippets.every((s) => s.id != _snippetId)) _snippetId = null;
     final hosts = widget.vault.hosts;
     if (_jumpHostId != null && hosts.every((h) => h.id != _jumpHostId)) _jumpHostId = null;
+    if (_proxyId != null && widget.vault.entry<ProxyEntry>(_proxyId) == null) _proxyId = null;
 
     return Scaffold(
       // The name keeps its own direction inside a Hebrew title (first-strong
@@ -130,6 +134,8 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
                   ],
                   onChanged: (v) => setState(() => _jumpHostId = v),
                 ),
+                const SizedBox(height: 14),
+                ProxyField(vault: widget.vault, value: _proxyId, onChanged: (v) => setState(() => _proxyId = v)),
                 const SizedBox(height: 14),
                 TextFormField(
                   key: const ValueKey('groupEnv'),

@@ -9,6 +9,7 @@ import 'connect_form.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
 import 'snippets_page.dart';
+import 'proxy_editor.dart';
 
 /// The home tab: saved hosts by group, and the ways to add one or connect
 /// without saving.
@@ -54,6 +55,7 @@ Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault,
       privateKey: target.privateKey,
       passphrase: target.passphrase,
       jump: jump,
+      proxy: target.proxy,
     );
   }
   if (!context.mounted) return null;
@@ -95,6 +97,8 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
     agentKeys: host.agentForwarding
         ? [for (final k in vault.keys) (privateKey: k.privateKey, passphrase: k.passphrase)]
         : null,
+    // Only the hop that connects directly uses it; the connector decides.
+    proxy: vault.entry<ProxyEntry>(host.proxyId ?? group?.proxyId)?.config,
   );
 }
 
@@ -472,6 +476,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late final _env = TextEditingController(text: formatEnv(widget.host?.env ?? const {}));
   late String? _jumpHostId = widget.host?.jumpHostId;
   late bool _agentForwarding = widget.host?.agentForwarding ?? false;
+  late String? _proxyId = widget.host?.proxyId;
 
   @override
   void dispose() {
@@ -502,6 +507,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
         env: parseEnv(_env.text) ?? const {},
         jumpHostId: _jumpHostId,
         agentForwarding: _agentForwarding,
+        proxyId: _proxyId,
       ),
     );
     if (mounted) Navigator.pop(context);
@@ -529,6 +535,8 @@ class _HostEditorPageState extends State<HostEditorPage> {
           // Settings the group provides may be left empty here.
           final group = widget.vault.groupNamed(_group.text);
           final groupJump = widget.vault.entry<HostEntry>(group?.jumpHostId);
+          if (_proxyId != null && widget.vault.entry<ProxyEntry>(_proxyId) == null) _proxyId = null;
+          final groupProxy = widget.vault.entry<ProxyEntry>(group?.proxyId);
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
@@ -664,6 +672,13 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         for (final h in jumps) DropdownMenuItem(value: h.id, child: Text(h.name)),
                       ],
                       onChanged: (v) => setState(() => _jumpHostId = v),
+                    ),
+                    const SizedBox(height: 14),
+                    ProxyField(
+                      vault: widget.vault,
+                      value: _proxyId,
+                      helperText: _proxyId == null && groupProxy != null ? t.fromGroup(groupProxy.name) : null,
+                      onChanged: (v) => setState(() => _proxyId = v),
                     ),
                     const SizedBox(height: 6),
                     SwitchListTile(

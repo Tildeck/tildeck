@@ -310,7 +310,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 | Stage | Scope | Status |
 |---|---|---|
 | 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
-| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding, jump hosts, and agent forwarding done |
+| 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Port forwarding, jump hosts, agent forwarding, and proxies done |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
 | Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
@@ -382,6 +382,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Only the host that asks for it gets the agent, not its jump hosts.
 - Session requests are pipelined, as ssh(1) sends them: a refused environment variable, agent forwarding, or pty is skipped, and only a refused shell or command fails the session. Before this, a variable outside the server's AcceptEnv failed the whole session.
 - Tests: the agent offered only when chosen; a refused environment variable no longer stops the shell (fails on the old behavior). Against the OpenSSH container, which now allows agent forwarding: the server signs in to itself with nothing but the forwarded key, and without the switch it has no agent and cannot.
+
+### Proxies (2026-10-01)
+
+- A proxy is a vault record (`proxy`): SOCKS5 or HTTP CONNECT, with a username and password only if it asks for them. A host or a group chooses one from the host or group editor, which also adds and edits proxies; a host's own choice wins.
+- The proxy is used by the hop that connects directly. Through jump hosts, that is the first one: the proxy carries the connection to it, and the rest goes inside SSH.
+- The target's name goes to the proxy unresolved (SOCKS5 by name, HTTP CONNECT by authority), so names only the proxy can resolve work.
+- Failures name the proxy when it is the proxy: unreachable, or a refused or missing password. A target the proxy cannot reach is reported as the target being unreachable.
+- Tests: both protocols against small proxies in the test, with and without a password: relaying both ways including bytes that arrive with the handshake, a wrong or missing password, a target the proxy cannot reach, a proxy that is not there. Against the OpenSSH container: SSH through each kind with a password, a refused proxy password named, and the proxy used only for the first hop through a jump host. A proxy added from the host editor, chosen, and used to connect.
 
 ## Required workflow contracts
 

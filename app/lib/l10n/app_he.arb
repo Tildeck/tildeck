@@ -265,5 +265,11 @@
   "viaHost": "דרך ⁨{name}⁩",
   "errConnVia": "ב-⁨{host}⁩: {message}",
   "agentForwarding": "Agent forwarding",
-  "agentForwardingHelp": "מאפשר לשרת הזה להתחבר הלאה עם המפתחות שבכספת בזמן החיבור, כמו ⁦ssh -A⁩. המפתחות נשארים במכשיר, אבל כל מי שיש לו root בשרת יכול להשתמש בהם בינתיים: כדאי להפעיל רק לשרתים שסומכים עליהם."
+  "agentForwardingHelp": "מאפשר לשרת הזה להתחבר הלאה עם המפתחות שבכספת בזמן החיבור, כמו ⁦ssh -A⁩. המפתחות נשארים במכשיר, אבל כל מי שיש לו root בשרת יכול להשתמש בהם בינתיים: כדאי להפעיל רק לשרתים שסומכים עליהם.",
+  "proxyLabel": "Proxy",
+  "noProxy": "בלי proxy",
+  "addProxy": "Proxy חדש",
+  "editProxy": "עריכת proxy",
+  "proxyNameHint": "Proxy של המשרד",
+  "proxyCredentialsHelp": "שם משתמש וסיסמה רק אם ה-proxy דורש אותם. הם נשמרים בכספת."
 }

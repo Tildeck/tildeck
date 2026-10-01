@@ -20,6 +20,7 @@ import 'package:tildeck/server_check.dart';
 import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/ssh/file_browser.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
+import 'package:tildeck/ssh/proxy.dart';
 import 'package:tildeck/ssh/port_forwarding.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/ssh/terminal_session.dart';
@@ -463,7 +464,25 @@ void main() {
       final vault = (await tester.runAsync(() async {
         final v = await sampleVault(unlocked: true);
         await v.put(
-          const GroupEntry(id: 'g1', name: 'Production', username: 'deploy', keyId: 'k1', env: {'LANG': 'en_US.UTF-8'}),
+          const GroupEntry(
+            id: 'g1',
+            name: 'Production',
+            username: 'deploy',
+            keyId: 'k1',
+            env: {'LANG': 'en_US.UTF-8'},
+            proxyId: 'p1',
+          ),
+        );
+        await v.put(
+          const ProxyEntry(
+            id: 'p1',
+            name: 'Office proxy',
+            kind: ProxyKind.http,
+            host: 'proxy.office.example.com',
+            port: 3128,
+            username: 'shlomi',
+            password: 'x',
+          ),
         );
         return v;
       }))!;
@@ -473,6 +492,12 @@ void main() {
         find.byType(MaterialApp),
         matchesGoldenFile('goldens/group_settings_${locale}_${mode.name}.png'),
       );
+
+      // The chosen proxy, open for editing.
+      await tester.tap(find.byKey(const ValueKey('editProxy')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('deleteProxy')), findsOneWidget);
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/proxy_editor_${locale}_${mode.name}.png'));
     });
 
     testWidgets('terminal appearance $locale ${mode.name}', (tester) async {

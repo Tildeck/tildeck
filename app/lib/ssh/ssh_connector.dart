@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dartssh2/dartssh2.dart';
 
 import 'known_hosts.dart';
+import 'proxy.dart';
 
 /// Where to connect and how to authenticate.
 class ConnectionTarget {
@@ -20,6 +21,7 @@ class ConnectionTarget {
     this.hostId,
     this.jump,
     this.agentKeys,
+    this.proxy,
   });
 
   final String host;
@@ -48,6 +50,10 @@ class ConnectionTarget {
   /// off. Keys that cannot be read (a passphrase not saved) are left out.
   final List<({String privateKey, String? passphrase})>? agentKeys;
 
+  /// The proxy to connect through, used only when this target is connected
+  /// to directly; through a jump host, the jump host's own setting counts.
+  final ProxyConfig? proxy;
+
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
 
   /// The same target with another command to run once the shell opens.
@@ -63,6 +69,7 @@ class ConnectionTarget {
     hostId: hostId,
     jump: jump,
     agentKeys: agentKeys,
+    proxy: proxy,
   );
 }
 
@@ -131,10 +138,21 @@ class SshConnector {
     final identities = _identities(target);
 
     final SSHSocket socket;
+    final proxy = target.proxy;
     try {
-      socket = via == null
-          ? await SSHSocket.connect(target.host, target.port, timeout: timeout)
-          : await via.forwardLocal(target.host, target.port).timeout(timeout);
+      socket = via != null
+          ? await via.forwardLocal(target.host, target.port).timeout(timeout)
+          : proxy != null
+          ? await connectThroughProxy(proxy, target.host, target.port, timeout: timeout)
+          : await SSHSocket.connect(target.host, target.port, timeout: timeout);
+    } on ProxyException catch (e) {
+      throw switch (e.problem) {
+        ProxyProblem.unreachable => ConnectException(ConnectProblem.unreachable, e.detail, proxy!.label),
+        ProxyProblem.authFailed => ConnectException(ConnectProblem.authFailed, e.detail, proxy!.label),
+        ProxyProblem.protocol => ConnectException(ConnectProblem.disconnected, e.detail, proxy!.label),
+        // The proxy is fine; the target is what it could not reach.
+        ProxyProblem.targetFailed => ConnectException(ConnectProblem.unreachable, e.detail),
+      };
     } on TimeoutException {
       throw const ConnectException(ConnectProblem.timeout);
     } on SocketException catch (e) {
