@@ -247,5 +247,38 @@
   "recoveryKeyLabel": "Recovery key",
   "recoverButton": "Set new password",
   "errorInvalidRecoveryKey": "That recovery key has a typo. Check it character by character.",
-  "errorRecoveryFailed": "The email or the recovery key is not right."
+  "errorRecoveryFailed": "The email or the recovery key is not right.",
+  "filesTitle": "Files",
+  "refresh": "Refresh",
+  "newFolder": "New folder",
+  "upload": "Upload",
+  "parentFolder": "Parent folder",
+  "folderEmpty": "This folder is empty.",
+  "transfersTitle": "Transfers",
+  "clearFinished": "Clear finished",
+  "transferDone": "Done",
+  "fileSaved": "Saved to {location}",
+  "folderCreated": "Folder {name} created",
+  "folderNameLabel": "Folder name",
+  "create": "Create",
+  "fileErrorNoSftp": "This server does not offer file transfer (SFTP).",
+  "fileErrorDenied": "The server refused: no permission here.",
+  "fileErrorNotFound": "It is no longer there. Refresh the folder.",
+  "fileErrorExists": "Something with this name is already here. Nothing was replaced.",
+  "fileErrorDisconnected": "The connection closed. Reconnect the session and open the files again.",
+  "fileErrorFailed": "The server could not do that.",
+  "@fileSaved": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+  "@folderCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
 }

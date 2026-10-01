@@ -235,7 +235,7 @@ Approved by Shlomi on 2026-09-30: the working version is the full first-release 
 | 4 | Accounts and email | Done on the server; the client uses it in step 5 | Registration by mode, email verification, pre-login, sign-in, new-device approval, recovery, security emails, rate limits, stable error codes | Server tests against PostgreSQL and an SMTP stub |
 | 5 | End-to-end sync | Done; Shlomi registered and synced through his proxy (2026-10-01) | Pull and push with versions, conflicts, and tombstones; protocol check | Two clients converge in tests; Shlomi syncs his phone and Windows through his HTTPS proxy |
 | 6 | Admin panel screens | Done; Shlomi set up an administrator (2026-10-01). Invitations added | First-run setup with a one-time token, administrator TOTP, users, devices, settings with environment locks, activity log | Panel screenshots in both languages and themes |
-| 7 | SFTP | Planned | Browse, upload, and download over an open session | Tests against the OpenSSH container |
+| 7 | SFTP | Done in code and tests; waiting for Shlomi's try | Browse, upload, and download over an open session | Tests against the OpenSSH container |
 
 ### Step 2 notes (2026-09-30)
 
@@ -283,6 +283,12 @@ Approved by Shlomi on 2026-09-30: the working version is the full first-release 
 - Invitations (decided by Shlomi on 2026-10-01): an administrator invites an email address from the Invitations page; the code is shown once and, with email configured, sent to the address in the panel's language. Registering with it works in the invite and open modes, needs no SMTP, and confirms the address, so the new device syncs at once. The app's account form has an optional invitation code field. Server tests cover one address, one use, a wrong address, a cancelled and an expired code, and the email.
 - The settings page saves with one button (after Shlomi's review): a bar appears with unsaved changes and saves them in one transaction; a refused value saves nothing and shows its reason under its field.
 - Not in this step: managing further administrators.
+
+### Step 7 notes (2026-10-01)
+
+- A connected session has a Files button next to the tabs. It opens the server's files over SFTP on the session's own connection: no second sign-in. The browser starts in the user's home folder, lists folders first, follows links to folders, and shows sizes and dates; the path and names are LTR in both languages.
+- Tapping a file downloads it. On Windows it goes straight into the Downloads folder as it arrives, never over an existing file ("name (2).ext"), with characters Windows refuses in a name replaced; on Android it goes through the system's save dialog. Upload sends one or more chosen files into the current folder and never replaces a file there; New folder creates one. Transfers show their progress and how they ended. File choosing uses `file_picker` 13.1.0 (MIT).
+- Tests: `sftp_integration_test` runs against the OpenSSH container of `verify.sh --area app`: the home folder, a new folder, a 300 KB upload in chunks and its download byte for byte, an upload refused over an existing file, a missing folder, and a folder without permission. `files_ui_test` covers the screen: a folder opens, a file downloads to where the user keeps files, an upload goes to the folder. Golden images show the screen in English and Hebrew.
 
 ### Step 4 notes (2026-09-30)
 

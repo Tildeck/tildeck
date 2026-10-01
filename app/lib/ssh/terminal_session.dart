@@ -5,6 +5,7 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:xterm/xterm.dart';
 
+import 'file_browser.dart';
 import 'ssh_connector.dart';
 
 enum SessionState { connecting, connected, closed }
@@ -57,6 +58,16 @@ class TerminalSession extends ChangeNotifier {
     } catch (_) {
       _close(ConnectProblem.disconnected);
     }
+  }
+
+  /// An SFTP channel on this session's connection, for browsing files: no
+  /// second sign-in.
+  Future<SftpClient> openSftp() async {
+    final client = _client;
+    if (client == null || state != SessionState.connected) {
+      throw const FileProblemException(FileProblem.disconnected);
+    }
+    return client.sftp();
   }
 
   /// Ctrl from the on-screen key bar: it applies to the next character typed

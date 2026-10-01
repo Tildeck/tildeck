@@ -18,6 +18,7 @@ import 'package:tildeck/app.dart';
 import 'package:tildeck/l10n/app_localizations.dart';
 import 'package:tildeck/server_check.dart';
 import 'package:tildeck/vault/password_rules.dart';
+import 'package:tildeck/ssh/file_browser.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/ssh/terminal_session.dart';
@@ -26,6 +27,7 @@ import 'package:tildeck/sync/sync_engine.dart';
 import 'package:tildeck/sync/sync_server.dart';
 import 'package:tildeck/theme.dart';
 import 'package:tildeck/ui/connect_form.dart';
+import 'package:tildeck/ui/files_page.dart';
 import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
 import 'package:tildeck/ui/account_page.dart';
@@ -152,6 +154,51 @@ Widget app(Vault vault, String locale, ThemeMode mode) => TildeckApp(
   initialLocale: Locale(locale),
   initialThemeMode: mode,
 );
+
+/// A folder as it looks mid-work, without a server.
+class SampleBrowser extends FileBrowser {
+  SampleBrowser() : super(() => throw UnimplementedError());
+
+  @override
+  Future<void> start() async {
+    path = '/home/deploy/releases';
+    final at = DateTime(2026, 9, 30, 14, 5);
+    entries = [
+      RemoteEntry(
+        name: 'current',
+        path: '/home/deploy/releases/current',
+        isDirectory: true,
+        isLink: true,
+        modified: at,
+      ),
+      RemoteEntry(name: 'v1.4.2', path: '/home/deploy/releases/v1.4.2', isDirectory: true, isLink: false, modified: at),
+      RemoteEntry(
+        name: 'deploy.log',
+        path: '/home/deploy/releases/deploy.log',
+        isDirectory: false,
+        isLink: false,
+        size: 48213,
+        modified: at,
+      ),
+      RemoteEntry(
+        name: 'app-v1.4.2.tar.gz',
+        path: '/home/deploy/releases/app-v1.4.2.tar.gz',
+        isDirectory: false,
+        isLink: false,
+        size: 18874368,
+        modified: at,
+      ),
+    ];
+    transfers
+      ..add(Transfer('app-v1.4.3.tar.gz', TransferDirection.upload, 20000000)..done = 13000000)
+      ..add(
+        Transfer('deploy.log', TransferDirection.download, 48213)
+          ..done = 48213
+          ..state = TransferState.done,
+      );
+    notifyListeners();
+  }
+}
 
 /// Sync for [vault] against an in-memory server; syncing only on request.
 SyncServices syncServices(Vault vault, FakeSyncServer server) {
@@ -377,6 +424,16 @@ void main() {
         find.byType(MaterialApp),
         matchesGoldenFile('goldens/change_password_${locale}_${mode.name}.png'),
       );
+    });
+
+    testWidgets('files $locale ${mode.name}', (tester) async {
+      phone(tester);
+      await tester.pumpWidget(
+        screen(locale, mode, FilesPage(browser: SampleBrowser(), title: 'deploy@prod-web-01.example.com')),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/files_${locale}_${mode.name}.png'));
     });
 
     testWidgets('waiting for approval $locale ${mode.name}', (tester) async {
