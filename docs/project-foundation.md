@@ -256,7 +256,7 @@ Approved by Shlomi on 2026-09-30: the working version is the full first-release 
 - Measured: one Argon2id derivation (ops 3, 64 MiB) takes about 85 ms in the Linux container and 90 ms natively on Windows on this machine; phones will be slower and are measured when Shlomi tries Android.
 - Tests: the vault file contains no plaintext; a changed ciphertext, a ciphertext moved to another record, and an old ciphertext replayed under a newer version are all detected and reported without being dropped; deletions keep tombstones; host keys in the vault; the password rules; and the whole flow through the interface (create, save a host, lock, wrong password, unlock). Golden images add the hosts list, the create screen, and the unlock screen.
 - Groups are a name on each host rather than records of their own (the security model says so); renaming a group means editing its hosts.
-- Known limitation, Android: typing on the soft keyboard is neither a hardware key event nor a touch, so a long stretch of typing in a terminal does not reset the idle timer and the vault can lock mid-session. Fix before Android use: sessions report input activity to the lock timer.
+- Fixed on 2026-10-01: typing on the Android soft keyboard is neither a hardware key event nor a touch, so a long stretch of typing in a terminal did not reset the idle timer and the vault could lock mid-session. Terminal input now reports activity to the lock timer; `idle_lock_test` covers it.
 - For product step 5: the local vault file is the only record of the highest version seen per record; a pull from the server must never lower a stored version.
 
 ### Step 5 notes (2026-09-30)

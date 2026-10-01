@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../activity.dart';
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
 import '../sync/account_service.dart';
@@ -34,7 +35,8 @@ class VaultGate extends StatefulWidget {
   /// vault. Null hides it.
   final SyncServices? sync;
 
-  /// Locks the vault after this long without a key press or a touch.
+  /// Locks the vault after this long without a key press, a touch, or
+  /// typing into a terminal ([userActivity]).
   final Duration autoLock;
 
   @override
@@ -50,12 +52,14 @@ class _VaultGateState extends State<VaultGate> {
     super.initState();
     widget.vault.addListener(_changed);
     HardwareKeyboard.instance.addHandler(_onKey);
+    userActivity.addListener(_touch);
   }
 
   @override
   void dispose() {
     widget.vault.removeListener(_changed);
     HardwareKeyboard.instance.removeHandler(_onKey);
+    userActivity.removeListener(_touch);
     _idle?.cancel();
     super.dispose();
   }

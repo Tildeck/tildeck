@@ -5,6 +5,7 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:xterm/xterm.dart';
 
+import '../activity.dart';
 import 'file_browser.dart';
 import 'ssh_connector.dart';
 
@@ -44,7 +45,11 @@ class TerminalSession extends ChangeNotifier {
       _subscriptions.add(
         shell.stdout.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen(terminal.write),
       );
-      terminal.onOutput = (data) => shell.write(utf8.encode(applyCtrl(data)));
+      terminal.onOutput = (data) {
+        // Soft keyboard typing sends no key events: tell the idle lock.
+        userActivity.ping();
+        shell.write(utf8.encode(applyCtrl(data)));
+      };
       terminal.onResize = (width, height, pixelWidth, pixelHeight) =>
           shell.resizeTerminal(width, height, pixelWidth, pixelHeight);
 
