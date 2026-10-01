@@ -16,6 +16,7 @@ sealed class VaultEntry {
     KeyEntry.recordType => KeyEntry.fromJson(id, data),
     KnownHostEntry.recordType => KnownHostEntry.fromJson(id, data),
     SnippetEntry.recordType => SnippetEntry.fromJson(id, data),
+    GroupEntry.recordType => GroupEntry.fromJson(id, data),
     _ => null,
   };
 }
@@ -36,6 +37,8 @@ class HostEntry extends VaultEntry {
     this.password,
     this.keyId,
     this.startupSnippetId,
+    this.tags = const [],
+    this.env = const {},
   });
 
   static const recordType = 'host';
@@ -56,6 +59,13 @@ class HostEntry extends VaultEntry {
   /// A [SnippetEntry] id, run in the shell as soon as the session opens.
   final String? startupSnippetId;
 
+  /// Free labels for finding hosts.
+  final List<String> tags;
+
+  /// Environment variables sent when the session opens (the server accepts
+  /// only those its AcceptEnv allows).
+  final Map<String, String> env;
+
   @override
   String get type => recordType;
 
@@ -70,6 +80,8 @@ class HostEntry extends VaultEntry {
     'password': password,
     'key_id': keyId,
     'startup_snippet_id': startupSnippetId,
+    'tags': tags,
+    'env': env,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -83,6 +95,8 @@ class HostEntry extends VaultEntry {
     password: d['password'] as String?,
     keyId: d['key_id'] as String?,
     startupSnippetId: d['startup_snippet_id'] as String?,
+    tags: [...?(d['tags'] as List?)?.cast<String>()],
+    env: {...?(d['env'] as Map?)?.cast<String, String>()},
   );
 
   String get label => port == 22 ? '$username@$host' : '$username@$host:$port';
@@ -165,3 +179,65 @@ class SnippetEntry extends VaultEntry {
   static SnippetEntry fromJson(String id, Map<String, dynamic> d) =>
       SnippetEntry(id: id, name: d['name'] as String, command: d['command'] as String);
 }
+
+/// Settings shared by every host in a group (hosts name their group). A
+/// host's own value wins; an empty one takes the group's.
+class GroupEntry extends VaultEntry {
+  const GroupEntry({
+    required super.id,
+    required this.name,
+    this.username,
+    this.keyId,
+    this.startupSnippetId,
+    this.env = const {},
+  });
+
+  static const recordType = 'group';
+
+  final String name;
+  final String? username;
+
+  /// A [KeyEntry] id for hosts that sign in with a key and choose none.
+  final String? keyId;
+  final String? startupSnippetId;
+  final Map<String, String> env;
+
+  @override
+  String get type => recordType;
+
+  @override
+  Map<String, Object?> dataJson() => {
+    'name': name,
+    'username': username,
+    'key_id': keyId,
+    'startup_snippet_id': startupSnippetId,
+    'env': env,
+  };
+
+  static GroupEntry fromJson(String id, Map<String, dynamic> d) => GroupEntry(
+    id: id,
+    name: d['name'] as String,
+    username: d['username'] as String?,
+    keyId: d['key_id'] as String?,
+    startupSnippetId: d['startup_snippet_id'] as String?,
+    env: {...?(d['env'] as Map?)?.cast<String, String>()},
+  );
+}
+
+/// Environment variables written one per line as NAME=value. Null when a
+/// line is not one; blank lines are skipped.
+Map<String, String>? parseEnv(String text) {
+  final result = <String, String>{};
+  for (final raw in text.split('\n')) {
+    final line = raw.trim();
+    if (line.isEmpty) continue;
+    final eq = line.indexOf('=');
+    if (eq <= 0) return null;
+    final name = line.substring(0, eq).trim();
+    if (!RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(name)) return null;
+    result[name] = line.substring(eq + 1);
+  }
+  return result;
+}
+
+String formatEnv(Map<String, String> env) => [for (final e in env.entries) '${e.key}=${e.value}'].join('\n');

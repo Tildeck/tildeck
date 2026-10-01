@@ -309,7 +309,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 | Stage | Scope | Status |
 |---|---|---|
-| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets done; the rest planned |
+| 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, and environment variables done; the rest planned |
 | 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Planned |
 | 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
@@ -322,6 +322,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - In a connected session, the Snippets button next to the tabs runs a snippet there, or opens a session on each chosen host and runs it in each. A host can have a startup snippet that runs as soon as its shell opens. Each line is sent as typed, followed by Enter.
 - A record of a type this version does not know (from a newer version, through sync) is now kept untouched and hidden instead of being reported as damaged.
 - Tests: snippets and startup snippets kept encrypted in the vault; an unknown record type kept and not damaged; against the OpenSSH container, a startup snippet runs when the shell opens and a two-line snippet runs line by line. Golden images of the Snippets page in English and Hebrew.
+
+### Hosts: tags, search, group settings, environment variables (2026-10-01)
+
+- Hosts have tags. The hosts list has a search box that matches every typed word against the name, address, user, group, and tags.
+- A group (hosts still name their group) can have settings: a username, a key, a startup snippet, and environment variables. A host takes them wherever it leaves its own field empty, and the host's own value always wins; group and host environment variables merge, host first. The settings button next to a group name edits them.
+- Environment variables are requested for the shell when the session opens. The server applies only names its `AcceptEnv` setting allows; the test server in `verify.sh --area app` allows `TILDECK_*` for its test.
+- Tests: search, the NAME=value format, inheritance from a group with the host's own values winning, and against the OpenSSH container a variable that reaches the shell. Golden images of the hosts list with tags and of the group settings page.
 
 ## Required workflow contracts
 

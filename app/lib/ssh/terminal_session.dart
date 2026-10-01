@@ -37,6 +37,7 @@ class TerminalSession extends ChangeNotifier {
       _client = client;
       final shell = await client.shell(
         pty: SSHPtyConfig(type: 'xterm-256color', width: terminal.viewWidth, height: terminal.viewHeight),
+        environment: target.environment.isEmpty ? null : target.environment,
       );
       _shell = shell;
 

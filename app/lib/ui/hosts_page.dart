@@ -6,31 +6,46 @@ import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'connect_form.dart';
+import 'group_editor_page.dart';
 import 'snippets_page.dart';
 
 /// The home tab: saved hosts by group, and the ways to add one or connect
 /// without saving.
 
 /// What it takes to connect to a saved host: its password (asked now
-/// when it is not saved), its key, and its startup snippet. Null when the
-/// user cancels the password prompt.
+/// when it is not saved), its key, its environment, and its startup
+/// snippet. Empty host settings take the group's. Null when the user
+/// cancels the password prompt.
 Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault, HostEntry host) async {
-  String? password;
-  KeyEntry? key;
-  if (host.auth == HostAuth.password) {
-    password = host.password ?? await _askPassword(context, host);
-    if (password == null) return null;
-  } else {
-    key = vault.entry<KeyEntry>(host.keyId);
-  }
-  return ConnectionTarget(
+  final group = vault.groupNamed(host.group);
+  final effective = HostEntry(
+    id: host.id,
+    name: host.name,
+    group: host.group,
     host: host.host,
     port: host.port,
-    username: host.username,
+    username: host.username.trim().isEmpty ? (group?.username ?? '') : host.username,
+    auth: host.auth,
+    password: host.password,
+    keyId: host.keyId ?? group?.keyId,
+  );
+  String? password;
+  KeyEntry? key;
+  if (effective.auth == HostAuth.password) {
+    password = effective.password ?? await _askPassword(context, effective);
+    if (password == null) return null;
+  } else {
+    key = vault.entry<KeyEntry>(effective.keyId);
+  }
+  return ConnectionTarget(
+    host: effective.host,
+    port: effective.port,
+    username: effective.username,
     password: password,
     privateKey: key?.privateKey,
     passphrase: key?.passphrase,
-    startupCommand: vault.entry<SnippetEntry>(host.startupSnippetId)?.command,
+    startupCommand: vault.entry<SnippetEntry>(host.startupSnippetId ?? group?.startupSnippetId)?.command,
+    environment: {...?group?.env, ...host.env},
   );
 }
 
@@ -58,11 +73,36 @@ Future<String?> _askPassword(BuildContext context, HostEntry host) {
   ).whenComplete(controller.dispose);
 }
 
-class HostsPage extends StatelessWidget {
+class HostsPage extends StatefulWidget {
   const HostsPage({super.key, required this.vault, required this.onConnect});
 
   final Vault vault;
   final void Function(ConnectionTarget target) onConnect;
+
+  @override
+  State<HostsPage> createState() => _HostsPageState();
+}
+
+/// Whether [host] matches every word of [query]: by name, address, user,
+/// group, or tag.
+bool hostMatches(HostEntry host, String query) {
+  final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
+  final haystack = [host.name, host.host, host.username, host.group, ...host.tags].join(' ').toLowerCase();
+  return words.every(haystack.contains);
+}
+
+class _HostsPageState extends State<HostsPage> {
+  final _search = TextEditingController();
+  String _query = '';
+
+  Vault get vault => widget.vault;
+  void Function(ConnectionTarget target) get onConnect => widget.onConnect;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   Future<void> _connectHost(BuildContext context, HostEntry host) async {
     final target = await connectionTargetFor(context, vault, host);
@@ -106,7 +146,11 @@ class HostsPage extends StatelessWidget {
     return ListenableBuilder(
       listenable: vault,
       builder: (context, _) {
-        final hosts = vault.hosts;
+        final all = vault.hosts;
+        final hosts = [
+          for (final h in all)
+            if (hostMatches(h, _query)) h,
+        ];
         final groups = <String, List<HostEntry>>{};
         for (final h in hosts) {
           groups.putIfAbsent(h.group.trim(), () => []).add(h);
@@ -166,14 +210,61 @@ class HostsPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text(t.damagedRecords, style: TextStyle(color: c.danger)),
                 ],
+                if (all.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    key: const ValueKey('hostSearch'),
+                    controller: _search,
+                    onChanged: (v) => setState(() => _query = v),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      hintText: t.searchHosts,
+                      isDense: true,
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: t.clearSearch,
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => setState(() {
+                                _search.clear();
+                                _query = '';
+                              }),
+                            ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
-                if (hosts.isEmpty) Text(t.noHostsYet, style: text.bodyLarge?.copyWith(color: c.muted, height: 1.5)),
+                if (all.isEmpty) Text(t.noHostsYet, style: text.bodyLarge?.copyWith(color: c.muted, height: 1.5)),
+                if (all.isNotEmpty && hosts.isEmpty)
+                  Text(t.noHostsMatch, style: text.bodyLarge?.copyWith(color: c.muted, height: 1.5)),
                 for (final group in names) ...[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 14, 4, 6),
-                    child: Text(
-                      group.isEmpty ? t.ungrouped : group,
-                      style: text.labelLarge?.copyWith(color: c.muted, fontWeight: FontWeight.w700),
+                    padding: const EdgeInsetsDirectional.fromSTEB(4, 8, 0, 2),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            group.isEmpty ? t.ungrouped : group,
+                            style: text.labelLarge?.copyWith(color: c.muted, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        if (group.isNotEmpty)
+                          IconButton(
+                            key: ValueKey('groupSettings-$group'),
+                            tooltip: t.groupSettings,
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(
+                              Icons.tune_rounded,
+                              size: 18,
+                              color: vault.groupNamed(group) == null ? c.muted : c.brand,
+                            ),
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => GroupEditorPage(vault: vault, name: group),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   Card.outlined(
@@ -187,12 +278,36 @@ class HostsPage extends StatelessWidget {
                             leading: Icon(host.auth == HostAuth.key ? Icons.key : Icons.dns_outlined, color: c.brand),
                             title: Text(host.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                             // Connection labels are Latin content: always LTR.
-                            subtitle: Text(
-                              host.label,
-                              textDirection: TextDirection.ltr,
-                              textAlign: Directionality.of(context) == TextDirection.rtl
-                                  ? TextAlign.right
-                                  : TextAlign.left,
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  host.label,
+                                  textDirection: TextDirection.ltr,
+                                  textAlign: Directionality.of(context) == TextDirection.rtl
+                                      ? TextAlign.right
+                                      : TextAlign.left,
+                                ),
+                                if (host.tags.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: [
+                                        for (final tag in host.tags)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: c.brand.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(tag, style: TextStyle(fontSize: 12, color: c.brand)),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
                             ),
                             onTap: () => _connectHost(context, host),
                             trailing: PopupMenuButton<String>(
@@ -245,10 +360,12 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late bool _savePassword = widget.host?.password != null;
   late String? _keyId = widget.host?.keyId;
   late String? _startupSnippetId = widget.host?.startupSnippetId;
+  late final _tags = TextEditingController(text: widget.host?.tags.join(', '));
+  late final _env = TextEditingController(text: formatEnv(widget.host?.env ?? const {}));
 
   @override
   void dispose() {
-    for (final c in [_name, _group, _host, _port, _username, _password]) {
+    for (final c in [_name, _group, _host, _port, _username, _password, _tags, _env]) {
       c.dispose();
     }
     super.dispose();
@@ -268,6 +385,11 @@ class _HostEditorPageState extends State<HostEditorPage> {
         password: _auth == HostAuth.password && _savePassword ? _password.text : null,
         keyId: _auth == HostAuth.key ? _keyId : null,
         startupSnippetId: _startupSnippetId,
+        tags: [
+          for (final tag in _tags.text.split(','))
+            if (tag.trim().isNotEmpty) tag.trim(),
+        ],
+        env: parseEnv(_env.text) ?? const {},
       ),
     );
     if (mounted) Navigator.pop(context);
@@ -290,6 +412,8 @@ class _HostEditorPageState extends State<HostEditorPage> {
           if (_startupSnippetId != null && snippets.every((x) => x.id != _startupSnippetId)) {
             _startupSnippetId = null;
           }
+          // Settings the group provides may be left empty here.
+          final group = widget.vault.groupNamed(_group.text);
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
@@ -308,6 +432,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                     TextFormField(
                       key: const ValueKey('hostGroup'),
                       controller: _group,
+                      onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(labelText: t.groupLabel, hintText: t.groupHint),
                     ),
                     const SizedBox(height: 14),
@@ -348,8 +473,11 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       controller: _username,
                       textDirection: TextDirection.ltr,
                       autocorrect: false,
-                      validator: required,
-                      decoration: InputDecoration(labelText: t.usernameLabel),
+                      validator: group?.username?.isNotEmpty == true ? null : required,
+                      decoration: InputDecoration(
+                        labelText: t.usernameLabel,
+                        helperText: group?.username?.isNotEmpty == true ? t.fromGroup(group!.username!) : null,
+                      ),
                     ),
                     const SizedBox(height: 18),
                     SegmentedButton<HostAuth>(
@@ -388,7 +516,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         key: const ValueKey('keyChoice'),
                         initialValue: _keyId,
                         decoration: InputDecoration(labelText: t.keyLabel, hintText: t.chooseKey),
-                        validator: (v) => v == null ? t.fieldRequired : null,
+                        validator: (v) => v == null && group?.keyId == null ? t.fieldRequired : null,
                         items: [for (final k in keys) DropdownMenuItem(value: k.id, child: Text(k.name))],
                         onChanged: (v) => setState(() => _keyId = v),
                       ),
@@ -404,6 +532,30 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      key: const ValueKey('hostTags'),
+                      controller: _tags,
+                      decoration: InputDecoration(labelText: t.tagsLabel, hintText: t.tagsHint),
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      key: const ValueKey('hostEnv'),
+                      controller: _env,
+                      minLines: 2,
+                      maxLines: 6,
+                      textDirection: TextDirection.ltr,
+                      autocorrect: false,
+                      style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13),
+                      validator: (v) => parseEnv(v ?? '') == null ? t.envInvalid : null,
+                      decoration: InputDecoration(
+                        labelText: t.envLabel,
+                        hintText: 'LANG=en_US.UTF-8',
+                        helperText: t.envHelp,
+                        helperMaxLines: 3,
+                        alignLabelWithHint: true,
+                      ),
+                    ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String?>(
                       key: const ValueKey('startupSnippet'),
