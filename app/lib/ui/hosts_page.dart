@@ -9,6 +9,7 @@ import '../vault/vault.dart';
 import 'connect_form.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
+import 'keys_page.dart';
 import 'proxy_editor.dart';
 import 'snippets_page.dart';
 
@@ -143,7 +144,14 @@ Future<String?> _askPassword(BuildContext context, HostEntry host) {
 }
 
 class HostsPage extends StatefulWidget {
-  const HostsPage({super.key, required this.vault, required this.onConnect, this.onOpenForwards, this.localShells});
+  const HostsPage({
+    super.key,
+    required this.vault,
+    required this.onConnect,
+    this.onOpenForwards,
+    this.localShells,
+    this.connectHost,
+  });
 
   final Vault vault;
   final void Function(ConnectionTarget target) onConnect;
@@ -153,6 +161,9 @@ class HostsPage extends StatefulWidget {
 
   /// The shells for local terminals; null looks for them on the desktop.
   final List<LocalShell>? localShells;
+
+  /// Connects to a saved host outside a session: installing a key on it.
+  final HostConnect? connectHost;
 
   @override
   State<HostsPage> createState() => _HostsPageState();
@@ -305,8 +316,11 @@ class _HostsPageState extends State<HostsPage> {
                     IconButton(
                       tooltip: t.keysTitle,
                       icon: const Icon(Icons.key),
-                      onPressed: () =>
-                          Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => KeysPage(vault: vault))),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => KeysPage(vault: vault, connect: widget.connectHost),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -715,16 +729,27 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         items: [for (final k in keys) DropdownMenuItem(value: k.id, child: Text(k.name))],
                         onChanged: (v) => setState(() => _keyId = v),
                       ),
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: TextButton.icon(
-                          icon: const Icon(Icons.add),
-                          label: Text(t.addKey),
-                          onPressed: () async {
-                            final id = await showKeyEditor(context, widget.vault);
-                            if (id != null) setState(() => _keyId = id);
-                          },
-                        ),
+                      Wrap(
+                        spacing: 4,
+                        children: [
+                          TextButton.icon(
+                            key: const ValueKey('hostGenerateKey'),
+                            icon: const Icon(Icons.auto_awesome_outlined),
+                            label: Text(t.generateKey),
+                            onPressed: () async {
+                              final id = await showKeyGenerator(context, widget.vault);
+                              if (id != null) setState(() => _keyId = id);
+                            },
+                          ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.file_download_outlined),
+                            label: Text(t.importKey),
+                            onPressed: () async {
+                              final id = await showKeyEditor(context, widget.vault);
+                              if (id != null) setState(() => _keyId = id);
+                            },
+                          ),
+                        ],
                       ),
                     ],
                     const SizedBox(height: 14),
@@ -805,143 +830,6 @@ class _HostEditorPageState extends State<HostEditorPage> {
                 ),
               ),
             ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// Adds a private key to the vault; returns its id.
-Future<String?> showKeyEditor(BuildContext context, Vault vault) {
-  final t = AppLocalizations.of(context);
-  final form = GlobalKey<FormState>();
-  final name = TextEditingController();
-  final pem = TextEditingController();
-  final passphrase = TextEditingController();
-  String? required(String? v) => (v == null || v.trim().isEmpty) ? t.fieldRequired : null;
-
-  return showDialog<String>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(t.addKey),
-      content: SizedBox(
-        width: 480,
-        child: Form(
-          key: form,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  key: const ValueKey('keyName'),
-                  controller: name,
-                  validator: required,
-                  decoration: InputDecoration(labelText: t.keyNameLabel, hintText: t.keyNameHint),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  key: const ValueKey('keyPem'),
-                  controller: pem,
-                  textDirection: TextDirection.ltr,
-                  style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12),
-                  minLines: 4,
-                  maxLines: 8,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  validator: required,
-                  decoration: InputDecoration(
-                    labelText: t.privateKeyLabel,
-                    hintText: t.privateKeyHint,
-                    alignLabelWithHint: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  key: const ValueKey('keyPassphrase'),
-                  controller: passphrase,
-                  obscureText: true,
-                  textDirection: TextDirection.ltr,
-                  decoration: InputDecoration(labelText: t.passphraseLabel),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
-        FilledButton(
-          key: const ValueKey('saveKey'),
-          onPressed: () async {
-            if (!form.currentState!.validate()) return;
-            final id = vault.newId();
-            await vault.put(
-              KeyEntry(
-                id: id,
-                name: name.text.trim(),
-                privateKey: pem.text.trim(),
-                passphrase: passphrase.text.isEmpty ? null : passphrase.text,
-              ),
-            );
-            if (context.mounted) Navigator.pop(context, id);
-          },
-          child: Text(t.save),
-        ),
-      ],
-    ),
-  ).whenComplete(() {
-    name.dispose();
-    pem.dispose();
-    passphrase.dispose();
-  });
-}
-
-class KeysPage extends StatelessWidget {
-  const KeysPage({super.key, required this.vault});
-
-  final Vault vault;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    final c = context.colors;
-    return Scaffold(
-      appBar: AppBar(title: Text(t.keysTitle)),
-      floatingActionButton: FloatingActionButton.extended(
-        icon: const Icon(Icons.add),
-        label: Text(t.addKey),
-        onPressed: () => showKeyEditor(context, vault),
-      ),
-      body: ListenableBuilder(
-        listenable: vault,
-        builder: (context, _) {
-          final keys = vault.keys;
-          if (keys.isEmpty) {
-            return Center(
-              child: Text(t.noKeysYet, style: TextStyle(color: c.muted)),
-            );
-          }
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              for (final key in keys)
-                ListTile(
-                  leading: Icon(Icons.key, color: c.brand),
-                  title: Text(key.name),
-                  trailing: IconButton(
-                    tooltip: t.deleteAction,
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () {
-                      if (vault.hosts.any((h) => h.keyId == key.id)) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.keyInUse)));
-                        return;
-                      }
-                      vault.delete(key.id);
-                    },
-                  ),
-                ),
-            ],
           );
         },
       ),

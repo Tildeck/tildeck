@@ -397,6 +397,19 @@ class _SearchBar extends StatelessWidget {
   }
 }
 
+/// What a connection failure tells the user.
+String connectProblemText(AppLocalizations t, ConnectProblem problem) => switch (problem) {
+  ConnectProblem.unreachable => t.errConnUnreachable,
+  ConnectProblem.timeout => t.errConnTimeout,
+  ConnectProblem.authFailed => t.errConnAuthFailed,
+  ConnectProblem.hostKeyRejected => t.errConnHostKeyRejected,
+  ConnectProblem.keyInvalid => t.errConnKeyInvalid,
+  ConnectProblem.keyPassphraseRequired => t.errConnKeyPassphraseRequired,
+  ConnectProblem.keyPassphraseWrong => t.errConnKeyPassphraseWrong,
+  ConnectProblem.disconnected => t.errConnDisconnected,
+  ConnectProblem.localShellFailed => t.errLocalShell,
+};
+
 class _StatusBanner extends StatelessWidget {
   const _StatusBanner({required this.session, required this.onReconnect});
 
@@ -412,15 +425,7 @@ class _StatusBanner extends StatelessWidget {
         ? t.connectingTo(session.target.label)
         : switch (session.problem) {
             null => t.disconnected,
-            ConnectProblem.unreachable => t.errConnUnreachable,
-            ConnectProblem.timeout => t.errConnTimeout,
-            ConnectProblem.authFailed => t.errConnAuthFailed,
-            ConnectProblem.hostKeyRejected => t.errConnHostKeyRejected,
-            ConnectProblem.keyInvalid => t.errConnKeyInvalid,
-            ConnectProblem.keyPassphraseRequired => t.errConnKeyPassphraseRequired,
-            ConnectProblem.keyPassphraseWrong => t.errConnKeyPassphraseWrong,
-            ConnectProblem.disconnected => t.errConnDisconnected,
-            ConnectProblem.localShellFailed => t.errLocalShell,
+            final problem => connectProblemText(t, problem),
           };
     final via = session.problemVia;
     final shown = !connecting && session.problem != null && via != null ? t.errConnVia(via, message) : message;

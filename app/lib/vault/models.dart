@@ -143,7 +143,15 @@ class HostEntry extends VaultEntry {
 
 /// A private key, stored only inside the vault.
 class KeyEntry extends VaultEntry {
-  const KeyEntry({required super.id, required this.name, required this.privateKey, this.passphrase});
+  const KeyEntry({
+    required super.id,
+    required this.name,
+    required this.privateKey,
+    this.passphrase,
+    this.keyType,
+    this.fingerprint,
+    this.publicKey,
+  });
 
   static const recordType = 'key';
 
@@ -151,17 +159,35 @@ class KeyEntry extends VaultEntry {
   final String privateKey;
   final String? passphrase;
 
+  /// Read from the private key when it is saved, so the list need not
+  /// decrypt it again; null for a key saved before they were kept.
+  final String? keyType;
+  final String? fingerprint;
+
+  /// The line for authorized_keys.
+  final String? publicKey;
+
   @override
   String get type => recordType;
 
   @override
-  Map<String, Object?> dataJson() => {'name': name, 'private_key': privateKey, 'passphrase': passphrase};
+  Map<String, Object?> dataJson() => {
+    'name': name,
+    'private_key': privateKey,
+    'passphrase': passphrase,
+    'key_type': keyType,
+    'fingerprint': fingerprint,
+    'public_key': publicKey,
+  };
 
   static KeyEntry fromJson(String id, Map<String, dynamic> d) => KeyEntry(
     id: id,
     name: d['name'] as String,
     privateKey: d['private_key'] as String,
     passphrase: d['passphrase'] as String?,
+    keyType: d['key_type'] as String?,
+    fingerprint: d['fingerprint'] as String?,
+    publicKey: d['public_key'] as String?,
   );
 }
 

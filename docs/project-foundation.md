@@ -311,7 +311,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 |---|---|---|
 | 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
 | 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Done: port forwarding, jump hosts, agent forwarding, proxies, Telnet, and a local terminal on the desktop |
-| 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Planned |
+| 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Key generation, import, and export done; SSH certificates, two-factor sign-in, and biometric unlock next |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
 | Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
 | Not now | Teams: shared and multiple vaults, access control, shared session logs (Shlomi, 2026-10-01: not now, maybe later) | Deferred |
@@ -407,6 +407,15 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - A local shell is not a server: it stays out of the synced connection history, and offers no files or server history.
 - `scripts/windows.ps1 test` runs the Windows-only tests in `app/integration_test/`, and the Windows CI job runs them after the build.
 - Tests: shell detection on Windows (order, PATH and install folder, letter case, missing ones) and elsewhere; the hosts screen opening the chosen shell, and no button on a phone. On Windows over ConPTY: Windows PowerShell answering, in the home folder, at the terminal width and again after a resize, and ending on `exit`; Command Prompt seeing the whole environment.
+
+### Keys (2026-10-01)
+
+- The Keys page generates a key (Ed25519 by default, made with libsodium; RSA 4096 for old servers, made with pointycastle off the UI thread) or imports one, pasted or from a file. A key that cannot be read, or whose passphrase is wrong, is refused when it is saved, with a message, instead of failing later at connect time.
+- Each key shows its type and SHA256 fingerprint, as `ssh-keygen -l` does. They and the public key line are read once when the key is saved and kept in the record, so the list never decrypts keys; keys saved before this are read once when the list shows them.
+- Per key: copy the public key; install it on a saved host (like `ssh-copy-id`: it signs in the way that host already does and adds the line to `~/.ssh/authorized_keys` once, creating the folder and file with the modes sshd requires); export the private key to a file, protected by a passphrase in OpenSSH's own format (bcrypt and AES), to the Downloads folder on the desktop and through the save dialog on Android.
+- The host editor can generate a key as well as import one.
+- The public key's comment is reduced to characters that need no shell quoting, and the install command refuses a line with quotes or line breaks.
+- Tests: generation, reading, fingerprints, export with and without a passphrase, refusing what is not a key, and the install command's quoting. On the Keys page: generate, copy the public key, export with a passphrase, and import from a file that needs its passphrase. Against the OpenSSH container, for Ed25519 and RSA 4096: the new key refused before, installed with the password (twice, kept once), then signing in alone; `ssh-keygen -lf` showing the same fingerprint; and `ssh-keygen -y` opening the exported file with its passphrase and refusing a wrong one.
 
 ## Required workflow contracts
 

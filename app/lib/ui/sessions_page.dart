@@ -358,7 +358,12 @@ class _SessionsPageState extends State<SessionsPage> {
                   : IndexedStack(
                       index: _selected + 1,
                       children: [
-                        HostsPage(vault: widget.vault, onConnect: _open, onOpenForwards: _openForwards),
+                        HostsPage(
+                          vault: widget.vault,
+                          onConnect: _open,
+                          onOpenForwards: _openForwards,
+                          connectHost: _connectFor,
+                        ),
                         for (final (i, _) in _sessions.indexed) _panel(i),
                       ],
                     ),

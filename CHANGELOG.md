@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Keys: generate Ed25519 or RSA 4096 keys, import from a file, see fingerprints, copy the public key, install it on a server, and export the private key protected by a passphrase.
 - A local terminal on the desktop: PowerShell, Command Prompt, or WSL on Windows, in a tab like a session.
 - Telnet hosts, for devices that have nothing else, through jump hosts and proxies like SSH, with a warning that Telnet is not encrypted.
 - Proxies: reach hosts through a SOCKS5 or HTTP proxy, with a password if it asks for one, chosen per host or per group.

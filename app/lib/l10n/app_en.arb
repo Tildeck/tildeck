@@ -468,5 +468,38 @@
   "telnetPasswordHelp": "The device asks for it in the terminal; a saved password is offered at its prompt.",
   "localTerminal": "Local terminal",
   "shellCmd": "Command Prompt",
-  "errLocalShell": "The shell could not start on this computer."
+  "errLocalShell": "The shell could not start on this computer.",
+  "generateKey": "Generate a key",
+  "importKey": "Import a key",
+  "generateButton": "Generate",
+  "keyEd25519Help": "Ed25519: short, fast, and accepted by every current server. The usual choice.",
+  "keyRsaHelp": "RSA 4096: for old servers that do not accept Ed25519. Takes a few seconds to make.",
+  "keyFromFile": "From a file",
+  "keyUnreadable": "This is not a private key, or its passphrase is wrong.",
+  "copyPublicKey": "Copy the public key",
+  "publicKeyCopied": "Public key copied.",
+  "installKey": "Install on a server",
+  "installKeyHelp": "Adds the public key to authorized_keys on the server, signing in the way that host already does. After that, the key can sign in there.",
+  "installKeyOn": "Server",
+  "installKeyButton": "Install",
+  "keyInstalled": "Installed on {host}.",
+  "keyInstallFailed": "The server did not accept the key. Check that the account can write to ~/.ssh.",
+  "exportKey": "Export the private key",
+  "exportKeyHelp": "A passphrase protects the file. Without one, anyone who gets the file can use the key.",
+  "exportPassphrase": "Passphrase for the file (recommended)",
+  "keyExported": "Saved to {path}.",
+  "@keyInstalled": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "@keyExported": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  }
 }
