@@ -452,6 +452,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The Keys page opens Known hosts: every server whose key the vault trusts, with the key type and the whole fingerprint, searchable once there are more than a few. Removing one (with undo) makes the next connection ask again, as for a new server.
 - Tests: the list (port 22 not written), and a removed key checked as unknown, then trusted again after undo. Golden: the page in both languages.
 
+### Desktop layout: the shell (2026-10-02)
+
+- From a window 900 pixels wide, the app lays out as a desktop app: a fixed sidebar with the vault's sections (hosts, keys, known hosts, port forwarding, snippets, history) and the app's settings (terminal appearance, sync, master password), with lock, theme, and language at its foot. Each section opens in place, with no page over the sidebar and no way back to take; the session tabs sit above the content. The layout follows the window's width, not the operating system: a wide tablet gets it, a narrow window gets the phone layout, which is unchanged.
+- Pages that closed themselves when done (the history after reconnecting, the password change after saving) now close only when they were opened over another page, so they can sit in a section.
+- Tests: every section opens in place from the sidebar, the hosts list drops the buttons the sidebar has, and a narrow window keeps the phone layout. Goldens: the desktop hosts and keys sections in both languages.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

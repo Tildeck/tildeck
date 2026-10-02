@@ -52,7 +52,8 @@ void main() {
     for (final host in vault.hosts) {
       await tester.tap(find.byKey(ValueKey('host-${host.id}')));
       await settle();
-      await tester.tap(find.byKey(const ValueKey('hostsTab')));
+      // A wide window has the desktop layout: the sidebar leads back to the hosts.
+      await tester.tap(find.byKey(const ValueKey('nav-hosts')));
       await settle();
     }
     await tester.tap(find.byKey(const ValueKey('tab-1')));

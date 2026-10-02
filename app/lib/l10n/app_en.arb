@@ -643,5 +643,8 @@
   "noKnownHosts": "No trusted servers yet. A server's key is added the first time you connect and trust it.",
   "knownHostRemoved": "The key is no longer trusted.",
   "forgetKnownHost": "Stop trusting this key",
-  "searchServers": "Search servers"
+  "searchServers": "Search servers",
+  "navVault": "VAULT",
+  "navSettings": "SETTINGS",
+  "navMasterPassword": "Master password"
 }

@@ -149,7 +149,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         signOutOtherDevices: _signOutOthers,
       );
       messenger.showSnackBar(SnackBar(content: Text(t.passwordChanged)));
-      navigator.pop();
+      navigator.maybePop();
     } catch (e) {
       if (mounted) setState(() => _error = accountErrorText(t, e));
     } finally {
@@ -264,7 +264,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
         deviceName: _deviceName.text.trim(),
       );
       s.engine.sync();
-      if (s.vault.status == VaultStatus.unlocked) navigator.pop();
+      if (s.vault.status == VaultStatus.unlocked) navigator.maybePop();
     } catch (e) {
       if (mounted) setState(() => _error = accountErrorText(t, e));
     } finally {

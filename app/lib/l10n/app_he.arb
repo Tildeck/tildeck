@@ -355,5 +355,8 @@
   "noKnownHosts": "עוד אין שרתים מוכרים. מפתח של שרת נוסף בפעם הראשונה שמתחברים וסומכים עליו.",
   "knownHostRemoved": "המפתח כבר לא מוכר.",
   "forgetKnownHost": "להפסיק לסמוך על המפתח הזה",
-  "searchServers": "חיפוש שרתים"
+  "searchServers": "חיפוש שרתים",
+  "navVault": "כספת",
+  "navSettings": "הגדרות",
+  "navMasterPassword": "סיסמה ראשית"
 }

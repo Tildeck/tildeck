@@ -13,7 +13,11 @@ import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
+import 'desktop_sidebar.dart';
 import 'files_page.dart';
+import 'history_page.dart';
+import 'keys_page.dart';
+import 'known_hosts_page.dart';
 import 'host_key_dialog.dart';
 import 'password_pages.dart';
 import 'port_forwards_page.dart';
@@ -49,8 +53,39 @@ class SessionsPage extends StatefulWidget {
 class _SessionsPageState extends State<SessionsPage> {
   final _sessions = <TerminalSession>[];
 
-  /// -1 is the hosts tab.
+  /// -1 is the hosts tab, or on the desktop the chosen section.
   int _selected = -1;
+
+  /// The desktop layout's section, shown when no session is.
+  DeskSection _section = DeskSection.hosts;
+
+  /// The section's page, in place of the hosts list.
+  Widget _sectionPage() => switch (_section) {
+    DeskSection.hosts => _hostsPage(desktop: true),
+    DeskSection.keys => KeysPage(vault: widget.vault, connect: _connectFor),
+    DeskSection.knownHosts => KnownHostsPage(vault: widget.vault),
+    DeskSection.forwards => PortForwardsPage(vault: widget.vault, manager: _forwards, connect: _connectFor),
+    DeskSection.snippets => SnippetsPage(vault: widget.vault),
+    DeskSection.history => HistoryPage(
+      vault: widget.vault,
+      onReconnect: (host) async {
+        final target = await connectionTargetFor(context, widget.vault, host);
+        if (target != null) _open(target);
+      },
+    ),
+    DeskSection.appearance => TerminalSettingsPage(vault: widget.vault),
+    DeskSection.account => AccountPage(services: widget.sync),
+    DeskSection.password => ChangePasswordPage(services: widget.sync),
+  };
+
+  Widget _hostsPage({required bool desktop}) => HostsPage(
+    vault: widget.vault,
+    onConnect: _open,
+    // On the desktop, the sidebar has these.
+    onOpenForwards: desktop ? null : _openForwards,
+    showNavigation: !desktop,
+    connectHost: _connectFor,
+  );
 
   /// A second session shown beside the selected one, on a wide screen.
   int? _splitWith;
@@ -199,8 +234,130 @@ class _SessionsPageState extends State<SessionsPage> {
     });
   }
 
+  /// The tabs, and the selected session's actions beside them.
+  Widget _sessionBar(BuildContext context, {required bool showHome}) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    return Row(
+      children: [
+        Expanded(
+          child: _TabStrip(
+            sessions: _sessions,
+            selected: _selected,
+            showHome: showHome,
+            onSelect: (i) => setState(() => _selected = i),
+            onClose: _close,
+          ),
+        ),
+        if (_selected >= 0)
+          ListenableBuilder(
+            listenable: _sessions[_selected],
+            builder: (context, _) {
+              final session = _sessions[_selected];
+              final connected = session.state == SessionState.connected;
+              final canSplit = _sessions.length > 1 && MediaQuery.sizeOf(context).width >= _splitMinWidth;
+              if (!connected && !canSplit) return const SizedBox.shrink();
+              return Container(
+                height: 52,
+                padding: const EdgeInsetsDirectional.only(end: 10),
+                decoration: BoxDecoration(
+                  color: c.page,
+                  border: Border(bottom: BorderSide(color: c.line)),
+                ),
+                child: Row(
+                  children: [
+                    if (canSplit) ...[
+                      IconButton(
+                        key: const ValueKey('splitView'),
+                        tooltip: _splitShown ? t.unsplitView : t.splitView,
+                        isSelected: _splitShown,
+                        icon: const Icon(Icons.vertical_split_outlined),
+                        selectedIcon: const Icon(Icons.vertical_split),
+                        onPressed: _toggleSplit,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    if (connected) ...[
+                      OutlinedButton.icon(
+                        key: const ValueKey('openSnippetPicker'),
+                        onPressed: () => _runSnippet(session),
+                        icon: const Icon(Icons.code_rounded, size: 18),
+                        label: Text(t.snippetsTitle),
+                      ),
+                      if (session.isSsh) ...[
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          key: const ValueKey('openFiles'),
+                          onPressed: () => _openFiles(session),
+                          icon: const Icon(Icons.folder_open_rounded, size: 18),
+                          label: Text(t.filesTitle),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  /// The selected session, the split, or [home] when no session is chosen.
+  Widget _content(BuildContext context, Widget home) {
+    final c = context.colors;
+    return _splitShown && MediaQuery.sizeOf(context).width >= _splitMinWidth
+        ? Row(
+            children: [
+              Expanded(child: _pane(_selected, active: true)),
+              VerticalDivider(width: 2, thickness: 2, color: c.brand.withValues(alpha: 0.5)),
+              Expanded(child: _pane(_splitWith!, active: false)),
+            ],
+          )
+        : IndexedStack(index: _selected + 1, children: [home, for (final (i, _) in _sessions.indexed) _panel(i)]);
+  }
+
+  /// A sidebar with the sections, the tabs above the content: a desktop
+  /// app, not a phone screen stretched.
+  Widget _desktop(BuildContext context) {
+    final c = context.colors;
+    return Scaffold(
+      body: Row(
+        children: [
+          DesktopSidebar(
+            section: _section,
+            sectionShown: _selected < 0,
+            onSection: (s) => setState(() {
+              _section = s;
+              _selected = -1;
+            }),
+            onLock: widget.vault.lock,
+            onToggleLocale: widget.onToggleLocale,
+            onToggleTheme: widget.onToggleTheme,
+            otherLanguageName: _otherLanguageName(context),
+          ),
+          Expanded(
+            child: ColoredBox(
+              color: c.page,
+              child: Column(
+                children: [
+                  if (_sessions.isNotEmpty) _sessionBar(context, showHome: false),
+                  Expanded(
+                    // Each section keeps its own state while another shows.
+                    child: _content(context, KeyedSubtree(key: ValueKey(_section), child: _sectionPage())),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (isDesktopLayout(context)) return _desktop(context);
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -284,90 +441,8 @@ class _SessionsPageState extends State<SessionsPage> {
       body: SafeArea(
         child: Column(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _TabStrip(
-                    sessions: _sessions,
-                    selected: _selected,
-                    onSelect: (i) => setState(() => _selected = i),
-                    onClose: _close,
-                  ),
-                ),
-                if (_selected >= 0)
-                  ListenableBuilder(
-                    listenable: _sessions[_selected],
-                    builder: (context, _) {
-                      final session = _sessions[_selected];
-                      final connected = session.state == SessionState.connected;
-                      final canSplit = _sessions.length > 1 && MediaQuery.sizeOf(context).width >= _splitMinWidth;
-                      if (!connected && !canSplit) return const SizedBox.shrink();
-                      return Container(
-                        height: 52,
-                        padding: const EdgeInsetsDirectional.only(end: 10),
-                        decoration: BoxDecoration(
-                          color: c.page,
-                          border: Border(bottom: BorderSide(color: c.line)),
-                        ),
-                        child: Row(
-                          children: [
-                            if (canSplit) ...[
-                              IconButton(
-                                key: const ValueKey('splitView'),
-                                tooltip: _splitShown ? t.unsplitView : t.splitView,
-                                isSelected: _splitShown,
-                                icon: const Icon(Icons.vertical_split_outlined),
-                                selectedIcon: const Icon(Icons.vertical_split),
-                                onPressed: _toggleSplit,
-                              ),
-                              const SizedBox(width: 4),
-                            ],
-                            if (connected) ...[
-                              OutlinedButton.icon(
-                                key: const ValueKey('openSnippetPicker'),
-                                onPressed: () => _runSnippet(session),
-                                icon: const Icon(Icons.code_rounded, size: 18),
-                                label: Text(t.snippetsTitle),
-                              ),
-                              if (session.isSsh) ...[
-                                const SizedBox(width: 8),
-                                OutlinedButton.icon(
-                                  key: const ValueKey('openFiles'),
-                                  onPressed: () => _openFiles(session),
-                                  icon: const Icon(Icons.folder_open_rounded, size: 18),
-                                  label: Text(t.filesTitle),
-                                ),
-                              ],
-                            ],
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-              ],
-            ),
-            Expanded(
-              child: _splitShown && MediaQuery.sizeOf(context).width >= _splitMinWidth
-                  ? Row(
-                      children: [
-                        Expanded(child: _pane(_selected, active: true)),
-                        VerticalDivider(width: 2, thickness: 2, color: c.brand.withValues(alpha: 0.5)),
-                        Expanded(child: _pane(_splitWith!, active: false)),
-                      ],
-                    )
-                  : IndexedStack(
-                      index: _selected + 1,
-                      children: [
-                        HostsPage(
-                          vault: widget.vault,
-                          onConnect: _open,
-                          onOpenForwards: _openForwards,
-                          connectHost: _connectFor,
-                        ),
-                        for (final (i, _) in _sessions.indexed) _panel(i),
-                      ],
-                    ),
-            ),
+            _sessionBar(context, showHome: true),
+            Expanded(child: _content(context, _hostsPage(desktop: false))),
           ],
         ),
       ),
@@ -429,10 +504,19 @@ class _RenameDialogState extends State<_RenameDialog> {
 }
 
 class _TabStrip extends StatelessWidget {
-  const _TabStrip({required this.sessions, required this.selected, required this.onSelect, required this.onClose});
+  const _TabStrip({
+    required this.sessions,
+    required this.selected,
+    required this.onSelect,
+    required this.onClose,
+    required this.showHome,
+  });
 
   final List<TerminalSession> sessions;
   final int selected;
+
+  /// The hosts tab; on the desktop the sidebar takes its place.
+  final bool showHome;
   final ValueChanged<int> onSelect;
   final ValueChanged<int> onClose;
 
@@ -520,23 +604,24 @@ class _TabStrip extends StatelessWidget {
                 ),
               ),
             ),
-          tab(
-            key: const ValueKey('hostsTab'),
-            on: selected == -1,
-            onTap: () => onSelect(-1),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.dns_outlined, size: 18, color: c.brand),
-                const SizedBox(width: 6),
-                Text(
-                  t.hostsTitle,
-                  style: TextStyle(color: c.brand, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(width: 6),
-              ],
+          if (showHome)
+            tab(
+              key: const ValueKey('hostsTab'),
+              on: selected == -1,
+              onTap: () => onSelect(-1),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.dns_outlined, size: 18, color: c.brand),
+                  const SizedBox(width: 6),
+                  Text(
+                    t.hostsTitle,
+                    style: TextStyle(color: c.brand, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
