@@ -862,5 +862,37 @@
   "paletteOpenTab": "Open tab",
   "paletteConnect": "Connect",
   "paletteSection": "Section",
-  "paletteAction": "Action"
+  "paletteAction": "Action",
+  "settingsBackup": "Backup",
+  "backupIntro": "An encrypted copy of the vault in one file, for keeping or moving without a sync server. It opens only with the master password it was saved under. It holds hosts, keys, identities, snippets, and settings, not this device's sign-in.",
+  "backupExport": "Save an encrypted backup",
+  "backupExportHelp": "Saved to Downloads on the desktop, and where you choose on a phone.",
+  "backupImport": "Restore from a backup",
+  "backupImportHelp": "Adds what the backup has and this vault does not; nothing here is overwritten.",
+  "backupExportPasswordTitle": "Confirm with the master password",
+  "backupExportPasswordBody": "The backup opens with this password, so it is asked for before a copy leaves the device.",
+  "backupImportPasswordTitle": "The backup's master password",
+  "backupImportPasswordBody": "The master password the vault had when the backup was saved.",
+  "backupSaved": "Backup saved: {path}",
+  "@backupSaved": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "backupImported": "{added, plural, =0{Nothing new} =1{1 item added} other{{added} items added}}, {kept, plural, =0{none already here} =1{1 already here} other{{kept} already here}}",
+  "@backupImported": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      }
+    }
+  },
+  "backupNotABackup": "This file is not a Tildeck backup.",
+  "backupNewer": "This backup comes from a newer version of Tildeck. Update Tildeck to restore it.",
+  "backupWrongPassword": "That is not the master password of this backup."
 }

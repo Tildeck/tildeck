@@ -606,6 +606,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - One field finds the open tabs, the saved hosts (connecting, with the password asked when not saved), the desktop's sections, and the lock and the shortcuts list. Every word typed must appear in the name, the address, or the kind; arrows choose, Enter runs.
 - Tests: matching by words; on the desktop, Ctrl+Shift+P, typing a host's name and Enter opening its tab, arrows moving the choice, and a section opening in place.
 
+### Encrypted backup (2026-10-02)
+
+- Holiday plan, wave 5. Settings, Backup saves the vault to one JSON file and restores from one. The file holds what the vault file holds for its records: the records still encrypted with `VK`, `vault_id`, the KDF parameters, and `wrap_pw`; never this device's sealed account (the device token) or biometric unlock, and no deleted records. It opens only with the master password the vault had when it was saved, so saving asks for that password first: someone at an unlocked device cannot take away a copy to guess at.
+- Restoring opens the file with its master password (KDF settings outside the allowed range are refused before any key is derived, as from a server) and adds the entries the vault does not have, re-encrypted under this vault's key; what the vault has is never overwritten, the result says how many were added and kept. Records that do not open, or of a kind this version does not know, are left out. A file from a newer backup version is refused with a message.
+- No change to docs/security-model.md: the file is the vault file's own protection, moved.
+- Tests: no token, no plaintext, no deleted record in the file; a wrong password refused; another vault adding only what is new; a file that is not a backup or is newer refused; the panel saving with the master password (a wrong one saves nothing) and restoring a deleted host.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

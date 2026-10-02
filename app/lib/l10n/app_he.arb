@@ -490,5 +490,20 @@
   "paletteOpenTab": "לשונית פתוחה",
   "paletteConnect": "התחברות",
   "paletteSection": "אזור",
-  "paletteAction": "פעולה"
+  "paletteAction": "פעולה",
+  "settingsBackup": "גיבוי",
+  "backupIntro": "עותק מוצפן של הכספת בקובץ אחד, לשמירה או להעברה בלי שרת סנכרון. הוא נפתח רק עם הסיסמה הראשית שאיתה נשמר. יש בו שרתים, מפתחות, זהויות, snippets והגדרות, בלי פרטי הכניסה של המכשיר הזה.",
+  "backupExport": "שמירת גיבוי מוצפן",
+  "backupExportHelp": "נשמר בתיקיית ההורדות במחשב, ובמקום שבוחרים בטלפון.",
+  "backupImport": "שחזור מגיבוי",
+  "backupImportHelp": "מוסיף את מה שיש בגיבוי ואין בכספת הזו; שום דבר כאן לא נדרס.",
+  "backupExportPasswordTitle": "אישור עם הסיסמה הראשית",
+  "backupExportPasswordBody": "הגיבוי נפתח עם הסיסמה הזו, ולכן היא נדרשת לפני שעותק יוצא מהמכשיר.",
+  "backupImportPasswordTitle": "הסיסמה הראשית של הגיבוי",
+  "backupImportPasswordBody": "הסיסמה הראשית שהייתה לכספת כשהגיבוי נשמר.",
+  "backupSaved": "הגיבוי נשמר: {path}",
+  "backupImported": "{added, plural, =0{אין פריטים חדשים} =1{נוסף פריט אחד} other{נוספו {added} פריטים}}, {kept, plural, =0{אין פריטים שכבר קיימים} =1{פריט אחד כבר קיים} other{{kept} כבר קיימים}}",
+  "backupNotABackup": "הקובץ הזה הוא לא גיבוי של Tildeck.",
+  "backupNewer": "הגיבוי הזה מגרסה חדשה יותר של Tildeck. צריך לעדכן את Tildeck כדי לשחזר אותו.",
+  "backupWrongPassword": "זו לא הסיסמה הראשית של הגיבוי הזה."
 }
