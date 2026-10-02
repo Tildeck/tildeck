@@ -86,16 +86,20 @@ async def test_only_the_next_version_is_accepted(client, mail):  # noqa: F811
     assert skipped["conflicts"][0]["current"] is None, "a new record starts at version 1"
 
 
-async def test_deletions_are_tombstones_without_content(client, mail):  # noqa: F811
+async def test_deletions_are_tombstones_with_at_most_a_marker(client, mail):  # noqa: F811
     auth = await signed_up(client, mail)
-    a = str(uuid.uuid4())
+    a, b = str(uuid.uuid4()), str(uuid.uuid4())
     await push(client, auth, live(a, 1))
     await push(client, auth, tombstone(a, 2))
-    [record] = (await pull(client, auth))["records"]
-    assert record["deleted"] is True and record["nonce"] is None and record["ct"] is None
+    marker = {**tombstone(b, 1), "ct": b64(64), "nonce": b64(24)}
+    await push(client, auth, marker)
+    records = {r["id"]: r for r in (await pull(client, auth))["records"]}
+    assert records[a]["deleted"] is True and records[a]["nonce"] is None and records[a]["ct"] is None
+    # A deletion marker is kept as sent, for the other devices to check.
+    assert records[b]["deleted"] is True and (records[b]["nonce"], records[b]["ct"]) == (marker["nonce"], marker["ct"])
 
-    bad = {**tombstone(str(uuid.uuid4()), 1), "ct": b64(64), "nonce": b64(24)}
-    res = await client.post("/api/sync/records", json={"changes": [bad]}, headers=auth)
+    half = {**tombstone(str(uuid.uuid4()), 1), "ct": b64(64)}
+    res = await client.post("/api/sync/records", json={"changes": [half]}, headers=auth)
     assert (res.status_code, res.json()) == (422, {"error": "invalid_request"})
     empty = {"id": str(uuid.uuid4()), "version": 1, "deleted": False}
     assert (await client.post("/api/sync/records", json={"changes": [empty]}, headers=auth)).status_code == 422

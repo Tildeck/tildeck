@@ -132,7 +132,43 @@ void main() {
     expect(a.vault.hosts.single.name, 'Primary database');
     expect(a.vault.keys, isEmpty);
     expect(server.records[keyId]!['deleted'], isTrue, reason: 'a deletion is kept as a tombstone');
-    expect(server.records[keyId]!['ct'], isNull);
+    expect(server.records[keyId]!['ct'], isNotNull, reason: 'with its marker, which a.vault checked');
+  });
+
+  test('a deletion from the server alone deletes nothing: without a marker, or with one that does not open', () async {
+    final a = await firstDevice();
+    final first = a.vault.newId(), second = a.vault.newId(), never = a.vault.newId();
+    await a.vault.put(host(first, 'Database'));
+    await a.vault.put(host(second, 'Web'));
+    await a.sync();
+    final b = await secondDevice(a);
+    await b.sync();
+    expect(b.vault.hosts, hasLength(2));
+
+    // The server makes tombstones up: one bare, one with a marker taken from
+    // another record (it opens with the vault key, but not for this record).
+    final borrowed = server.records[second]!;
+    server.records[first] = {
+      'id': first,
+      'version': 2,
+      'deleted': true,
+      'nonce': null,
+      'ct': null,
+      'revision': ++server.revision,
+    };
+    server.records[second] = {...borrowed, 'version': 2, 'deleted': true, 'revision': ++server.revision};
+    // And one for a record no device has: nothing to delete, taken as it is.
+    server.records[never] = {
+      'id': never,
+      'version': 1,
+      'deleted': true,
+      'nonce': null,
+      'ct': null,
+      'revision': ++server.revision,
+    };
+    await b.sync();
+    expect(b.vault.hosts.map((h) => h.name).toSet(), {'Database', 'Web'});
+    expect(b.vault.damaged.toSet(), {first, second});
   });
 
   test('the server never receives plaintext', () async {

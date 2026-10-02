@@ -481,7 +481,7 @@ class Vault extends ChangeNotifier {
     _requireUnlocked();
     final current = _records[id];
     if (current == null || current.deleted) return;
-    _records[id] = StoredRecord(id: id, version: _nextVersion(current), deleted: true, dirty: true);
+    _records[id] = _tombstone(id, _nextVersion(current));
     _entries.remove(id);
     notifyListeners();
     await _save();
@@ -621,6 +621,12 @@ class Vault extends ChangeNotifier {
         if (!damaged.contains(remote.id)) damaged.add(remote.id);
         return;
       }
+    } else if (local != null && !local.deleted && !_proven(remote)) {
+      // A deletion without a marker this vault's key opens may come from
+      // the server alone: it never deletes what this device has. The entry
+      // stays, and is reported.
+      if (!damaged.contains(remote.id)) damaged.add(remote.id);
+      return;
     }
 
     if (local != null && local.dirty && _localWins(local, remoteDoc)) {
@@ -662,15 +668,27 @@ class Vault extends ChangeNotifier {
   /// A dirty record moved to [version]: re-encrypted, since the version is
   /// bound into the ciphertext. Its content and `modified_at` are unchanged.
   StoredRecord _reencrypt(StoredRecord local, int version) {
-    if (local.deleted || local.sealed == null) {
-      return StoredRecord(id: local.id, version: version, deleted: true, dirty: true);
-    }
+    if (local.deleted || local.sealed == null) return _tombstone(local.id, version);
     final key = _requireUnlocked();
     final plain = crypto.decryptRecord(key, _vaultId!, local.id, local.version, local.sealed!);
     final sealed = crypto.encryptRecord(key, _vaultId!, local.id, version, plain);
     plain.fillRange(0, plain.length, 0);
     return StoredRecord(id: local.id, version: version, sealed: sealed, dirty: true);
   }
+
+  /// The deletion of [id] at [version], with its marker: sealed under the
+  /// vault key and bound to the record and version, so other devices can
+  /// tell it came from a device of this vault, not from the server.
+  StoredRecord _tombstone(String id, int version) {
+    final plain = Uint8List.fromList(utf8.encode(jsonEncode(_deletionMarker)));
+    final sealed = crypto.encryptRecord(_requireUnlocked(), _vaultId!, id, version, plain);
+    return StoredRecord(id: id, version: version, deleted: true, sealed: sealed, dirty: true);
+  }
+
+  static const _deletionMarker = {'deleted': true};
+
+  /// Whether a pulled deletion carries a marker this vault's key opens.
+  bool _proven(StoredRecord tombstone) => _decrypt(tombstone)?['deleted'] == true;
 
   Map<String, dynamic>? _decrypt(StoredRecord record, [SecureKey? key]) {
     if (record.sealed == null) return null;
