@@ -575,6 +575,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Now the saved password answers only the first prompt that asks for a password (not "Verification code" or "One-time password"), once per connection: a server asking again (it refused the password) gets the user's answer instead of the same password. Every other prompt is shown to the user in a dialog with the server's own words, hidden or shown as the server asks; a cancel answers nothing. The screen that opens connections sets `SshConnector.askLogin`, so sessions, files, and forwarding all ask.
 - Tests: password prompts told apart from code prompts; a password and a code in one request; a repeated password prompt asked of the user; nobody to ask, a cancel, an empty request; the dialog showing the server's words and hiding a secret prompt. Not tried against a real server with a one-time code.
 
+### Importing hosts from an SSH configuration (2026-10-02)
+
+- As Termius does: the hosts page imports hosts from ~/.ssh/config (or a chosen file, on a phone too). The parser follows ssh_config(5) for what it keeps: for each option the first value from the matching `Host` blocks in file order (so `Host *` gives defaults), `IdentityFile` adding up, `%h` in HostName, `=` and quotes, the first hop of ProxyJump, `none`. `Match` and `Include` are not followed, and a wildcard or negated pattern names no host.
+- Each named host becomes a host; its key files are read and added as keys (a key already in the vault, by fingerprint, is reused; one that cannot be read or needs a passphrase is listed, and its host signs in with a password); a ProxyJump naming another imported host, or a saved one, becomes its jump host; with no User, ssh's default, this computer's user. Hosts already saved (same address, port, and user) are shown and left out.
+- Tests: the parser on a configuration with defaults, several names per line, negation, Match, `=`, quotes, and ProxyJump forms; importing with keys read once, an unreadable key, jump hosts by alias and by a saved host's name, a key not added twice; the dialog listing hosts, leaving out a saved one, and saving the chosen.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
