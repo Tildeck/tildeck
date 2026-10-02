@@ -2,6 +2,7 @@
 token, password and TOTP sign-in, sessions with CSRF, and the users, devices,
 settings, and activity an administrator manages."""
 
+import asyncio
 import time
 import uuid
 from datetime import timedelta
@@ -11,12 +12,21 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
-from app import admins, clock
+from app import accounts, admins, clock
 from app.db import engine
 from app.main import app
 from app.routers import account as account_routes
 from app.routers import admin as admin_routes
-from tests.test_accounts import H, Keys, b64, bearer, mail, register, verify  # noqa: F401 - mail is a fixture
+from tests.test_accounts import (  # noqa: F401 - mail is a fixture
+    CountingHasher,
+    H,
+    Keys,
+    b64,
+    bearer,
+    mail,
+    register,
+    verify,
+)
 
 USERNAME = "operator"
 PASSWORD = "a-long-admin-password"
@@ -129,6 +139,22 @@ async def test_sign_in_needs_the_password_and_an_unused_code(panel, monkeypatch)
     log = (await panel.get("/api/admin/activity")).json()["entries"]
     actions = [e["action"] for e in log]
     assert actions[:4] == ["admin_signin_failed", "admin_signin", "admin_signin_failed", "admin_signin_failed"]
+
+
+async def test_an_unknown_administrator_takes_as_long_as_a_wrong_password(panel, monkeypatch):
+    await set_up(panel, monkeypatch)
+    verified = []
+    monkeypatch.setattr(accounts, "_hasher", CountingHasher(accounts._hasher, verified))
+    res = await panel.post("/api/admin/session", json={"username": "nobody", "password": PASSWORD, "code": "000000"})
+    assert res.status_code == 401
+    assert len(verified) == 1
+
+
+async def test_admin_attempts_sent_at_once_cannot_get_past_the_limit(panel, monkeypatch):
+    await set_up(panel, monkeypatch)
+    body = {"username": USERNAME, "password": "not-the-password", "code": "000000"}
+    answers = await asyncio.gather(*(panel.post("/api/admin/session", json=body) for _ in range(15)))
+    assert sorted(a.status_code for a in answers) == [401] * 10 + [429] * 5
 
 
 async def test_changes_need_the_csrf_token_and_sessions_expire(panel, monkeypatch):

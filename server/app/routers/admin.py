@@ -39,10 +39,8 @@ def _address(request: Request) -> str:
 
 
 def _limit_address(request: Request) -> None:
-    key = f"addr:{_address(request)}"
-    if limiter.exceeded(key, ADDRESS_LIMIT):
+    if not limiter.take(f"addr:{_address(request)}", ADDRESS_LIMIT):
         raise ApiError(429, ErrorCode.rate_limited)
-    limiter.hit(key)
 
 
 def _set_cookie(response: Response, token: str) -> None:
@@ -184,18 +182,18 @@ async def sign_in(
     """Password and TOTP code. Failures look the same whichever part was
     wrong, and are logged."""
     _limit_address(request)
+    # Counted as a failure from the start, as for accounts: concurrent
+    # attempts cannot all pass while the password is being checked.
     user_key = f"admin:{body.username.lower()}"
-    if limiter.exceeded(user_key, USERNAME_LIMIT):
+    if not limiter.take(user_key, USERNAME_LIMIT):
         raise ApiError(429, ErrorCode.rate_limited)
     admin = await session.scalar(select(Admin).where(Admin.username == body.username))
-    ok = (
-        admin is not None
-        and admin.disabled_at is None
-        and await accounts.verify_key(admin.password_hash, body.password)
-    )
+    usable = admin if admin is not None and admin.disabled_at is None else None
+    # Verified even without a usable administrator, so the time taken does
+    # not tell which usernames exist.
+    ok = await accounts.verify_key(usable.password_hash if usable else None, body.password)
     step = admins.totp_step(admins.secret_of(admin), body.code, admin.totp_last_step) if ok and admin else None
     if admin is None or step is None:
-        limiter.hit(user_key)
         audit.record(
             session,
             actor=body.username[:100],
@@ -206,6 +204,7 @@ async def sign_in(
         )
         await session.commit()
         raise ApiError(401, ErrorCode.invalid_credentials)
+    limiter.give_back(user_key)
     admin.totp_last_step = step
     token, csrf = await admins.open_session(session, admin)
     audit.record(

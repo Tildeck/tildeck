@@ -160,21 +160,21 @@ def _address(request: Request) -> str:
 
 
 async def _limit(session: AsyncSession, request: Request, email: str | None = None) -> None:
-    """Refuse when the client address, or the account after failures, is over
-    its limit. Checked before any expensive work."""
+    """Refuse when the client address, or the account, is over its limit.
+    Checked before any expensive work. An attempt on an account counts as a
+    failure from the start, so attempts sent at once cannot all pass while
+    the key is still being checked; _succeeded gives it back."""
     per_address = int(await settings_store.get_value(session, "signin_limit_per_address") or 30)
-    address_key = f"addr:{_address(request)}"
-    if limiter.exceeded(address_key, per_address):
+    if not limiter.take(f"addr:{_address(request)}", per_address):
         raise ApiError(429, ErrorCode.rate_limited)
-    limiter.hit(address_key)
     if email is not None:
         per_account = int(await settings_store.get_value(session, "signin_limit_per_account") or 10)
-        if limiter.exceeded(f"acct:{email}", per_account):
+        if not limiter.take(f"acct:{email}", per_account):
             raise ApiError(429, ErrorCode.rate_limited)
 
 
-def _failed(email: str) -> None:
-    limiter.hit(f"acct:{email}")
+def _succeeded(email: str) -> None:
+    limiter.give_back(f"acct:{email}")
 
 
 def _vault_keys(account: Account) -> VaultKeys:
@@ -422,8 +422,10 @@ async def signin(
     email = accounts.normalize_email(body.email)
     await _limit(session, request, email)
     account = await _account_by_email(session, email)
-    if account is None or not await accounts.verify_key(account.auth_key_hash, body.auth_key):
-        _failed(email)
+    # Verified even for an unknown email, so the time taken does not tell
+    # which accounts exist.
+    ok = await accounts.verify_key(account.auth_key_hash if account else None, body.auth_key)
+    if account is None or not ok:
         audit.record(
             session,
             actor=email,
@@ -434,6 +436,7 @@ async def signin(
         )
         await session.commit()
         raise ApiError(401, ErrorCode.invalid_credentials)
+    _succeeded(email)
     if account.disabled_at is not None:
         raise ApiError(403, ErrorCode.account_disabled)
 
@@ -666,8 +669,8 @@ async def change_password(
     device is signed out unless the user asks to keep them."""
     await _limit(session, request, caller.account.email)
     if not await accounts.verify_key(caller.account.auth_key_hash, body.auth_key):
-        _failed(caller.account.email)
         raise ApiError(401, ErrorCode.invalid_credentials)
+    _succeeded(caller.account.email)
     await _set_password(session, caller.account, body.new)
     if not body.keep_other_devices:
         await _revoke_others(session, caller.account, keep=caller.device.id)
@@ -688,8 +691,8 @@ async def _recovery_account(session: AsyncSession, request: Request, body: Recov
     email = accounts.normalize_email(body.email)
     await _limit(session, request, email)
     account = await _account_by_email(session, email)
-    if account is None or not await accounts.verify_key(account.recovery_auth_hash, body.recovery_auth_key):
-        _failed(email)
+    ok = await accounts.verify_key(account.recovery_auth_hash if account else None, body.recovery_auth_key)
+    if account is None or not ok:
         audit.record(
             session,
             actor=email,
@@ -700,6 +703,7 @@ async def _recovery_account(session: AsyncSession, request: Request, body: Recov
         )
         await session.commit()
         raise ApiError(401, ErrorCode.recovery_failed)
+    _succeeded(email)
     if account.disabled_at is not None:
         raise ApiError(403, ErrorCode.account_disabled)
     return account

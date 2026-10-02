@@ -114,6 +114,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health/ready', timeout=8)"
 
 # The server always sits behind a TLS-terminating reverse proxy, which is the
-# only thing that should reach this port. Without the proxy headers the client
-# address and the https scheme would be lost.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# only thing that should reach this port. The application reads the proxy
+# headers itself, believing only TRUSTED_PROXIES (app/config.py), so uvicorn
+# must not rewrite the client address first.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-proxy-headers"]

@@ -2,6 +2,7 @@
 "Accounts and devices"). Keys here are random stand-ins: the server treats
 them as opaque bytes, exactly as it treats the real ones."""
 
+import asyncio
 import base64
 import json
 import os
@@ -11,9 +12,10 @@ import uuid
 from datetime import timedelta
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
-from app import clock, mailer
+from app import accounts, clock, mailer
 from app.db import engine
 from app.main import app
 from app.routers import account as account_routes
@@ -59,6 +61,20 @@ class Keys:
             "wrap_rk": self.wrap_rk,
             "device": self.device,
         }
+
+
+class CountingHasher:
+    """The server's Argon2 hasher, noting every hash it verifies against."""
+
+    def __init__(self, real, verified: list):
+        self.real, self.verified = real, verified
+
+    def hash(self, key):
+        return self.real.hash(key)
+
+    def verify(self, stored, key):
+        self.verified.append(stored)
+        return self.real.verify(stored, key)
 
 
 @pytest.fixture
@@ -341,6 +357,63 @@ async def test_repeated_failures_are_rate_limited(client, mail):
     assert codes[:10] == [401] * 10 and codes[10] == 429
     right = {**body, "auth_key": keys.auth_key}
     assert (await client.post("/api/account/signin", json=right, headers=H)).json() == {"error": "rate_limited"}
+
+
+async def test_attempts_sent_at_once_cannot_get_past_the_limit(client, mail):
+    # Each attempt counts before its key is checked: otherwise all of them
+    # pass the limit while the first ones are still being hashed.
+    keys = Keys("user@example.test")
+    await register(client, keys)
+    body = {"email": keys.email, "auth_key": b64(32), "device": device()}
+    answers = await asyncio.gather(*(client.post("/api/account/signin", json=body, headers=H) for _ in range(20)))
+    codes = sorted(a.status_code for a in answers)
+    assert codes == [401] * 10 + [429] * 10
+
+
+async def test_a_successful_sign_in_is_not_counted_as_a_failure(client, mail):
+    keys = Keys("user@example.test")
+    await register(client, keys)
+    right = {"email": keys.email, "auth_key": keys.auth_key, "device": keys.device}
+    for _ in range(12):
+        assert (await client.post("/api/account/signin", json=right, headers=H)).status_code == 200
+
+
+async def test_an_unknown_email_takes_as_long_as_a_wrong_key(client, mail, monkeypatch):
+    # The same Argon2 verification runs whether or not the account exists,
+    # so timing does not reveal which addresses have accounts.
+    verified = []
+    monkeypatch.setattr(accounts, "_hasher", CountingHasher(accounts._hasher, verified))
+    for path, body in (
+        ("/api/account/signin", {"email": "nobody@example.test", "auth_key": b64(32), "device": device()}),
+        ("/api/account/recovery/start", {"email": "nobody@example.test", "recovery_auth_key": b64(32)}),
+    ):
+        verified.clear()
+        res = await client.post(path, json=body, headers=H)
+        assert res.status_code == 401, res.text
+        assert len(verified) == 1, path
+
+
+async def test_the_address_limit_counts_the_address_the_proxy_saw(client, mail, monkeypatch):
+    monkeypatch.setenv("SIGNIN_LIMIT_PER_ADDRESS", "3")
+    body = {"email": "a@example.test"}
+
+    def prelogin(forwarded: str, c=client):
+        return c.post("/api/account/prelogin", json=body, headers={**H, "X-Forwarded-For": forwarded})
+
+    # Behind the proxy (the test client connects from 127.0.0.1): the proxy
+    # appends the address it saw; whatever the client wrote before it is not
+    # believed, so changing it does not reset the limit.
+    codes = [(await prelogin(f"198.51.100.{i}, 203.0.113.5")).status_code for i in range(4)]
+    assert codes == [200, 200, 200, 429]
+    # Another client behind the same proxy has its own limit.
+    assert (await prelogin("203.0.113.6")).status_code == 200
+
+    # A client connecting directly from a public address cannot choose the
+    # address it is counted under.
+    direct = AsyncClient(transport=ASGITransport(app=app, client=("203.0.113.7", 4000)), base_url="http://test")
+    async with direct:
+        codes = [(await prelogin(f"198.51.100.{i}", direct)).status_code for i in range(4)]
+    assert codes == [200, 200, 200, 429]
 
 
 async def test_a_waiting_device_may_keep_asking_but_wrong_claim_tokens_are_limited(client, mail):

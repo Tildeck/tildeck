@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     # ships it; a checkout running outside a container may point elsewhere or
     # leave it missing, in which case only the API is served.
     PANEL_DIR: str = "/app/panel"
+    # Peers whose X-Forwarded-For and X-Forwarded-Proto are believed: the
+    # reverse proxy in front of the server. Comma-separated addresses or
+    # networks. The default covers a proxy on this host or in a private
+    # network (Docker's included); a client reaching the server directly
+    # from a public address cannot choose the address its limits count.
+    TRUSTED_PROXIES: str = "127.0.0.0/8,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"
 
     def production_problems(self) -> list[str]:
         """Reasons this configuration must not run in production. Enforced

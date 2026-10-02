@@ -102,7 +102,7 @@ The associated data binds a ciphertext to its place: `ad = "tildeck:record:v1|" 
 
 **Pre-login.** Sign-in starts with the email address; the server answers with the salt and parameters. For an unknown address it answers with a deterministic fake salt (a keyed hash of the address with a server secret), so the endpoint does not reveal which addresses have accounts.
 
-**Sign-in.** The client sends `AK` and a device name. The server verifies it against the stored hash and, for a known device, issues a device token. Sign-in attempts are rate-limited per account and per client address, and failures are recorded in the activity log.
+**Sign-in.** The client sends `AK` and a device name. The server verifies it against the stored hash and, for a known device, issues a device token. Sign-in attempts are rate-limited per account and per client address, and failures are recorded in the activity log. An attempt counts against the account before its key is checked and is given back when it succeeds, so attempts sent at once cannot pass the limit together. An unknown address is checked against a throwaway Argon2 hash, so the answer takes as long as for a wrong key. The client address is the one the reverse proxy saw: `X-Forwarded-For` is believed only from `TRUSTED_PROXIES`, and only its nearest untrusted entry counts.
 
 **New-device approval.** A sign-in from a device the account has not used before creates a pending device. It receives the wrapped vault key and records only after approval, given from an already signed-in device or, with SMTP, through a link in an email to the account address. Approval is defense in depth for a leaked master password: an attacker with the password still needs one of the user's devices or mailbox.
 

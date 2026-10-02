@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app import admins, migrations_runner, panel, settings_store
 from app.config import get_app_version, get_settings
@@ -91,6 +92,9 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     # Last: the panel's catch-all route must not shadow any API route.
     panel.mount(app, get_settings().PANEL_DIR)
+    # The client's address, as the trusted proxy saw it: the nearest entry of
+    # X-Forwarded-For that is not a trusted proxy, never one the client wrote.
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=get_settings().TRUSTED_PROXIES)
     return app
 
 
