@@ -488,6 +488,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The files page now starts listing after its first frame: starting notifies listeners (the tab, too), which must not happen while building.
 - Tests: on the desktop, selection by click, Shift, and Ctrl; F2 and Delete; sorting by a column; a double-click opening a folder; the right-click menu; and a host's files opening as a tab. Golden: the table in both languages.
 
+### Desktop layout: two panes (2026-10-02)
+
+- On the desktop, the files tab shows this computer beside the server, as Termius does: the same table on both sides (one component, `FileTable`, with its selection), each with its path as steps (a Windows drive as its first step). Dragging entries from one side to the other copies them: onto the server it uploads files and folders, onto this computer it downloads into the folder shown there, never over a file that is there. The selection also copies by a button, and the server's right-click menu offers both the folder shown here and the Downloads folder.
+- A switch under the panes hides this computer's side; with it hidden, the toolbar takes the room back.
+- Two panes share the width, so a side's name keeps to an icon (with a tooltip) and the server's upload button to its icon.
+- Tests: on the desktop with a real local folder, a local file dragged onto the server's table uploads its content, a server file dragged onto the local table lands there and shows, and the local side hides. Golden: both sides in both languages.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

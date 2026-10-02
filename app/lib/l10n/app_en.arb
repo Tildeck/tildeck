@@ -660,5 +660,12 @@
   "closeOtherTabs": "Close the other tabs",
   "columnName": "Name",
   "columnSize": "Size",
-  "columnModified": "Modified"
+  "columnModified": "Modified",
+  "thisComputer": "This computer",
+  "downloadToPane": "Download to this computer's folder",
+  "downloadToDownloads": "Download to Downloads",
+  "uploadToServer": "Upload to the server",
+  "hideThisComputer": "Hide this computer",
+  "showThisComputer": "Show this computer beside the server",
+  "dragBetweenPanes": "Drag files from one side to the other to copy them."
 }

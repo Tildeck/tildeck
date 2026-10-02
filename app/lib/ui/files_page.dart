@@ -1,13 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 
 import '../l10n/app_localizations.dart';
+import '../local/local_browser.dart';
 import '../ssh/file_browser.dart';
 import '../ssh/local_files.dart';
 import '../theme.dart';
 import 'desktop_sidebar.dart' show isDesktopLayout;
 import 'file_editor_page.dart';
+import 'file_table.dart';
 import 'terminal_panel.dart' show connectProblemText;
 
 String fileProblemText(AppLocalizations t, FileProblem problem) => switch (problem) {
@@ -26,13 +30,23 @@ String fileProblemText(AppLocalizations t, FileProblem problem) => switch (probl
 /// files into the current one, download a file by tapping it. Paths and
 /// names are LTR content in either language.
 class FilesPage extends StatefulWidget {
-  const FilesPage({super.key, required this.browser, required this.title, this.local = const DeviceFiles()});
+  const FilesPage({
+    super.key,
+    required this.browser,
+    required this.title,
+    this.local = const DeviceFiles(),
+    this.localBrowser,
+  });
 
   final FileBrowser browser;
 
   /// Who and where: user@host.
   final String title;
   final LocalFiles local;
+
+  /// This computer's side in the desktop layout; made from the home folder
+  /// when not given.
+  final LocalBrowser? localBrowser;
 
   @override
   State<FilesPage> createState() => _FilesPageState();
@@ -41,8 +55,18 @@ class FilesPage extends StatefulWidget {
 class _FilesPageState extends State<FilesPage> {
   FileBrowser get browser => widget.browser;
 
-  /// Paths chosen with a long press, for acting on several at once.
-  final _selected = <String>{};
+  /// The server's entries chosen: by long press on a phone, by click on
+  /// the desktop.
+  final _remoteSel = FileSelection();
+  Set<String> get _selected => _remoteSel.paths;
+
+  /// This computer's side of the desktop layout, and what is chosen there.
+  late final LocalBrowser _local = widget.localBrowser ?? LocalBrowser();
+  final _localSel = FileSelection();
+  final _localFocus = FocusNode(debugLabel: 'localFiles');
+
+  /// Whether this computer's side shows, beside the server's.
+  var _twoPanes = true;
 
   void _toggle(RemoteEntry entry) => setState(() {
     if (!_selected.remove(entry.path)) _selected.add(entry.path);
@@ -57,11 +81,16 @@ class _FilesPageState extends State<FilesPage> {
     // tab showing its state, too), which must not happen while building.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && browser.path == null) browser.start();
+      if (mounted && widget.local.folders && _local.path == null) _local.start();
     });
   }
 
   @override
   void dispose() {
+    _localFocus.dispose();
+    _localSel.dispose();
+    _remoteSel.dispose();
+    if (widget.localBrowser == null) _local.dispose();
     _listFocus.dispose();
     browser.dispose();
     super.dispose();
@@ -235,43 +264,9 @@ class _FilesPageState extends State<FilesPage> {
     }
   }
 
-  /// The last entry clicked, where a Shift+click range starts.
-  String? _anchor;
-
-  /// The last click, to tell a double-click.
-  ({String path, DateTime at})? _lastClick;
-
-  /// A click selects one entry; with Ctrl it adds or removes one; with
-  /// Shift it selects the range from the last click.
-  void _click(RemoteEntry entry) {
-    final keys = HardwareKeyboard.instance;
-    final list = browser.entries;
-    setState(() {
-      if (keys.isShiftPressed && _anchor != null) {
-        final from = list.indexWhere((e) => e.path == _anchor);
-        final to = list.indexOf(entry);
-        if (from >= 0 && to >= 0) {
-          final (a, b) = from < to ? (from, to) : (to, from);
-          _selected
-            ..clear()
-            ..addAll(list.sublist(a, b + 1).map((e) => e.path));
-          return;
-        }
-      }
-      if (keys.isControlPressed || keys.isMetaPressed) {
-        if (!_selected.remove(entry.path)) _selected.add(entry.path);
-      } else {
-        _selected
-          ..clear()
-          ..add(entry.path);
-      }
-      _anchor = entry.path;
-    });
-  }
-
   /// A folder opens; a file opens in the editor.
   void _openEntry(RemoteEntry entry) {
-    setState(_selected.clear);
+    _remoteSel.clear();
     if (entry.isDirectory) {
       browser.open(entry.path);
     } else {
@@ -281,8 +276,7 @@ class _FilesPageState extends State<FilesPage> {
 
   Future<void> _contextMenu(Offset at, RemoteEntry entry) async {
     final t = AppLocalizations.of(context);
-    if (!_selected.contains(entry.path)) _click(entry);
-    final several = _selected.length > 1;
+    final several = _remoteSel.length > 1;
     final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
     final action = await showMenu<String>(
       context: context,
@@ -291,8 +285,10 @@ class _FilesPageState extends State<FilesPage> {
         if (!several && !entry.isDirectory)
           PopupMenuItem(key: const ValueKey('rowEdit'), value: 'edit', child: Text(t.editFile)),
         if (!several && entry.isDirectory) PopupMenuItem(value: 'open', child: Text(t.open)),
+        if (_showsLocal)
+          PopupMenuItem(key: const ValueKey('rowDownloadHere'), value: 'toLocal', child: Text(t.downloadToPane)),
         if (widget.local.folders || !entry.isDirectory || several)
-          PopupMenuItem(key: const ValueKey('rowDownload'), value: 'download', child: Text(t.download)),
+          PopupMenuItem(key: const ValueKey('rowDownload'), value: 'download', child: Text(t.downloadToDownloads)),
         if (!several) ...[
           PopupMenuItem(key: const ValueKey('rowRename'), value: 'rename', child: Text(t.renameAction)),
           PopupMenuItem(value: 'permissions', child: Text(t.permissionsTitle)),
@@ -305,6 +301,8 @@ class _FilesPageState extends State<FilesPage> {
     switch (action) {
       case 'open':
         _openEntry(entry);
+      case 'toLocal':
+        await _downloadToLocal(_remoteSel.of(browser.entries));
       case 'download' when several:
         await _downloadChosen();
       case 'delete' when several:
@@ -314,7 +312,7 @@ class _FilesPageState extends State<FilesPage> {
     }
   }
 
-  /// The keys of a file manager, while the list has the focus.
+  /// The keys of a file manager, while the server's list has the focus.
   KeyEventResult _onListKey(FocusNode _, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final chosen = _chosen;
@@ -327,12 +325,33 @@ class _FilesPageState extends State<FilesPage> {
       case LogicalKeyboardKey.enter when one != null:
         _openEntry(one);
       case LogicalKeyboardKey.backspace when browser.path != '/':
-        setState(_selected.clear);
+        _remoteSel.clear();
         browser.up();
       case LogicalKeyboardKey.keyA when HardwareKeyboard.instance.isControlPressed:
-        setState(() => _selected.addAll(browser.entries.map((e) => e.path)));
-      case LogicalKeyboardKey.escape when _selected.isNotEmpty:
-        setState(_selected.clear);
+        _remoteSel.selectAll(browser.entries);
+      case LogicalKeyboardKey.escape when !_remoteSel.isEmpty:
+        _remoteSel.clear();
+      default:
+        return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
+
+  /// The local list's keys: open, up, select all.
+  KeyEventResult _onLocalKey(FocusNode _, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final chosen = _localSel.of(_local.entries);
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.enter when chosen.length == 1 && chosen.single.isDirectory:
+        _localSel.clear();
+        _local.open(chosen.single.path);
+      case LogicalKeyboardKey.backspace when !_local.atRoot:
+        _localSel.clear();
+        _local.up();
+      case LogicalKeyboardKey.keyA when HardwareKeyboard.instance.isControlPressed:
+        _localSel.selectAll(_local.entries);
+      case LogicalKeyboardKey.escape when !_localSel.isEmpty:
+        _localSel.clear();
       default:
         return KeyEventResult.ignored;
     }
@@ -341,322 +360,395 @@ class _FilesPageState extends State<FilesPage> {
 
   final _listFocus = FocusNode(debugLabel: 'files');
 
-  /// Files on a wide window: a toolbar with the path, a table with sortable
-  /// columns, and the transfers under it, as a file manager has them.
+  /// Whether this computer's side is on screen.
+  bool get _showsLocal => _twoPanes && widget.local.folders;
+
+  /// Copies files and folders from this computer into the server's folder.
+  Future<void> _uploadFromLocal(List<RemoteEntry> entries) async {
+    _localSel.clear();
+    for (final e in entries) {
+      if (e.isDirectory) {
+        await browser.uploadFolder(Directory(e.path));
+      } else {
+        final file = File(e.path);
+        await browser.upload(file.openRead(), e.name, e.size);
+      }
+    }
+  }
+
+  /// Copies the server's files and folders into this computer's folder,
+  /// never over what is there.
+  Future<void> _downloadToLocal(List<RemoteEntry> entries) async {
+    _remoteSel.clear();
+    for (final e in entries) {
+      final target = _local.unusedPath(e.name);
+      if (e.isDirectory) {
+        await browser.downloadFolder(e, Directory(target));
+      } else {
+        await browser.download(e, File(target));
+      }
+    }
+    await _local.refresh();
+  }
+
+  /// Files on a wide window: this computer and the server side by side, as
+  /// a file manager has them, with the transfers under both.
   Widget _desktop(BuildContext context) {
     final t = AppLocalizations.of(context);
     final c = context.colors;
-    final locale = Localizations.localeOf(context).toLanguageTag();
     return ListenableBuilder(
-      listenable: browser,
+      listenable: Listenable.merge([browser, _local, _remoteSel, _localSel]),
       builder: (context, _) {
         final ready = browser.path != null;
-        final path = browser.path ?? '';
-        final segments = path.split('/').where((p) => p.isNotEmpty).toList();
         final muted = TextStyle(color: c.muted, fontSize: 12.5);
+        final remoteChosen = _remoteSel.of(browser.entries);
+        final localChosen = _localSel.of(_local.entries);
 
-        Widget header(String label, SortBy? by, {double? width, TextAlign align = TextAlign.start}) {
-          final on = by != null && browser.sortBy == by;
-          final text = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: on ? c.ink : c.muted, fontWeight: FontWeight.w700, fontSize: 12.5),
-                ),
-              ),
-              if (on) Icon(Icons.arrow_downward_rounded, size: 14, color: c.ink),
-            ],
-          );
-          final cell = by == null
-              ? text
-              : InkWell(
-                  key: ValueKey('sort-${by.name}'),
-                  onTap: () => browser.setSortBy(by),
-                  child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: text),
-                );
-          return width == null ? Expanded(child: cell) : SizedBox(width: width, child: cell);
-        }
+        Widget pathField(
+          String? path, {
+          required Key key,
+          required void Function(String) onOpen,
+          VoidCallback? onEdit,
+        }) {
+          final segments = (path ?? '').split(RegExp(r'[/\\]')).where((p) => p.isNotEmpty).toList();
+          // A Windows path keeps its drive ("C:") as its first step.
+          final windows = path != null && RegExp(r'^[A-Za-z]:').hasMatch(path);
+          String upTo(int i) {
+            final parts = segments.take(i).join(windows ? r'\' : '/');
+            return windows ? (i == 1 ? '$parts\\' : parts) : '/$parts';
+          }
 
-        final selected = _chosen;
-        // A left-to-right value (a size, a name) at its column's start.
-        final start = Directionality.of(context) == TextDirection.rtl ? TextAlign.right : TextAlign.left;
-        return Scaffold(
-          backgroundColor: c.page,
-          body: Column(
-            children: [
-              // Toolbar: up, the path as steps, and the folder's actions.
-              Container(
-                height: 56,
-                padding: const EdgeInsetsDirectional.fromSTEB(10, 0, 14, 0),
+          final steps = [
+            if (!windows) ('/', '/'),
+            for (var i = 1; i <= segments.length; i++) (segments[i - 1], upTo(i)),
+          ];
+          return Expanded(
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: c.line)),
+                  color: c.surface,
+                  border: Border.all(color: c.line),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    IconButton(
-                      key: const ValueKey('filesUp'),
-                      tooltip: t.parentFolder,
-                      onPressed: ready && path != '/' ? browser.up : null,
-                      icon: const Icon(Icons.arrow_upward_rounded),
-                    ),
-                    IconButton(
-                      key: const ValueKey('filesRefresh'),
-                      tooltip: t.refresh,
-                      onPressed: ready && !browser.loading ? browser.refresh : null,
-                      icon: const Icon(Icons.refresh_rounded),
-                    ),
-                    const SizedBox(width: 6),
-                    // Paths read left to right in either language.
                     Expanded(
-                      child: Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: Container(
-                          height: 38,
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          decoration: BoxDecoration(
-                            color: c.surface,
-                            border: Border.all(color: c.line),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                // Short paths start at the left; a long one
-                                // shows its end, the folder you are in.
-                                child: LayoutBuilder(
-                                  builder: (context, box) => SingleChildScrollView(
-                                    key: const ValueKey('filesPath'),
-                                    scrollDirection: Axis.horizontal,
-                                    reverse: true,
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(minWidth: box.maxWidth),
-                                      child: Row(
-                                        children: [
-                                          for (var i = 0; i <= segments.length; i++)
-                                            TextButton(
-                                              key: ValueKey('crumb-$i'),
-                                              style: TextButton.styleFrom(
-                                                foregroundColor: i == segments.length ? c.ink : c.muted,
-                                                minimumSize: const Size(0, 30),
-                                                padding: const EdgeInsets.symmetric(horizontal: 5),
-                                                textStyle: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13),
-                                              ),
-                                              onPressed: i == segments.length
-                                                  ? null
-                                                  : () => browser.open(i == 0 ? '/' : '/${segments.take(i).join('/')}'),
-                                              child: Text(
-                                                i == 0 ? '/' : '${segments[i - 1]}${i < segments.length ? ' /' : ''}',
-                                              ),
-                                            ),
-                                        ],
-                                      ),
+                      // Short paths start at the left; a long one shows its
+                      // end, the folder you are in.
+                      child: LayoutBuilder(
+                        builder: (context, box) => SingleChildScrollView(
+                          key: key,
+                          scrollDirection: Axis.horizontal,
+                          reverse: true,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minWidth: box.maxWidth),
+                            child: Row(
+                              children: [
+                                for (final (i, (label, to)) in steps.indexed)
+                                  TextButton(
+                                    key: ValueKey('$key-crumb-$i'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: i == steps.length - 1 ? c.ink : c.muted,
+                                      minimumSize: const Size(0, 30),
+                                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                                      textStyle: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13),
                                     ),
+                                    onPressed: i == steps.length - 1 ? null : () => onOpen(to),
+                                    child: Text(label == '/' || i == steps.length - 1 ? label : '$label /'),
                                   ),
-                                ),
-                              ),
-                              IconButton(
-                                key: const ValueKey('filesGoTo'),
-                                tooltip: t.goToFolder,
-                                visualDensity: VisualDensity.compact,
-                                iconSize: 18,
-                                onPressed: ready ? _goTo : null,
-                                icon: const Icon(Icons.edit_outlined),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    if (selected.isNotEmpty) ...[
-                      Text(t.selectedCount(selected.length), key: const ValueKey('selectionCount'), style: muted),
+                    if (onEdit != null)
                       IconButton(
-                        key: const ValueKey('selectionDownload'),
-                        tooltip: t.download,
-                        onPressed: _downloadChosen,
-                        icon: const Icon(Icons.download_rounded),
+                        key: const ValueKey('filesGoTo'),
+                        tooltip: t.goToFolder,
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 18,
+                        onPressed: onEdit,
+                        icon: const Icon(Icons.edit_outlined),
                       ),
-                      IconButton(
-                        key: const ValueKey('selectionDelete'),
-                        tooltip: t.deleteAction,
-                        onPressed: _deleteChosen,
-                        icon: const Icon(Icons.delete_outline_rounded),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        Widget bar(List<Widget> children) => Container(
+          height: 56,
+          padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 12, 0),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: c.line)),
+          ),
+          child: Row(children: children),
+        );
+
+        // Two panes share the width: the side's name keeps to an icon, and
+        // shows in full when the pointer rests on it.
+        Widget title(IconData icon, String text) => Tooltip(
+          message: text,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(start: 8, end: 4),
+            child: _showsLocal
+                ? Icon(icon, size: 20, color: c.brand)
+                : Row(
+                    children: [
+                      Icon(icon, size: 18, color: c.brand),
+                      const SizedBox(width: 8),
+                      Text(
+                        text,
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(width: 6),
                     ],
-                    IconButton(
-                      key: const ValueKey('filesShowHidden'),
-                      tooltip: t.showHiddenFiles,
-                      isSelected: browser.showHidden,
-                      onPressed: () => browser.setShowHidden(!browser.showHidden),
-                      icon: const Icon(Icons.visibility_off_outlined),
-                      selectedIcon: const Icon(Icons.visibility_outlined),
+                  ),
+          ),
+        );
+
+        final remote = Column(
+          children: [
+            bar([
+              title(Icons.dns_outlined, widget.title),
+              IconButton(
+                key: const ValueKey('filesUp'),
+                tooltip: t.parentFolder,
+                onPressed: ready && browser.path != '/' ? browser.up : null,
+                icon: const Icon(Icons.arrow_upward_rounded),
+              ),
+              IconButton(
+                key: const ValueKey('filesRefresh'),
+                tooltip: t.refresh,
+                onPressed: ready && !browser.loading ? browser.refresh : null,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+              pathField(
+                browser.path,
+                key: const ValueKey('filesPath'),
+                onOpen: (to) => browser.open(to),
+                onEdit: ready ? _goTo : null,
+              ),
+              const SizedBox(width: 8),
+              if (remoteChosen.isNotEmpty) ...[
+                Text(t.selectedCount(remoteChosen.length), key: const ValueKey('selectionCount'), style: muted),
+                if (_showsLocal)
+                  IconButton(
+                    key: const ValueKey('selectionToLocal'),
+                    tooltip: t.downloadToPane,
+                    onPressed: () => _downloadToLocal(remoteChosen),
+                    icon: const Icon(Icons.download_rounded),
+                  )
+                else
+                  IconButton(
+                    key: const ValueKey('selectionDownload'),
+                    tooltip: t.download,
+                    onPressed: _downloadChosen,
+                    icon: const Icon(Icons.download_rounded),
+                  ),
+                IconButton(
+                  key: const ValueKey('selectionDelete'),
+                  tooltip: t.deleteAction,
+                  onPressed: _deleteChosen,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+              ],
+              IconButton(
+                key: const ValueKey('filesShowHidden'),
+                tooltip: t.showHiddenFiles,
+                isSelected: browser.showHidden,
+                onPressed: () => browser.setShowHidden(!browser.showHidden),
+                icon: const Icon(Icons.visibility_off_outlined),
+                selectedIcon: const Icon(Icons.visibility_outlined),
+              ),
+              IconButton(
+                key: const ValueKey('filesNewFolder'),
+                tooltip: t.newFolder,
+                onPressed: ready ? _newFolder : null,
+                icon: const Icon(Icons.create_new_folder_outlined),
+              ),
+              const SizedBox(width: 4),
+              MenuAnchor(
+                menuChildren: [
+                  MenuItemButton(
+                    key: const ValueKey('filesUploadFiles'),
+                    leadingIcon: const Icon(Icons.upload_file_outlined),
+                    onPressed: _upload,
+                    child: Text(t.uploadFiles),
+                  ),
+                  if (widget.local.folders)
+                    MenuItemButton(
+                      key: const ValueKey('filesUploadFolder'),
+                      leadingIcon: const Icon(Icons.drive_folder_upload_outlined),
+                      onPressed: _uploadFolder,
+                      child: Text(t.uploadFolder),
                     ),
-                    IconButton(
-                      key: const ValueKey('filesNewFolder'),
-                      tooltip: t.newFolder,
-                      onPressed: ready ? _newFolder : null,
-                      icon: const Icon(Icons.create_new_folder_outlined),
-                    ),
-                    const SizedBox(width: 6),
-                    MenuAnchor(
-                      menuChildren: [
-                        MenuItemButton(
-                          key: const ValueKey('filesUploadFiles'),
-                          leadingIcon: const Icon(Icons.upload_file_outlined),
-                          onPressed: _upload,
-                          child: Text(t.uploadFiles),
-                        ),
-                        if (widget.local.folders)
-                          MenuItemButton(
-                            key: const ValueKey('filesUploadFolder'),
-                            leadingIcon: const Icon(Icons.drive_folder_upload_outlined),
-                            onPressed: _uploadFolder,
-                            child: Text(t.uploadFolder),
-                          ),
-                      ],
-                      builder: (context, menu, _) => FilledButton.icon(
+                ],
+                builder: (context, menu, _) => _showsLocal
+                    ? IconButton.filled(
+                        key: const ValueKey('filesUpload'),
+                        tooltip: t.upload,
+                        onPressed: ready ? () => menu.isOpen ? menu.close() : menu.open() : null,
+                        icon: const Icon(Icons.upload_rounded, size: 18),
+                      )
+                    : FilledButton.icon(
                         key: const ValueKey('filesUpload'),
                         onPressed: ready ? () => menu.isOpen ? menu.close() : menu.open() : null,
                         icon: const Icon(Icons.upload_rounded, size: 18),
                         label: Text(t.upload),
                       ),
-                    ),
-                  ],
+              ),
+            ]),
+            if (browser.problem != null)
+              Container(
+                width: double.infinity,
+                color: c.danger.withValues(alpha: 0.1),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Text(
+                  browser.connectProblem != null
+                      ? connectProblemText(t, browser.connectProblem!)
+                      : fileProblemText(t, browser.problem!),
+                  key: const ValueKey('filesProblem'),
+                  style: TextStyle(color: c.danger),
                 ),
               ),
-              if (browser.problem != null)
+            if (browser.loading) const LinearProgressIndicator(minHeight: 2) else const SizedBox(height: 2),
+            Expanded(
+              child: !ready
+                  ? const SizedBox.shrink()
+                  : FileTable(
+                      side: FileSide.remote,
+                      entries: browser.entries,
+                      selection: _remoteSel,
+                      sortBy: browser.sortBy,
+                      onSort: browser.setSortBy,
+                      onOpen: _openEntry,
+                      onMenu: _contextMenu,
+                      focusNode: _listFocus,
+                      onKey: _onListKey,
+                      empty: browser.loading ? null : t.folderEmpty,
+                      onDrop: _showsLocal ? (drag) => _uploadFromLocal(drag.entries) : null,
+                    ),
+            ),
+          ],
+        );
+
+        final local = Column(
+          children: [
+            bar([
+              title(Icons.computer_outlined, t.thisComputer),
+              IconButton(
+                key: const ValueKey('localUp'),
+                tooltip: t.parentFolder,
+                onPressed: _local.atRoot ? null : _local.up,
+                icon: const Icon(Icons.arrow_upward_rounded),
+              ),
+              IconButton(tooltip: t.refresh, onPressed: _local.refresh, icon: const Icon(Icons.refresh_rounded)),
+              pathField(_local.path, key: const ValueKey('localPath'), onOpen: _local.open),
+              const SizedBox(width: 8),
+              if (localChosen.isNotEmpty) ...[
+                Text(t.selectedCount(localChosen.length), style: muted),
+                IconButton.filledTonal(
+                  key: const ValueKey('selectionToRemote'),
+                  tooltip: t.uploadToServer,
+                  onPressed: ready ? () => _uploadFromLocal(localChosen) : null,
+                  icon: const Icon(Icons.upload_rounded, size: 18),
+                ),
+              ],
+            ]),
+            if (_local.denied)
+              Container(
+                width: double.infinity,
+                color: c.danger.withValues(alpha: 0.1),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Text(t.fileErrorDenied, style: TextStyle(color: c.danger)),
+              ),
+            const SizedBox(height: 2),
+            Expanded(
+              child: FileTable(
+                side: FileSide.local,
+                entries: _local.entries,
+                selection: _localSel,
+                sortBy: _local.sortBy,
+                onSort: _local.setSortBy,
+                showPermissions: false,
+                onOpen: (e) {
+                  if (!e.isDirectory) return;
+                  _localSel.clear();
+                  _local.open(e.path);
+                },
+                onMenu: (at, e) async {
+                  final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+                  final chosen = _localSel.of(_local.entries);
+                  final action = await showMenu<String>(
+                    context: context,
+                    position: RelativeRect.fromRect(at & const Size(1, 1), Offset.zero & overlay.size),
+                    items: [
+                      if (e.isDirectory && chosen.length == 1) PopupMenuItem(value: 'open', child: Text(t.open)),
+                      PopupMenuItem(key: const ValueKey('localUpload'), value: 'upload', child: Text(t.uploadToServer)),
+                    ],
+                  );
+                  if (action == 'open') {
+                    _localSel.clear();
+                    await _local.open(e.path);
+                  } else if (action == 'upload' && ready) {
+                    await _uploadFromLocal(chosen);
+                  }
+                },
+                focusNode: _localFocus,
+                onKey: _onLocalKey,
+                empty: t.folderEmpty,
+                onDrop: ready ? (drag) => _downloadToLocal(drag.entries) : null,
+              ),
+            ),
+          ],
+        );
+
+        return Scaffold(
+          backgroundColor: c.page,
+          body: Column(
+            children: [
+              Expanded(
+                child: _showsLocal
+                    ? Row(
+                        children: [
+                          Expanded(child: local),
+                          VerticalDivider(width: 1, color: c.line),
+                          Expanded(child: remote),
+                        ],
+                      )
+                    : remote,
+              ),
+              // Two panes, or the server's alone.
+              if (widget.local.folders)
                 Container(
-                  width: double.infinity,
-                  color: c.danger.withValues(alpha: 0.1),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Text(
-                    browser.connectProblem != null
-                        ? connectProblemText(t, browser.connectProblem!)
-                        : fileProblemText(t, browser.problem!),
-                    key: const ValueKey('filesProblem'),
-                    style: TextStyle(color: c.danger),
+                  height: 34,
+                  padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    border: Border(top: BorderSide(color: c.line)),
+                  ),
+                  child: Row(
+                    children: [
+                      TextButton.icon(
+                        key: const ValueKey('toggleTwoPanes'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: c.muted,
+                          textStyle: const TextStyle(fontSize: 12.5),
+                        ),
+                        onPressed: () => setState(() => _twoPanes = !_twoPanes),
+                        icon: Icon(_twoPanes ? Icons.view_agenda_outlined : Icons.vertical_split_outlined, size: 16),
+                        label: Text(_twoPanes ? t.hideThisComputer : t.showThisComputer),
+                      ),
+                      const Spacer(),
+                      if (_showsLocal) Text(t.dragBetweenPanes, style: muted),
+                    ],
                   ),
                 ),
-              if (browser.loading) const LinearProgressIndicator(minHeight: 2) else const SizedBox(height: 2),
-              // Column titles; a click sorts by that column.
-              Container(
-                padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 20, 0),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: c.line)),
-                ),
-                child: Row(
-                  children: [
-                    header(t.columnName, SortBy.name),
-                    header(t.columnSize, SortBy.size, width: 110),
-                    header(t.columnModified, SortBy.modified, width: 190),
-                    header(t.permissionsTitle, null, width: 120),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: !ready
-                    ? const SizedBox.shrink()
-                    : browser.entries.isEmpty && !browser.loading
-                    ? Center(
-                        child: Text(t.folderEmpty, style: TextStyle(color: c.muted)),
-                      )
-                    : Focus(
-                        focusNode: _listFocus,
-                        onKeyEvent: _onListKey,
-                        child: ListView.builder(
-                          key: const ValueKey('filesTable'),
-                          itemCount: browser.entries.length,
-                          itemExtent: 36,
-                          itemBuilder: (context, i) {
-                            final e = browser.entries[i];
-                            final on = _selected.contains(e.path);
-                            final size = !e.isDirectory && e.size != null ? formatSize(e.size!, locale) : '';
-                            final date = e.modified == null
-                                ? ''
-                                : DateFormat.yMMMd(locale).add_Hm().format(e.modified!);
-                            return Material(
-                              color: on ? c.brand.withValues(alpha: 0.14) : Colors.transparent,
-                              child: InkWell(
-                                key: ValueKey('row-${e.name}'),
-                                hoverColor: c.brand.withValues(alpha: 0.06),
-                                // A double-click is told apart here, so a single
-                                // click selects at once instead of waiting.
-                                onTap: () {
-                                  _listFocus.requestFocus();
-                                  final now = DateTime.now();
-                                  final again =
-                                      _lastClick?.path == e.path &&
-                                      now.difference(_lastClick!.at) < const Duration(milliseconds: 400);
-                                  _lastClick = again ? null : (path: e.path, at: now);
-                                  again ? _openEntry(e) : _click(e);
-                                },
-                                onSecondaryTapUp: (d) {
-                                  _listFocus.requestFocus();
-                                  _contextMenu(d.globalPosition, e);
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 20, 0),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              e.isDirectory ? Icons.folder_rounded : Icons.insert_drive_file_outlined,
-                                              size: 18,
-                                              color: e.isDirectory ? c.brand : c.muted,
-                                            ),
-                                            const SizedBox(width: 10),
-                                            // A name reads left to right, at the row's start.
-                                            Expanded(
-                                              child: Text(
-                                                e.name,
-                                                textDirection: TextDirection.ltr,
-                                                textAlign: Directionality.of(context) == TextDirection.rtl
-                                                    ? TextAlign.right
-                                                    : TextAlign.left,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontWeight: e.isDirectory ? FontWeight.w600 : FontWeight.w400,
-                                                  color: e.isHidden ? c.muted : c.ink,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 110,
-                                        child: Text(
-                                          size,
-                                          textDirection: TextDirection.ltr,
-                                          textAlign: start,
-                                          style: muted,
-                                        ),
-                                      ),
-                                      SizedBox(width: 190, child: Text(date, style: muted)),
-                                      SizedBox(
-                                        width: 120,
-                                        child: Text(
-                                          e.permissions == null ? '' : permissionString(e.permissions!),
-                                          textDirection: TextDirection.ltr,
-                                          textAlign: start,
-                                          style: muted.copyWith(fontFamily: 'JetBrainsMono', fontSize: 12),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-              ),
               if (browser.transfers.isNotEmpty) _Transfers(browser: browser),
             ],
           ),

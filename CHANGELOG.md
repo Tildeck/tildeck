@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- On the desktop, files show this computer beside the server; drag between them to upload or download.
 - On the desktop, files open as a tab with a file manager's table: sortable columns, Ctrl and Shift selection, double-click, right-click, and keys.
 - Keyboard shortcuts for connections and tabs, with a list of them; tabs close on a middle click and have a right-click menu.
 - On the desktop, hosts as a grid of cards with a right-click menu, edited in a side panel beside them.

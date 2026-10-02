@@ -16,6 +16,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:tildeck/app.dart';
 import 'package:tildeck/l10n/app_localizations.dart';
+import 'package:tildeck/local/local_browser.dart';
 import 'package:tildeck/server_check.dart';
 import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/ssh/file_browser.dart';
@@ -182,6 +183,29 @@ Widget app(Vault vault, String locale, ThemeMode mode) => TildeckApp(
   initialLocale: Locale(locale),
   initialThemeMode: mode,
 );
+
+/// This computer's side, fixed for the images.
+class SampleLocal extends LocalBrowser {
+  SampleLocal() : super(home: r'C:\Users\shlomi\Projects');
+
+  @override
+  Future<void> start() async {
+    path = r'C:\Users\shlomi\Projects';
+    final at = DateTime(2026, 9, 29, 9, 30);
+    entries = [
+      RemoteEntry(name: 'site', path: r'C:\Users\shlomi\Projects\site', isDirectory: true, isLink: false, modified: at),
+      RemoteEntry(
+        name: 'nginx.conf',
+        path: r'C:\Users\shlomi\Projects\nginx.conf',
+        isDirectory: false,
+        isLink: false,
+        size: 2210,
+        modified: at,
+      ),
+    ];
+    notifyListeners();
+  }
+}
 
 /// A folder as it looks mid-work, without a server.
 class SampleBrowser extends FileBrowser {
@@ -469,7 +493,11 @@ void main() {
     testWidgets('desktop files $locale ${mode.name}', (tester) async {
       desktop(tester);
       await tester.pumpWidget(
-        screen(locale, mode, FilesPage(browser: SampleBrowser(), title: 'deploy@prod-web-01.example.com')),
+        screen(
+          locale,
+          mode,
+          FilesPage(browser: SampleBrowser(), title: 'deploy@prod-web-01.example.com', localBrowser: SampleLocal()),
+        ),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
