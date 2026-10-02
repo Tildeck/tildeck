@@ -48,12 +48,38 @@ class SnippetsPage extends StatelessWidget {
               ),
             );
           }
+          // By folder, alphabetically; those in none last.
+          final folders = snippets.map((s) => s.folder).toSet().toList()
+            ..sort((a, b) => a.isEmpty ? 1 : (b.isEmpty ? -1 : a.toLowerCase().compareTo(b.toLowerCase())));
+          final rows = <Object>[
+            for (final folder in folders) ...[
+              if (folders.length > 1 || folder.isNotEmpty) folder,
+              ...snippets.where((s) => s.folder == folder),
+            ],
+          ];
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-            itemCount: snippets.length,
+            itemCount: rows.length,
             separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, i) {
-              final snippet = snippets[i];
+              final row = rows[i];
+              if (row is String) {
+                return Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(4, 10, 4, 0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.folder_outlined, size: 18, color: c.muted),
+                      const SizedBox(width: 8),
+                      Text(
+                        row.isEmpty ? t.ungrouped : row,
+                        key: ValueKey('snippetFolder-$row'),
+                        style: TextStyle(color: c.muted, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              final snippet = row as SnippetEntry;
               return Card(
                 margin: EdgeInsets.zero,
                 child: ListTile(
@@ -107,11 +133,13 @@ class _SnippetEditorState extends State<_SnippetEditor> {
   final _form = GlobalKey<FormState>();
   late final _name = TextEditingController(text: widget.snippet?.name);
   late final _command = TextEditingController(text: widget.snippet?.command);
+  late final _folder = TextEditingController(text: widget.snippet?.folder);
 
   @override
   void dispose() {
     _name.dispose();
     _command.dispose();
+    _folder.dispose();
     super.dispose();
   }
 
@@ -121,6 +149,7 @@ class _SnippetEditorState extends State<_SnippetEditor> {
       id: widget.snippet?.id ?? widget.vault.newId(),
       name: _name.text.trim(),
       command: _command.text,
+      folder: _folder.text.trim(),
     );
     await widget.vault.put(entry);
     if (mounted) Navigator.pop(context, entry.id);
@@ -145,6 +174,25 @@ class _SnippetEditorState extends State<_SnippetEditor> {
                 autofocus: true,
                 validator: required,
                 decoration: InputDecoration(labelText: t.snippetNameLabel, hintText: t.snippetNameHint),
+              ),
+              const SizedBox(height: 14),
+              Autocomplete<String>(
+                initialValue: TextEditingValue(text: _folder.text),
+                optionsBuilder: (value) {
+                  final typed = value.text.trim().toLowerCase();
+                  return {
+                    for (final s in widget.vault.snippets)
+                      if (s.folder.isNotEmpty && s.folder.toLowerCase().contains(typed)) s.folder,
+                  };
+                },
+                onSelected: (v) => _folder.text = v,
+                fieldViewBuilder: (context, controller, focus, onSubmit) => TextFormField(
+                  key: const ValueKey('snippetFolder'),
+                  controller: controller,
+                  focusNode: focus,
+                  onChanged: (v) => _folder.text = v,
+                  decoration: InputDecoration(labelText: t.folderLabel, hintText: t.groupHint),
+                ),
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -260,7 +308,7 @@ class _SnippetPicker extends StatelessWidget {
                           ListTile(
                             key: ValueKey('run-${snippet.name}'),
                             leading: Icon(Icons.play_arrow_rounded, color: c.brand),
-                            title: Text(snippet.name),
+                            title: Text(snippet.folder.isEmpty ? snippet.name : '${snippet.folder} / ${snippet.name}'),
                             subtitle: Text(
                               snippet.command,
                               maxLines: 1,

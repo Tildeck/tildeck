@@ -252,11 +252,14 @@ class KnownHostEntry extends VaultEntry {
 /// A saved command or script: run in an open session, on several hosts at
 /// once, or when a host's session starts.
 class SnippetEntry extends VaultEntry {
-  const SnippetEntry({required super.id, required this.name, required this.command});
+  const SnippetEntry({required super.id, required this.name, required this.command, this.folder = ''});
 
   static const recordType = 'snippet';
 
   final String name;
+
+  /// A folder to list it in; empty is none.
+  final String folder;
 
   /// One or more lines, sent to the shell as typed, each followed by Enter.
   final String command;
@@ -265,10 +268,14 @@ class SnippetEntry extends VaultEntry {
   String get type => recordType;
 
   @override
-  Map<String, Object?> dataJson() => {'name': name, 'command': command};
+  Map<String, Object?> dataJson() => {'name': name, 'command': command, 'folder': folder};
 
-  static SnippetEntry fromJson(String id, Map<String, dynamic> d) =>
-      SnippetEntry(id: id, name: d['name'] as String, command: d['command'] as String);
+  static SnippetEntry fromJson(String id, Map<String, dynamic> d) => SnippetEntry(
+    id: id,
+    name: d['name'] as String,
+    command: d['command'] as String,
+    folder: (d['folder'] as String? ?? '').trim(),
+  );
 }
 
 /// Settings shared by every host in a group (hosts name their group). A

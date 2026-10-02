@@ -613,6 +613,11 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - No change to docs/security-model.md: the file is the vault file's own protection, moved.
 - Tests: no token, no plaintext, no deleted record in the file; a wrong password refused; another vault adding only what is new; a file that is not a backup or is newer refused; the panel saving with the master password (a wrong one saves nothing) and restoring a deleted host.
 
+### Snippet folders (2026-10-02)
+
+- Termius organizes snippets in folders ("packages"). A snippet has an optional `folder`; the editor offers the folders already used, and the snippets page lists them by folder, alphabetically, with those in none last. The picker in a session shows "Folder / Name". A snippet from before has none.
+- Tests: the folder kept, and none for an old snippet; the page listing by folder and the editor saving one.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

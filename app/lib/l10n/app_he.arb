@@ -505,5 +505,6 @@
   "backupImported": "{added, plural, =0{אין פריטים חדשים} =1{נוסף פריט אחד} other{נוספו {added} פריטים}}, {kept, plural, =0{אין פריטים שכבר קיימים} =1{פריט אחד כבר קיים} other{{kept} כבר קיימים}}",
   "backupNotABackup": "הקובץ הזה הוא לא גיבוי של Tildeck.",
   "backupNewer": "הגיבוי הזה מגרסה חדשה יותר של Tildeck. צריך לעדכן את Tildeck כדי לשחזר אותו.",
-  "backupWrongPassword": "זו לא הסיסמה הראשית של הגיבוי הזה."
+  "backupWrongPassword": "זו לא הסיסמה הראשית של הגיבוי הזה.",
+  "folderLabel": "תיקייה"
 }
