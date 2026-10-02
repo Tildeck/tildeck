@@ -12,6 +12,7 @@ import 'connect_form.dart';
 import 'files_page.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
+import 'host_folders.dart';
 import 'identities_page.dart';
 import 'import_hosts.dart';
 import 'keys_page.dart';
@@ -32,7 +33,7 @@ List<HostEntry> jumpChainOf(Vault vault, HostEntry host) {
   final seen = {host.id};
   var current = host;
   while (true) {
-    final id = current.jumpHostId ?? vault.groupNamed(current.group)?.jumpHostId;
+    final id = current.jumpHostId ?? vault.effectiveGroup(current.group)?.jumpHostId;
     final next = id == null ? null : vault.entry<HostEntry>(id);
     if (next == null || !seen.add(next.id)) return chain;
     chain.add(next);
@@ -58,7 +59,7 @@ String localShellName(AppLocalizations t, LocalShell shell) => switch (shell.kin
 /// The identity [host] signs in as: its own, or else its group's; null when
 /// neither chose one (or it was deleted).
 IdentityEntry? identityFor(Vault vault, HostEntry host) =>
-    vault.entry<IdentityEntry>(host.identityId ?? vault.groupNamed(host.group)?.identityId);
+    vault.entry<IdentityEntry>(host.identityId ?? vault.effectiveGroup(host.group)?.identityId);
 
 Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault, HostEntry host) async {
   // The farthest jump host is connected to first.
@@ -84,7 +85,7 @@ Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault,
 }
 
 Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntry host, ConnectionTarget? jump) async {
-  final group = vault.groupNamed(host.group);
+  final group = vault.effectiveGroup(host.group);
   // An identity (the host's, or else the group's) decides who signs in, and
   // how; without one, the host's fields, with the group's for empty ones.
   final identity = host.isTelnet ? null : identityFor(vault, host);
@@ -208,6 +209,11 @@ bool hostMatches(HostEntry host, String query) {
 class _HostsPageState extends State<HostsPage> {
   final _search = TextEditingController();
   String _query = '';
+
+  /// Folders folded away on this screen; a search unfolds what matches.
+  final _collapsed = <String>{};
+
+  void _toggleFolder(String path) => _collapsed.contains(path) ? _collapsed.remove(path) : _collapsed.add(path);
 
   Vault get vault => widget.vault;
   void Function(ConnectionTarget target) get onConnect => widget.onConnect;
@@ -374,10 +380,20 @@ class _HostsPageState extends State<HostsPage> {
         _editHost(context, host);
       case 'files':
         await _openFiles(context, host);
+      case 'duplicate':
+        await _duplicate(context, host);
       case 'delete':
         if (_panel?.host?.id == host.id) _closePanel();
         await _delete(context, host);
     }
+  }
+
+  /// A copy of [host], everything but its name, then opened for editing.
+  Future<void> _duplicate(BuildContext context, HostEntry host) async {
+    final t = AppLocalizations.of(context);
+    final copy = HostEntry.fromJson(vault.newId(), {...host.dataJson(), 'name': t.copyName(host.name)});
+    await vault.put(copy);
+    if (context.mounted) _editHost(context, copy);
   }
 
   List<PopupMenuEntry<String>> _hostMenu(AppLocalizations t, HostEntry host) => [
@@ -385,6 +401,7 @@ class _HostsPageState extends State<HostsPage> {
     if (widget.connectHost != null && !host.isTelnet)
       PopupMenuItem(key: const ValueKey('hostFiles'), value: 'files', child: Text(t.filesTitle)),
     PopupMenuItem(key: const ValueKey('hostEdit'), value: 'edit', child: Text(t.editAction)),
+    PopupMenuItem(key: const ValueKey('hostDuplicate'), value: 'duplicate', child: Text(t.duplicateAction)),
     PopupMenuItem(value: 'delete', child: Text(t.deleteAction)),
   ];
 
@@ -404,10 +421,12 @@ class _HostsPageState extends State<HostsPage> {
         ];
         final groups = <String, List<HostEntry>>{};
         for (final h in hosts) {
-          groups.putIfAbsent(h.group.trim(), () => []).add(h);
+          groups.putIfAbsent(canonicalGroup(h.group), () => []).add(h);
         }
-        final names = groups.keys.where((g) => g.isNotEmpty).toList()..sort();
-        if (groups.containsKey('')) names.add('');
+        final names = [
+          for (final g in folderOrder(groups.keys))
+            if (_query.isNotEmpty || !headerHidden(g, _collapsed)) g,
+        ];
         final panel = _panel;
         // A host deleted elsewhere (another device) closes its panel.
         final panelHost = panel?.host == null ? null : vault.entry<HostEntry>(panel!.host!.id);
@@ -570,15 +589,20 @@ class _HostsPageState extends State<HostsPage> {
               ),
             for (final group in names) ...[
               Padding(
-                padding: const EdgeInsets.only(top: 14, bottom: 8),
+                padding: EdgeInsetsDirectional.only(top: 14, bottom: 8, start: depthOf(group) * 22.0),
                 child: Row(
                   children: [
+                    _FolderToggle(
+                      path: group,
+                      collapsed: _collapsed.contains(group),
+                      onToggle: () => setState(() => _toggleFolder(group)),
+                    ),
                     Text(
-                      group.isEmpty ? t.ungrouped : group,
+                      group.isEmpty ? t.ungrouped : leafOf(group),
                       style: text.titleSmall?.copyWith(color: c.muted, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(width: 8),
-                    Text('${groups[group]!.length}', style: text.labelMedium?.copyWith(color: c.muted)),
+                    Text('${hostCountUnder(group, groups)}', style: text.labelMedium?.copyWith(color: c.muted)),
                     if (group.isNotEmpty) ...[
                       const SizedBox(width: 4),
                       IconButton(
@@ -596,34 +620,35 @@ class _HostsPageState extends State<HostsPage> {
                   ],
                 ),
               ),
-              LayoutBuilder(
-                builder: (context, box) {
-                  const gap = 12.0;
-                  final columns = ((box.maxWidth + gap) / (280 + gap)).floor().clamp(1, 6);
-                  final width = (box.maxWidth - gap * (columns - 1)) / columns;
-                  return Wrap(
-                    spacing: gap,
-                    runSpacing: gap,
-                    children: [
-                      for (final host in groups[group]!)
-                        SizedBox(
-                          width: width,
-                          child: _HostCard(
-                            host: host,
-                            via: switch (jumpChainOf(vault, host)) {
-                              [final first, ...] => t.viaHost(first.name),
-                              _ => null,
-                            },
-                            selected: panelHost?.id == host.id,
-                            onConnect: () => _connectHost(context, host),
-                            menu: () => _hostMenu(t, host),
-                            onAction: (action) => _hostAction(context, action, host),
+              if (groups[group] != null && (_query.isNotEmpty || !hostsHidden(group, _collapsed)))
+                LayoutBuilder(
+                  builder: (context, box) {
+                    const gap = 12.0;
+                    final columns = ((box.maxWidth + gap) / (280 + gap)).floor().clamp(1, 6);
+                    final width = (box.maxWidth - gap * (columns - 1)) / columns;
+                    return Wrap(
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: [
+                        for (final host in groups[group]!)
+                          SizedBox(
+                            width: width,
+                            child: _HostCard(
+                              host: host,
+                              via: switch (jumpChainOf(vault, host)) {
+                                [final first, ...] => t.viaHost(first.name),
+                                _ => null,
+                              },
+                              selected: panelHost?.id == host.id,
+                              onConnect: () => _connectHost(context, host),
+                              menu: () => _hostMenu(t, host),
+                              onAction: (action) => _hostAction(context, action, host),
+                            ),
                           ),
-                        ),
-                    ],
-                  );
-                },
-              ),
+                      ],
+                    );
+                  },
+                ),
             ],
           ],
         );
@@ -681,10 +706,12 @@ class _HostsPageState extends State<HostsPage> {
         ];
         final groups = <String, List<HostEntry>>{};
         for (final h in hosts) {
-          groups.putIfAbsent(h.group.trim(), () => []).add(h);
+          groups.putIfAbsent(canonicalGroup(h.group), () => []).add(h);
         }
-        final names = groups.keys.where((g) => g.isNotEmpty).toList()..sort();
-        if (groups.containsKey('')) names.add('');
+        final names = [
+          for (final g in folderOrder(groups.keys))
+            if (_query.isNotEmpty || !headerHidden(g, _collapsed)) g,
+        ];
 
         return Center(
           child: ConstrainedBox(
@@ -835,12 +862,17 @@ class _HostsPageState extends State<HostsPage> {
                   Text(t.noHostsMatch, style: text.bodyLarge?.copyWith(color: c.muted, height: 1.5)),
                 for (final group in names) ...[
                   Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(4, 8, 0, 2),
+                    padding: EdgeInsetsDirectional.fromSTEB(4 + depthOf(group) * 18.0, 8, 0, 2),
                     child: Row(
                       children: [
+                        _FolderToggle(
+                          path: group,
+                          collapsed: _collapsed.contains(group),
+                          onToggle: () => setState(() => _toggleFolder(group)),
+                        ),
                         Expanded(
                           child: Text(
-                            group.isEmpty ? t.ungrouped : group,
+                            '${group.isEmpty ? t.ungrouped : leafOf(group)}  ${hostCountUnder(group, groups)}',
                             style: text.labelLarge?.copyWith(color: c.muted, fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -863,82 +895,89 @@ class _HostsPageState extends State<HostsPage> {
                       ],
                     ),
                   ),
-                  Card.outlined(
-                    margin: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        for (final (i, host) in groups[group]!.indexed) ...[
-                          if (i > 0) Divider(height: 1, color: c.line),
-                          ListTile(
-                            key: ValueKey('host-${host.id}'),
-                            leading: Icon(host.auth == HostAuth.key ? Icons.key : Icons.dns_outlined, color: c.brand),
-                            title: Text(host.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            // Connection labels are Latin content: always LTR.
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  host.label,
-                                  textDirection: TextDirection.ltr,
-                                  textAlign: Directionality.of(context) == TextDirection.rtl
-                                      ? TextAlign.right
-                                      : TextAlign.left,
-                                ),
-                                if (jumpChainOf(vault, host) case [final first, ...])
+                  if (groups[group] != null && (_query.isNotEmpty || !hostsHidden(group, _collapsed)))
+                    Card.outlined(
+                      margin: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          for (final (i, host) in groups[group]!.indexed) ...[
+                            if (i > 0) Divider(height: 1, color: c.line),
+                            ListTile(
+                              key: ValueKey('host-${host.id}'),
+                              leading: Icon(host.auth == HostAuth.key ? Icons.key : Icons.dns_outlined, color: c.brand),
+                              title: Text(host.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              // Connection labels are Latin content: always LTR.
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
                                   Text(
-                                    t.viaHost(first.name),
-                                    key: ValueKey('via-${host.id}'),
-                                    style: TextStyle(fontSize: 12, color: c.muted),
+                                    host.label,
+                                    textDirection: TextDirection.ltr,
+                                    textAlign: Directionality.of(context) == TextDirection.rtl
+                                        ? TextAlign.right
+                                        : TextAlign.left,
                                   ),
-                                if (host.tags.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Wrap(
-                                      spacing: 6,
-                                      runSpacing: 4,
-                                      children: [
-                                        for (final tag in host.tags)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-                                            decoration: BoxDecoration(
-                                              color: c.brand.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(20),
+                                  if (jumpChainOf(vault, host) case [final first, ...])
+                                    Text(
+                                      t.viaHost(first.name),
+                                      key: ValueKey('via-${host.id}'),
+                                      style: TextStyle(fontSize: 12, color: c.muted),
+                                    ),
+                                  if (host.tags.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        children: [
+                                          for (final tag in host.tags)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: c.brand.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(20),
+                                              ),
+                                              child: Text(tag, style: TextStyle(fontSize: 12, color: c.brand)),
                                             ),
-                                            child: Text(tag, style: TextStyle(fontSize: 12, color: c.brand)),
-                                          ),
-                                      ],
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              onTap: () => _connectHost(context, host),
+                              trailing: PopupMenuButton<String>(
+                                key: ValueKey('hostMenu-${host.id}'),
+                                onSelected: (action) => switch (action) {
+                                  'edit' => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => HostEditorPage(vault: vault, host: host),
                                     ),
                                   ),
-                              ],
-                            ),
-                            onTap: () => _connectHost(context, host),
-                            trailing: PopupMenuButton<String>(
-                              key: ValueKey('hostMenu-${host.id}'),
-                              onSelected: (action) => switch (action) {
-                                'edit' => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => HostEditorPage(vault: vault, host: host),
-                                  ),
-                                ),
-                                'files' => _openFiles(context, host),
-                                _ => _delete(context, host),
-                              },
-                              itemBuilder: (_) => [
-                                if (widget.connectHost != null && !host.isTelnet)
+                                  'files' => _openFiles(context, host),
+                                  'duplicate' => _duplicate(context, host),
+                                  _ => _delete(context, host),
+                                },
+                                itemBuilder: (_) => [
+                                  if (widget.connectHost != null && !host.isTelnet)
+                                    PopupMenuItem(
+                                      key: const ValueKey('hostFiles'),
+                                      value: 'files',
+                                      child: Text(t.filesTitle),
+                                    ),
+                                  PopupMenuItem(value: 'edit', child: Text(t.editAction)),
                                   PopupMenuItem(
-                                    key: const ValueKey('hostFiles'),
-                                    value: 'files',
-                                    child: Text(t.filesTitle),
+                                    key: const ValueKey('hostDuplicate'),
+                                    value: 'duplicate',
+                                    child: Text(t.duplicateAction),
                                   ),
-                                PopupMenuItem(value: 'edit', child: Text(t.editAction)),
-                                PopupMenuItem(value: 'delete', child: Text(t.deleteAction)),
-                              ],
+                                  PopupMenuItem(value: 'delete', child: Text(t.deleteAction)),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
                 ],
               ],
             ),
@@ -998,7 +1037,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
       HostEntry(
         id: widget.host?.id ?? widget.vault.newId(),
         name: _name.text.trim(),
-        group: _group.text.trim(),
+        group: canonicalGroup(_group.text),
         host: _host.text.trim(),
         port: int.parse(_port.text.trim()),
         username: _username.text.trim(),
@@ -1055,7 +1094,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
           final jumps = jumpCandidatesFor(widget.vault, widget.host?.id);
           if (_jumpHostId != null && jumps.every((h) => h.id != _jumpHostId)) _jumpHostId = null;
           // Settings the group provides may be left empty here.
-          final group = widget.vault.groupNamed(_group.text);
+          final group = widget.vault.effectiveGroup(_group.text);
           final groupJump = widget.vault.entry<HostEntry>(group?.jumpHostId);
           if (_proxyId != null && widget.vault.entry<ProxyEntry>(_proxyId) == null) _proxyId = null;
           final groupProxy = widget.vault.entry<ProxyEntry>(group?.proxyId);
@@ -1487,6 +1526,34 @@ class _HostCardState extends State<_HostCard> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The arrow that folds a folder away, or opens it.
+class _FolderToggle extends StatelessWidget {
+  const _FolderToggle({required this.path, required this.collapsed, required this.onToggle});
+
+  final String path;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    return IconButton(
+      key: ValueKey('folderToggle-$path'),
+      tooltip: collapsed ? t.expandFolder : t.collapseFolder,
+      visualDensity: VisualDensity.compact,
+      icon: Icon(
+        collapsed ? Icons.chevron_right_rounded : Icons.expand_more_rounded,
+        size: 20,
+        color: c.muted,
+        // In Hebrew the closed arrow points to the start, to the left.
+        textDirection: Directionality.of(context),
+      ),
+      onPressed: onToggle,
     );
   }
 }

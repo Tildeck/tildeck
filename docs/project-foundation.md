@@ -592,6 +592,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - They are vault preferences, synced like the color scheme; `TerminalOptions.of` reads them with their defaults and ignores a value outside the choices, from another device or version. Right-click already copied a selection or pasted.
 - Tests: options from the preferences, with odd values ignored; the fonts offered per system; a visual bell flashing and no bell showing nothing; the cursor and font reaching the terminal; a finished selection copied once. Golden: the terminal settings with the new options.
 
+### Nested folders and duplicating hosts (2026-10-02)
+
+- Asked for by Shlomi as Termius basics. A host's group is now a path: "Production/Web" is the Web folder inside Production (spaces around the slashes do not count, and the editor saves the plain form). No model change: an older version shows the whole path as one group.
+- The hosts list (phone and desktop) shows the folders nested, each with its own name, the hosts in it and below it counted, and an arrow that folds it away with everything inside; a search shows matches in folded folders. Folding is per screen and not saved.
+- Settings come from the host's folder and then the folders above it, for what the nearer ones leave empty (`Vault.effectiveGroup`); environment variables add up, the nearest winning. Everything that took a group's settings (username, key, identity, jump host, proxy, startup snippet, environment) uses it.
+- A host's menu duplicates it: a copy with everything but its name ("Name (copy)"), opened for editing.
+- Tests: paths made plain, the folder order with the folders above, folding, counting; settings taken through two levels; the list nesting and folding, a search inside a folded folder, and a duplicate opened for editing.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

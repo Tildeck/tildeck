@@ -418,6 +418,29 @@ class Vault extends ChangeNotifier {
   PreferencesEntry get preferences => entry<PreferencesEntry>(PreferencesEntry.fixedId) ?? const PreferencesEntry();
 
   /// The shared settings of the group named [name], if it has any.
+  /// The settings a host in [path] takes: its folder's, then those of the
+  /// folders above it for what the nearer ones leave empty; environment
+  /// variables add up, the nearest winning. Null when no folder on the way
+  /// has settings.
+  GroupEntry? effectiveGroup(String path) {
+    final parts = path.split('/').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+    final chain = [for (var i = parts.length; i > 0; i--) ?groupNamed(parts.take(i).join('/'))];
+    if (chain.isEmpty) return null;
+    if (chain.length == 1) return chain.single;
+    T? first<T extends Object>(T? Function(GroupEntry g) pick) => chain.map<T?>(pick).nonNulls.firstOrNull;
+    return GroupEntry(
+      id: chain.first.id,
+      name: chain.first.name,
+      username: first((g) => g.username?.trim().isEmpty ?? true ? null : g.username),
+      keyId: first((g) => g.keyId),
+      startupSnippetId: first((g) => g.startupSnippetId),
+      env: {for (final g in chain.reversed) ...g.env},
+      jumpHostId: first((g) => g.jumpHostId),
+      proxyId: first((g) => g.proxyId),
+      identityId: first((g) => g.identityId),
+    );
+  }
+
   GroupEntry? groupNamed(String name) {
     final key = name.trim();
     if (key.isEmpty) return null;
