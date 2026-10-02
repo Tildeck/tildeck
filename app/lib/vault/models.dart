@@ -453,6 +453,7 @@ class PreferencesEntry extends VaultEntry {
     this.bell,
     this.scrollback,
     this.copyOnSelect,
+    this.autoReconnect,
   }) : super(id: fixedId);
 
   static const recordType = 'preferences';
@@ -488,6 +489,7 @@ class PreferencesEntry extends VaultEntry {
   /// Lines kept above the screen, for new sessions.
   final int? scrollback;
   final bool? copyOnSelect;
+  final bool? autoReconnect;
 
   PreferencesEntry copyWith({
     String? terminalTheme,
@@ -500,6 +502,7 @@ class PreferencesEntry extends VaultEntry {
     String? bell,
     int? scrollback,
     bool? copyOnSelect,
+    bool? autoReconnect,
   }) => PreferencesEntry(
     terminalTheme: terminalTheme ?? this.terminalTheme,
     fontSize: fontSize ?? this.fontSize,
@@ -511,6 +514,7 @@ class PreferencesEntry extends VaultEntry {
     bell: bell ?? this.bell,
     scrollback: scrollback ?? this.scrollback,
     copyOnSelect: copyOnSelect ?? this.copyOnSelect,
+    autoReconnect: autoReconnect ?? this.autoReconnect,
   );
 
   @override
@@ -528,6 +532,7 @@ class PreferencesEntry extends VaultEntry {
     'bell': bell,
     'scrollback': scrollback,
     'copy_on_select': copyOnSelect,
+    'auto_reconnect': autoReconnect,
   };
 
   static PreferencesEntry fromJson(String id, Map<String, dynamic> d) => PreferencesEntry(
@@ -543,6 +548,7 @@ class PreferencesEntry extends VaultEntry {
     bell: d['bell'] as String?,
     scrollback: d['scrollback'] as int?,
     copyOnSelect: d['copy_on_select'] as bool?,
+    autoReconnect: d['auto_reconnect'] as bool?,
   );
 }
 

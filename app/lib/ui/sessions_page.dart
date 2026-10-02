@@ -319,9 +319,12 @@ class _SessionsPageState extends State<SessionsPage> {
     );
   }
 
-  void _open(ConnectionTarget target, {int? replacing}) {
+  /// [attempt] counts automatic reconnections; one of those replaces its
+  /// tab without switching to it.
+  void _open(ConnectionTarget target, {int? replacing, int attempt = 0}) {
     final session = TerminalSession(target, scrollback: TerminalOptions.of(widget.vault.preferences).scrollback)
-      ..autocomplete = widget.vault.preferences.autocomplete ?? true;
+      ..autocomplete = widget.vault.preferences.autocomplete ?? true
+      ..reconnectAttempt = attempt;
     setState(() {
       if (replacing == null) {
         _tabs.add(_TermTab(session));
@@ -329,7 +332,7 @@ class _SessionsPageState extends State<SessionsPage> {
       } else {
         _tabs[replacing].dispose();
         _tabs[replacing] = _TermTab(session);
-        _selected = replacing;
+        if (attempt == 0) _selected = replacing;
       }
     });
     // A local shell is not a server: it stays out of the synced history.
@@ -388,6 +391,7 @@ class _SessionsPageState extends State<SessionsPage> {
           session: session,
           showKeyBar: widget.showKeyBar,
           onReconnect: () => _open(session.target, replacing: i),
+          onAutoReconnect: (attempt) => _open(session.target, replacing: i, attempt: attempt),
           theme: themeById(prefs.terminalTheme).theme,
           fontSize: prefs.fontSize ?? defaultFontSize,
           onFontSize: (size) => widget.vault.put(prefs.copyWith(fontSize: size)),

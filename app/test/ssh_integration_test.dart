@@ -163,6 +163,19 @@ void main() {
       expect(session.problem, isNull, reason: 'a shell that exits is a normal close');
     });
 
+    test('a connection that drops is told apart from a shell that exits', () async {
+      final session = TerminalSession(target(pass: password));
+      addTearDown(session.dispose);
+      session.terminal.resize(100, 30);
+      unawaited(session.start(SshConnector(knownHosts: MemoryKnownHosts()), PromptLog().call));
+      await _until(() => session.state == SessionState.connected);
+      // The server's process for this connection dies: no exit status comes.
+      session.terminal.textInput('kill -9 \$PPID\r');
+      await _until(() => session.state == SessionState.closed);
+      expect(session.problem, ConnectProblem.disconnected);
+      expect(session.wasConnected, isTrue);
+    });
+
     test('suggestions come from the server history, and a password prompt is answered', () async {
       final setup = await SshConnector(
         knownHosts: MemoryKnownHosts(),

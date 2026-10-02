@@ -625,6 +625,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The server accepts a tombstone with a marker (nonce and ct together, or neither); a live record still needs both. No contract change.
 - Tests: a deletion from another device arrives with its marker and deletes; a bare tombstone and one with a marker taken from another record delete nothing and are reported, a tombstone for a record never seen is taken; the vault file keeps the marker and nothing of the deleted host; the server stores a marker as sent and refuses a half one.
 
+### Reconnecting on its own (2026-10-02)
+
+- From the Termius research. A session tells a drop from an exit: an SSH shell that ends without an exit status or signal dropped (`ConnectProblem.disconnected`); one that exits is a normal close; one the user closes is neither.
+- After a drop, or a failed attempt to come back (unreachable, timeout), the session's panel counts down and replaces the session with a new one: 2, 5, 10, 20, then 30 seconds, five tries, then the user decides. The banner shows the wait and the attempt, with "Reconnect now" and "Cancel". A refused sign-in or a host key question never repeats on its own. An automatic reconnection of a tab in the background does not switch to it.
+- A vault preference (Settings, Terminal, "Reconnect when the connection drops"), on by default.
+- Tests: against OpenSSH, killing the server's process for the connection is a drop while `exit` is not; the panel counting down and reconnecting, waiting longer after a failed attempt, stopping after five, and not reconnecting after an exit, a refused sign-in, a cancel, or with the preference off.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

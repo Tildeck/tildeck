@@ -895,5 +895,22 @@
   "backupNotABackup": "This file is not a Tildeck backup.",
   "backupNewer": "This backup comes from a newer version of Tildeck. Update Tildeck to restore it.",
   "backupWrongPassword": "That is not the master password of this backup.",
-  "folderLabel": "Folder"
+  "folderLabel": "Folder",
+  "autoReconnectLabel": "Reconnect when the connection drops",
+  "autoReconnectHelp": "A few times, waiting a little longer each time.",
+  "reconnectingIn": "Reconnecting in {seconds} s ({attempt} of {total}).",
+  "@reconnectingIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      },
+      "attempt": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "reconnectNow": "Reconnect now"
 }

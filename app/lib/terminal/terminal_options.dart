@@ -35,6 +35,7 @@ class TerminalOptions {
     this.bell = BellMode.visual,
     this.scrollback = 10000,
     this.copyOnSelect = false,
+    this.autoReconnect = true,
   });
 
   factory TerminalOptions.of(PreferencesEntry prefs) {
@@ -50,6 +51,7 @@ class TerminalOptions {
       bell: BellMode.values.where((b) => b.name == prefs.bell).firstOrNull ?? BellMode.visual,
       scrollback: scrollbackChoices.contains(prefs.scrollback) ? prefs.scrollback! : 10000,
       copyOnSelect: prefs.copyOnSelect ?? false,
+      autoReconnect: prefs.autoReconnect ?? true,
     );
   }
 
@@ -60,6 +62,18 @@ class TerminalOptions {
   final int scrollback;
   final bool copyOnSelect;
 
+  /// A dropped connection reconnects on its own, a few times.
+  final bool autoReconnect;
+
   /// The bundled font behind a system one that is missing.
   List<String> get fontFallback => fontFamily == 'JetBrainsMono' ? const [] : const ['JetBrainsMono'];
 }
+
+/// The waits before each automatic reconnection: then it stops.
+const reconnectDelays = [
+  Duration(seconds: 2),
+  Duration(seconds: 5),
+  Duration(seconds: 10),
+  Duration(seconds: 20),
+  Duration(seconds: 30),
+];
