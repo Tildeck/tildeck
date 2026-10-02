@@ -10,6 +10,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - Folders inside folders (a slash in the group: Production/Web), shown nested and foldable, with settings taken from the folders above; and duplicating a host.
 - Find anything with Ctrl+Shift+P: connect to a host, switch to an open tab, go to a section, or lock, by typing.
 - Encrypted backup: save the vault to one file, opened only with the master password, and restore what it has into a vault, without a sync server.
+- Snippet folders: a snippet can be put in a folder, and the snippets page lists them by folder.
 - Biometric unlock: a fingerprint or face on Android, Windows Hello on Windows, turned on per device in Settings, Security with the master password, which always keeps working too.
 - Identities: a username with a key or a password, saved once and chosen by any number of hosts or groups; changing it changes all of them.
 - Import hosts from an SSH configuration (~/.ssh/config, or a chosen file): names, addresses, users, ports, key files, and jump hosts, with the hosts already saved left out.

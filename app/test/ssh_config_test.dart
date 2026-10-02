@@ -165,9 +165,10 @@ void main() {
     configFile.copySync('${dir.path}/.ssh/config');
     final source = SshConfigSource(files: NoFiles(), environment: {'HOME': dir.path, 'USER': 'local'});
     final done = showImportHosts(context, vault, source: source);
-    for (var i = 0; i < 200 && find.byKey(const ValueKey('import-db')).evaluate().isEmpty; i++) {
+    for (var i = 0; i < 2000 && find.byKey(const ValueKey('import-db')).evaluate().isEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
-      await tester.pump();
+      // Advances the test clock too, so dialogs finish opening and closing.
+      await tester.pump(const Duration(milliseconds: 20));
     }
     expect(find.text('Already saved'), findsOneWidget, reason: 'bastion is saved');
     expect(find.text('Import 3 hosts'), findsOneWidget);
@@ -175,9 +176,10 @@ void main() {
     await tester.pump();
     expect(find.text('Import 2 hosts'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('importHostsConfirm')));
-    for (var i = 0; i < 300 && find.byKey(const ValueKey('importHostsConfirm')).evaluate().isNotEmpty; i++) {
+    for (var i = 0; i < 2000 && find.byKey(const ValueKey('importHostsConfirm')).evaluate().isNotEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
-      await tester.pump();
+      // Advances the test clock too, so dialogs finish opening and closing.
+      await tester.pump(const Duration(milliseconds: 20));
     }
     final result = (await tester.runAsync(() => done))!;
     expect(result.hosts, 2);

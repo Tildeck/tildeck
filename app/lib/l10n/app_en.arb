@@ -894,5 +894,6 @@
   },
   "backupNotABackup": "This file is not a Tildeck backup.",
   "backupNewer": "This backup comes from a newer version of Tildeck. Update Tildeck to restore it.",
-  "backupWrongPassword": "That is not the master password of this backup."
+  "backupWrongPassword": "That is not the master password of this backup.",
+  "folderLabel": "Folder"
 }
