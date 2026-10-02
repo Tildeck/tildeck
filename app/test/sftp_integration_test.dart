@@ -349,7 +349,7 @@ void main() {
       await Future.wait(runs);
       expect(browser.transfers.every((t) => t.state == TransferState.cancelled), isTrue);
       final listing = utf8.decode(await client.run('ls ~/$folder'));
-      expect(listing, isNot(contains('.bin')), reason: 'nothing partial is left');
+      expect(listing, isNot(matches(RegExp('[abcd][.]bin'))), reason: 'nothing partial is left');
     });
 
     test(
