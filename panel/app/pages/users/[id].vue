@@ -20,6 +20,7 @@ interface UserDetail {
   records: number
   storage_bytes: number
   locale: string
+  totp_enabled: boolean
   device_list: DeviceRow[]
 }
 
@@ -31,7 +32,7 @@ const { data: user, error, status, refresh } = useAsyncData(
 )
 useHead({ title: () => user.value?.email ?? t('nav.users') })
 
-type Pending = { kind: 'disable' | 'enable' | 'delete' } | { kind: 'revoke', device: DeviceRow }
+type Pending = { kind: 'disable' | 'enable' | 'delete' | 'totp' } | { kind: 'revoke', device: DeviceRow }
 const pending = ref<Pending | null>(null)
 const busy = ref(false)
 const actionError = ref('')
@@ -44,6 +45,7 @@ const dialog = computed(() => {
     case 'disable': return { title: t('user.disableTitle', { email }), body: t('user.disableBody'), label: t('user.disable'), danger: true }
     case 'enable': return { title: t('user.enableTitle', { email }), body: t('user.enableBody'), label: t('user.enable'), danger: false }
     case 'delete': return { title: t('user.deleteTitle', { email }), body: t('user.deleteBody'), label: t('user.delete'), danger: true }
+    case 'totp': return { title: t('user.totpTitle', { email }), body: t('user.totpBody'), label: t('user.totpOff'), danger: true }
     case 'revoke': return { title: t('user.revokeTitle', { device: p.device.name }), body: t('user.revokeBody'), label: t('user.revoke'), danger: true }
   }
   return null
@@ -57,6 +59,7 @@ async function run() {
   try {
     if (p.kind === 'revoke') await call(`/devices/${p.device.id}/revoke`, { method: 'POST' })
     else if (p.kind === 'delete') await call(`/users/${id.value}`, { method: 'DELETE' })
+    else if (p.kind === 'totp') await call(`/users/${id.value}/totp/disable`, { method: 'POST' })
     else await call(`/users/${id.value}/${p.kind}`, { method: 'POST' })
     pending.value = null
     if (p.kind === 'delete') await navigateTo('/users')
@@ -108,10 +111,22 @@ const statusClass: Record<DeviceRow['status'], string> = {
           </h1>
           <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
             <UserStatus :user="user" />
+            <span
+              v-if="user.totp_enabled"
+              class="badge bg-success/10 text-success"
+            >{{ t('user.totpOn') }}</span>
             <span>{{ t('users.created', { date: date(user.created_at) }) }}</span>
           </div>
         </div>
-        <div class="flex shrink-0 gap-2">
+        <div class="flex shrink-0 flex-wrap gap-2">
+          <button
+            v-if="user.totp_enabled"
+            type="button"
+            class="btn btn-quiet"
+            @click="pending = { kind: 'totp' }"
+          >
+            {{ t('user.totpOff') }}
+          </button>
           <button
             v-if="user.disabled"
             type="button"

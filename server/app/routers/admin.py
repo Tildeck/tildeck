@@ -20,7 +20,7 @@ from app.accounts import RateLimiter
 from app.db import get_db
 from app.models import Account, Admin, AdminSession, AuditEntry, Device, Invite, Record
 from app.protocol import ApiError, ErrorCode
-from app.routers.account import revoke_device, send_invite
+from app.routers.account import mail_account, revoke_device, send_invite
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], include_in_schema=False)
 
@@ -260,6 +260,7 @@ class UserRow(BaseModel):
 
 class UserDetail(UserRow):
     locale: str
+    totp_enabled: bool
     device_list: list[DeviceRow]
 
 
@@ -330,6 +331,7 @@ async def get_user(
     return UserDetail(
         **row.model_dump(),
         locale=account.locale,
+        totp_enabled=account.totp_secret_encrypted is not None,
         device_list=[
             DeviceRow(id=d.id, name=d.name, status=d.status, created_at=d.created_at, last_seen_at=d.last_seen_at)
             for d in device_list
@@ -367,6 +369,30 @@ async def enable_user(
     account_id: str, caller: Caller = Depends(current_admin), session: AsyncSession = Depends(get_db)
 ) -> Response:
     return await _set_disabled(session, caller, account_id, False)
+
+
+@router.post("/users/{account_id}/totp/disable", status_code=204)
+async def disable_user_totp(
+    account_id: str, request: Request, caller: Caller = Depends(current_admin), session: AsyncSession = Depends(get_db)
+) -> Response:
+    """For a user who lost the authenticator: two-factor sign-in goes off,
+    the activity log records who did it, and the user is told by email."""
+    account = await _account(session, account_id)
+    if account.totp_secret_encrypted is None and account.totp_pending_encrypted is None:
+        return Response(status_code=204)
+    account.totp_secret_encrypted = account.totp_pending_encrypted = account.totp_last_step = None
+    audit.record(
+        session,
+        actor=caller.name,
+        source="admin",
+        action="totp_reset",
+        entity="account",
+        entity_id=account.id,
+        new_value=account.email,
+    )
+    await session.commit()
+    await mail_account(request, session, account, "totp_reset")
+    return Response(status_code=204)
 
 
 @router.delete("/users/{account_id}", status_code=204)

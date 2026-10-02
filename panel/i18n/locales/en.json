@@ -115,7 +115,11 @@
       "active": "Active",
       "pending": "Waiting for approval",
       "revoked": "Removed"
-    }
+    },
+    "totpOn": "Two-factor sign-in",
+    "totpOff": "Turn off two-factor sign-in",
+    "totpTitle": "Turn off two-factor sign-in for {email}?",
+    "totpBody": "Do this only when the owner lost the authenticator app and asked you, after checking it is really them. Signing in will need only the master password until they turn it on again. They get an email about it, and the activity log records it."
   },
   "settings": {
     "title": "Settings",
@@ -227,7 +231,11 @@
       "recovery_used": "Recovery key used",
       "recovery_failed": "Recovery key attempt failed",
       "invite_created": "Invitation created",
-      "invite_revoked": "Invitation cancelled"
+      "invite_revoked": "Invitation cancelled",
+      "totp_enabled": "Two-factor sign-in turned on",
+      "totp_disabled": "Two-factor sign-in turned off",
+      "totp_reset": "Two-factor sign-in turned off by an administrator",
+      "totp_failed": "Wrong two-factor code"
     }
   },
   "errors": {

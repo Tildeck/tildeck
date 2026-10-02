@@ -25,5 +25,11 @@
   "link_invalid_title": "This link cannot be used",
   "link_invalid_body": "It was already used, it expired, or it is incomplete. Ask Tildeck for a new one.",
   "invite_subject": "You are invited to Tildeck",
-  "invite_body": "You are invited to keep your SSH hosts and keys in Tildeck, synced through {server}.\n\nInstall Tildeck, open Sync, and create an account with this email address, this server's address ({server}), and this invitation code:\n{code}\n\nThe code works once, for this address only, within 7 days."
+  "invite_body": "You are invited to keep your SSH hosts and keys in Tildeck, synced through {server}.\n\nInstall Tildeck, open Sync, and create an account with this email address, this server's address ({server}), and this invitation code:\n{code}\n\nThe code works once, for this address only, within 7 days.",
+  "totp_enabled_subject": "Two-factor sign-in is on for your Tildeck account",
+  "totp_enabled_body": "Two-factor sign-in was turned on for your Tildeck account on {server}. Signing in now needs a code from your authenticator app as well as your master password.\n\nIf you did not do this, change your master password: someone knows it.",
+  "totp_disabled_subject": "Two-factor sign-in is off for your Tildeck account",
+  "totp_disabled_body": "Two-factor sign-in was turned off for your Tildeck account on {server}.\n\nIf you did not do this, change your master password and turn it on again.",
+  "totp_reset_subject": "An administrator turned off two-factor sign-in",
+  "totp_reset_body": "An administrator of {server} turned off two-factor sign-in for your Tildeck account, usually because the authenticator app was lost.\n\nYou can turn it on again in Settings, Security. If you did not ask for this, contact the administrator."
 }

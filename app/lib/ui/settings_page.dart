@@ -12,6 +12,7 @@ import '../vault/vault.dart';
 import 'account_page.dart';
 import 'desktop_sidebar.dart';
 import 'password_pages.dart';
+import 'two_factor.dart';
 
 /// The groups of the settings area.
 enum SettingsCategory { general, terminal, security, password, account, shortcuts }
@@ -90,7 +91,7 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsCategory.security => _SettingsForm(
       title: _title(AppLocalizations.of(context), c),
       draft: _draft,
-      content: () => _SecuritySettings(draft: _draft, mobileOptions: _mobileOptions),
+      content: () => _SecuritySettings(draft: _draft, mobileOptions: _mobileOptions, sync: widget.sync),
     ),
     SettingsCategory.password => ChangePasswordPage(services: widget.sync),
     SettingsCategory.account => AccountPage(services: widget.sync),
@@ -486,10 +487,11 @@ class _TerminalSettings extends StatelessWidget {
 }
 
 class _SecuritySettings extends StatelessWidget {
-  const _SecuritySettings({required this.draft, required this.mobileOptions});
+  const _SecuritySettings({required this.draft, required this.mobileOptions, required this.sync});
 
   final SettingsDraft draft;
   final bool mobileOptions;
+  final SyncServices sync;
 
   @override
   Widget build(BuildContext context) {
@@ -544,6 +546,10 @@ class _SecuritySettings extends StatelessWidget {
             subtitle: Text(t.blockScreenshotsHelp, style: TextStyle(color: c.muted, fontSize: 13)),
           ),
         ],
+        const SizedBox(height: 22),
+        Divider(color: c.line),
+        const SizedBox(height: 14),
+        TwoFactorSettings(key: const ValueKey('twoFactor'), services: sync),
       ],
     );
   }

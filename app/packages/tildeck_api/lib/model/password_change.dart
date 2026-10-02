@@ -16,6 +16,7 @@ class PasswordChange {
     required this.authKey,
     this.keepOtherDevices = false,
     required this.new_,
+    this.totpCode,
   });
 
   String authKey;
@@ -24,27 +25,36 @@ class PasswordChange {
 
   NewPassword new_;
 
+  String? totpCode;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is PasswordChange &&
     other.authKey == authKey &&
     other.keepOtherDevices == keepOtherDevices &&
-    other.new_ == new_;
+    other.new_ == new_ &&
+    other.totpCode == totpCode;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (authKey.hashCode) +
     (keepOtherDevices.hashCode) +
-    (new_.hashCode);
+    (new_.hashCode) +
+    (totpCode == null ? 0 : totpCode!.hashCode);
 
   @override
-  String toString() => 'PasswordChange[authKey=$authKey, keepOtherDevices=$keepOtherDevices, new_=$new_]';
+  String toString() => 'PasswordChange[authKey=$authKey, keepOtherDevices=$keepOtherDevices, new_=$new_, totpCode=$totpCode]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'auth_key'] = this.authKey;
       json[r'keep_other_devices'] = this.keepOtherDevices;
       json[r'new'] = this.new_;
+    if (this.totpCode != null) {
+      json[r'totp_code'] = this.totpCode;
+    } else {
+      json[r'totp_code'] = null;
+    }
     return json;
   }
 
@@ -70,6 +80,7 @@ class PasswordChange {
         authKey: mapValueOfType<String>(json, r'auth_key')!,
         keepOtherDevices: mapValueOfType<bool>(json, r'keep_other_devices') ?? false,
         new_: NewPassword.fromJson(json[r'new'])!,
+        totpCode: mapValueOfType<String>(json, r'totp_code'),
       );
     }
     return null;

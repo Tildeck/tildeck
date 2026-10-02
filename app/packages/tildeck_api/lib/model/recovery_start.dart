@@ -15,30 +15,40 @@ class RecoveryStart {
   RecoveryStart({
     required this.email,
     required this.recoveryAuthKey,
+    this.totpCode,
   });
 
   String email;
 
   String recoveryAuthKey;
 
+  String? totpCode;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is RecoveryStart &&
     other.email == email &&
-    other.recoveryAuthKey == recoveryAuthKey;
+    other.recoveryAuthKey == recoveryAuthKey &&
+    other.totpCode == totpCode;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (email.hashCode) +
-    (recoveryAuthKey.hashCode);
+    (recoveryAuthKey.hashCode) +
+    (totpCode == null ? 0 : totpCode!.hashCode);
 
   @override
-  String toString() => 'RecoveryStart[email=$email, recoveryAuthKey=$recoveryAuthKey]';
+  String toString() => 'RecoveryStart[email=$email, recoveryAuthKey=$recoveryAuthKey, totpCode=$totpCode]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'email'] = this.email;
       json[r'recovery_auth_key'] = this.recoveryAuthKey;
+    if (this.totpCode != null) {
+      json[r'totp_code'] = this.totpCode;
+    } else {
+      json[r'totp_code'] = null;
+    }
     return json;
   }
 
@@ -63,6 +73,7 @@ class RecoveryStart {
       return RecoveryStart(
         email: mapValueOfType<String>(json, r'email')!,
         recoveryAuthKey: mapValueOfType<String>(json, r'recovery_auth_key')!,
+        totpCode: mapValueOfType<String>(json, r'totp_code'),
       );
     }
     return null;

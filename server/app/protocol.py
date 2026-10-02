@@ -35,6 +35,10 @@ class ErrorCode(StrEnum):
     invalid_token = "invalid_token"
     token_expired = "token_expired"
     recovery_failed = "recovery_failed"
+    # Two-factor sign-in: the key was right, and a code is needed too.
+    totp_required = "totp_required"
+    totp_not_enabled = "totp_not_enabled"
+    totp_already_enabled = "totp_already_enabled"
     rate_limited = "rate_limited"
     invalid_request = "invalid_request"
     # Email.

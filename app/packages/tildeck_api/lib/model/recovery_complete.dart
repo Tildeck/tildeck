@@ -17,6 +17,7 @@ class RecoveryComplete {
     required this.email,
     required this.new_,
     required this.recoveryAuthKey,
+    this.totpCode,
   });
 
   DeviceInfo device;
@@ -27,12 +28,15 @@ class RecoveryComplete {
 
   String recoveryAuthKey;
 
+  String? totpCode;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is RecoveryComplete &&
     other.device == device &&
     other.email == email &&
     other.new_ == new_ &&
-    other.recoveryAuthKey == recoveryAuthKey;
+    other.recoveryAuthKey == recoveryAuthKey &&
+    other.totpCode == totpCode;
 
   @override
   int get hashCode =>
@@ -40,10 +44,11 @@ class RecoveryComplete {
     (device.hashCode) +
     (email.hashCode) +
     (new_.hashCode) +
-    (recoveryAuthKey.hashCode);
+    (recoveryAuthKey.hashCode) +
+    (totpCode == null ? 0 : totpCode!.hashCode);
 
   @override
-  String toString() => 'RecoveryComplete[device=$device, email=$email, new_=$new_, recoveryAuthKey=$recoveryAuthKey]';
+  String toString() => 'RecoveryComplete[device=$device, email=$email, new_=$new_, recoveryAuthKey=$recoveryAuthKey, totpCode=$totpCode]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -51,6 +56,11 @@ class RecoveryComplete {
       json[r'email'] = this.email;
       json[r'new'] = this.new_;
       json[r'recovery_auth_key'] = this.recoveryAuthKey;
+    if (this.totpCode != null) {
+      json[r'totp_code'] = this.totpCode;
+    } else {
+      json[r'totp_code'] = null;
+    }
     return json;
   }
 
@@ -81,6 +91,7 @@ class RecoveryComplete {
         email: mapValueOfType<String>(json, r'email')!,
         new_: NewPassword.fromJson(json[r'new'])!,
         recoveryAuthKey: mapValueOfType<String>(json, r'recovery_auth_key')!,
+        totpCode: mapValueOfType<String>(json, r'totp_code'),
       );
     }
     return null;

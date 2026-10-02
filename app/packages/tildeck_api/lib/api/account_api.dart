@@ -271,6 +271,134 @@ class AccountApi {
     return null;
   }
 
+  /// Confirm Totp
+  ///
+  /// Turns two-factor sign-in on with a code from the new secret.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [TotpCode] totpCode (required):
+  ///
+  /// * [int] tildeckProtocol:
+  ///
+  /// * [String] authorization:
+  Future<Response> confirmTotpWithHttpInfo(TotpCode totpCode, { int? tildeckProtocol, String? authorization, Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final path = r'/api/account/totp/confirm';
+
+    // ignore: prefer_final_locals
+    Object? postBody = totpCode;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (tildeckProtocol != null) {
+      headerParams[r'Tildeck-Protocol'] = parameterToString(tildeckProtocol);
+    }
+    if (authorization != null) {
+      headerParams[r'authorization'] = parameterToString(authorization);
+    }
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      path,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Confirm Totp
+  ///
+  /// Turns two-factor sign-in on with a code from the new secret.
+  ///
+  /// Parameters:
+  ///
+  /// * [TotpCode] totpCode (required):
+  ///
+  /// * [int] tildeckProtocol:
+  ///
+  /// * [String] authorization:
+  Future<void> confirmTotp(TotpCode totpCode, { int? tildeckProtocol, String? authorization, Future<void>? abortTrigger, }) async {
+    final response = await confirmTotpWithHttpInfo(totpCode, tildeckProtocol: tildeckProtocol, authorization: authorization, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Disable Totp
+  ///
+  /// Turns two-factor sign-in off; a current code proves the authenticator.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [TotpCode] totpCode (required):
+  ///
+  /// * [int] tildeckProtocol:
+  ///
+  /// * [String] authorization:
+  Future<Response> disableTotpWithHttpInfo(TotpCode totpCode, { int? tildeckProtocol, String? authorization, Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final path = r'/api/account/totp/disable';
+
+    // ignore: prefer_final_locals
+    Object? postBody = totpCode;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (tildeckProtocol != null) {
+      headerParams[r'Tildeck-Protocol'] = parameterToString(tildeckProtocol);
+    }
+    if (authorization != null) {
+      headerParams[r'authorization'] = parameterToString(authorization);
+    }
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      path,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Disable Totp
+  ///
+  /// Turns two-factor sign-in off; a current code proves the authenticator.
+  ///
+  /// Parameters:
+  ///
+  /// * [TotpCode] totpCode (required):
+  ///
+  /// * [int] tildeckProtocol:
+  ///
+  /// * [String] authorization:
+  Future<void> disableTotp(TotpCode totpCode, { int? tildeckProtocol, String? authorization, Future<void>? abortTrigger, }) async {
+    final response = await disableTotpWithHttpInfo(totpCode, tildeckProtocol: tildeckProtocol, authorization: authorization, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
   /// Get Account
   ///
   /// Note: This method returns the HTTP [Response].
@@ -711,6 +839,74 @@ class AccountApi {
     // FormatException when trying to decode an empty string.
     if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'RecoveryWrap',) as RecoveryWrap;
+    
+    }
+    return null;
+  }
+
+  /// Start Totp
+  ///
+  /// A new secret for two-factor sign-in. Nothing changes until a code from it is confirmed.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [int] tildeckProtocol:
+  ///
+  /// * [String] authorization:
+  Future<Response> startTotpWithHttpInfo({ int? tildeckProtocol, String? authorization, Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final path = r'/api/account/totp/start';
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (tildeckProtocol != null) {
+      headerParams[r'Tildeck-Protocol'] = parameterToString(tildeckProtocol);
+    }
+    if (authorization != null) {
+      headerParams[r'authorization'] = parameterToString(authorization);
+    }
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      path,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Start Totp
+  ///
+  /// A new secret for two-factor sign-in. Nothing changes until a code from it is confirmed.
+  ///
+  /// Parameters:
+  ///
+  /// * [int] tildeckProtocol:
+  ///
+  /// * [String] authorization:
+  Future<TotpEnrollment?> startTotp({ int? tildeckProtocol, String? authorization, Future<void>? abortTrigger, }) async {
+    final response = await startTotpWithHttpInfo(tildeckProtocol: tildeckProtocol, authorization: authorization, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'TotpEnrollment',) as TotpEnrollment;
     
     }
     return null;

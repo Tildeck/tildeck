@@ -16,6 +16,7 @@ class SigninRequest {
     required this.authKey,
     required this.device,
     required this.email,
+    this.totpCode,
   });
 
   String authKey;
@@ -24,27 +25,37 @@ class SigninRequest {
 
   String email;
 
+  /// Needed when two-factor sign-in is on
+  String? totpCode;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is SigninRequest &&
     other.authKey == authKey &&
     other.device == device &&
-    other.email == email;
+    other.email == email &&
+    other.totpCode == totpCode;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (authKey.hashCode) +
     (device.hashCode) +
-    (email.hashCode);
+    (email.hashCode) +
+    (totpCode == null ? 0 : totpCode!.hashCode);
 
   @override
-  String toString() => 'SigninRequest[authKey=$authKey, device=$device, email=$email]';
+  String toString() => 'SigninRequest[authKey=$authKey, device=$device, email=$email, totpCode=$totpCode]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'auth_key'] = this.authKey;
       json[r'device'] = this.device;
       json[r'email'] = this.email;
+    if (this.totpCode != null) {
+      json[r'totp_code'] = this.totpCode;
+    } else {
+      json[r'totp_code'] = null;
+    }
     return json;
   }
 
@@ -72,6 +83,7 @@ class SigninRequest {
         authKey: mapValueOfType<String>(json, r'auth_key')!,
         device: DeviceInfo.fromJson(json[r'device'])!,
         email: mapValueOfType<String>(json, r'email')!,
+        totpCode: mapValueOfType<String>(json, r'totp_code'),
       );
     }
     return null;

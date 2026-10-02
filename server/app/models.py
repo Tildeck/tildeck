@@ -63,6 +63,12 @@ class Account(Base):
     recovery_auth_hash: Mapped[str] = mapped_column(Text)
     wrap_pw: Mapped[str] = mapped_column(Text)
     wrap_rk: Mapped[str] = mapped_column(Text)
+    # Two-factor sign-in: the active TOTP secret, one being enrolled until a
+    # code from it is confirmed, both encrypted with the config key, and the
+    # last accepted time step (a code works once).
+    totp_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    totp_pending_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    totp_last_step: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     # The last revision assigned to one of this account's records.
     revision: Mapped[int] = mapped_column(BigInteger, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

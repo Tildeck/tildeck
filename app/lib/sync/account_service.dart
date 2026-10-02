@@ -14,6 +14,12 @@ class WrongMasterPassword implements Exception {
   const WrongMasterPassword();
 }
 
+/// The account has two-factor sign-in on: the same request needs a code
+/// from the authenticator app as well. The key itself was right.
+class TotpRequired implements Exception {
+  const TotpRequired();
+}
+
 /// The account holds a different vault than the one on this device.
 class DifferentVault implements Exception {
   const DifferentVault();
@@ -133,12 +139,14 @@ class AccountService {
   /// hold that same vault (a device signing in again after its token
   /// expired or it was removed). Returns null when signed in, or the
   /// pending device when another device must approve it first. Throws
-  /// [WrongMasterPassword], [DifferentVault], or [SyncFailure].
+  /// [WrongMasterPassword], [TotpRequired], [DifferentVault], or
+  /// [SyncFailure].
   Future<PendingDevice?> signIn({
     required String address,
     required String email,
     required String password,
     required String deviceName,
+    String? totpCode,
   }) async {
     final server = engine.serverFor(address);
     final kdf = await server.prelogin(email);
@@ -148,8 +156,13 @@ class AccountService {
     try {
       // A device signing in again keeps its id, so it needs no new approval.
       var deviceId = vault.account?.deviceId ?? VaultCrypto.newId();
-      Future<SigninOutcome> signin() =>
-          server.signin(email: email, authKey: keys.authKey.extractBytes(), deviceId: deviceId, deviceName: deviceName);
+      Future<SigninOutcome> signin() => server.signin(
+        email: email,
+        authKey: keys.authKey.extractBytes(),
+        deviceId: deviceId,
+        deviceName: deviceName,
+        totpCode: totpCode,
+      );
       SigninOutcome outcome;
       try {
         outcome = await signin();
@@ -169,6 +182,7 @@ class AccountService {
       }
     } on SyncFailure catch (e) {
       if (e.code == 'invalid_credentials') throw const WrongMasterPassword();
+      if (e.code == 'totp_required') throw const TotpRequired();
       rethrow;
     } finally {
       if (!keep) keys.dispose();
@@ -221,11 +235,12 @@ class AccountService {
   /// key wrapped under them. With an account, the server checks the
   /// current password first and, unless [signOutOtherDevices] is false,
   /// signs out every other device; they sign in again with the new password.
-  /// Throws [WrongMasterPassword] or [SyncFailure].
+  /// Throws [WrongMasterPassword], [TotpRequired], or [SyncFailure].
   Future<void> changePassword({
     required String current,
     required String newPassword,
     bool signOutOtherDevices = true,
+    String? totpCode,
   }) async {
     final keys = await vault.passwordKeys(current);
     if (keys == null) throw const WrongMasterPassword();
@@ -236,16 +251,22 @@ class AccountService {
       final wrapPw = vault.wrapWith(next.keyEncryptionKey);
       final account = vault.account;
       if (account != null) {
-        await engine
-            .serverFor(account.server)
-            .changePassword(
-              account.token,
-              currentAuthKey: keys.authKey.extractBytes(),
-              kdf: kdf,
-              authKey: next.authKey.extractBytes(),
-              wrapPw: wrapPw,
-              keepOtherDevices: !signOutOtherDevices,
-            );
+        try {
+          await engine
+              .serverFor(account.server)
+              .changePassword(
+                account.token,
+                currentAuthKey: keys.authKey.extractBytes(),
+                kdf: kdf,
+                authKey: next.authKey.extractBytes(),
+                wrapPw: wrapPw,
+                keepOtherDevices: !signOutOtherDevices,
+                totpCode: totpCode,
+              );
+        } on SyncFailure catch (e) {
+          if (e.code == 'totp_required') throw const TotpRequired();
+          rethrow;
+        }
       }
       await vault.replaceWrap(kdf: kdf, wrapPw: wrapPw);
     } finally {
@@ -258,13 +279,15 @@ class AccountService {
   /// "Recovery"): every other device is signed out, and this one opens the
   /// vault. A vault already on this device must be the account's; that is
   /// checked before anything changes on the server. Throws
-  /// [InvalidRecoveryKey], [DifferentVault], or [SyncFailure].
+  /// [InvalidRecoveryKey], [TotpRequired], [DifferentVault], or
+  /// [SyncFailure].
   Future<void> recover({
     required String address,
     required String email,
     required String recoveryKey,
     required String newPassword,
     required String deviceName,
+    String? totpCode,
   }) async {
     final crypto = vault.status == VaultStatus.unlocked ? vault.crypto : await VaultCrypto.load();
     final rk = RecoveryKeyCodec(crypto).decode(recoveryKey);
@@ -276,7 +299,14 @@ class AccountService {
     try {
       final server = engine.serverFor(address);
       final rak = recovery.authKey.extractBytes();
-      final (vaultId, wrapRk) = await server.startRecovery(email, rak);
+      final String vaultId;
+      final Sealed wrapRk;
+      try {
+        (vaultId, wrapRk) = await server.startRecovery(email, rak, totpCode: totpCode);
+      } on SyncFailure catch (e) {
+        if (e.code == 'totp_required') throw const TotpRequired();
+        rethrow;
+      }
       if (vault.status != VaultStatus.missing && vault.status != VaultStatus.loading && vaultId != vault.vaultId) {
         throw const DifferentVault();
       }
@@ -297,6 +327,7 @@ class AccountService {
         wrapPw: wrapPw,
         deviceId: deviceId,
         deviceName: deviceName,
+        totpCode: totpCode,
       );
       await vault.recover(
         vaultId: vaultId,
@@ -317,6 +348,31 @@ class AccountService {
       next?.dispose();
       vaultKey?.dispose();
     }
+  }
+
+  /// Whether the account has two-factor sign-in on; null without an
+  /// account.
+  Future<bool?> twoFactorEnabled() async {
+    final account = vault.account;
+    if (account == null) return null;
+    return (await engine.serverFor(account.server).account(account.token)).totpEnabled;
+  }
+
+  /// A new secret for the authenticator app. Two-factor sign-in turns on
+  /// only with [confirmTwoFactor].
+  Future<TotpSetup> startTwoFactor() {
+    final account = vault.account!;
+    return engine.serverFor(account.server).startTotp(account.token);
+  }
+
+  Future<void> confirmTwoFactor(String code) {
+    final account = vault.account!;
+    return engine.serverFor(account.server).confirmTotp(account.token, code.replaceAll(' ', ''));
+  }
+
+  Future<void> disableTwoFactor(String code) {
+    final account = vault.account!;
+    return engine.serverFor(account.server).disableTotp(account.token, code.replaceAll(' ', ''));
   }
 
   /// Removes this device from the account and forgets the account here.

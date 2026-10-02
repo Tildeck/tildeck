@@ -24,6 +24,8 @@ dependencies:
   path_provider: ^2.1.5
   # Key generation (RSA) and fingerprints; dartssh2 already depends on it.
   pointycastle: ^4.0.0
+  # QR codes for setting up two-factor sign-in in an authenticator app.
+  qr_flutter: ^4.1.0
   sodium: ^4.0.4
   tildeck_api:
     path: packages/tildeck_api

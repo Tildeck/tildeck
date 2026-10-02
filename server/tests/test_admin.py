@@ -165,6 +165,27 @@ async def test_a_code_sent_twice_at_once_signs_in_once(panel, monkeypatch):
     assert sorted(a.status_code for a in answers) == [200, 401]
 
 
+async def test_an_administrator_turns_off_two_factor_sign_in_for_a_lost_authenticator(panel, client, mail, monkeypatch):  # noqa: F811
+    from tests.test_totp import turn_on
+
+    csrf, _ = await set_up(panel, monkeypatch)
+    keys = Keys("user@example.test")
+    token = await register(client, keys)
+    await turn_on(client, token, monkeypatch)
+    [user] = (await panel.get("/api/admin/users")).json()
+    assert (await panel.get(f"/api/admin/users/{user['id']}")).json()["totp_enabled"] is True
+
+    assert (await panel.post(f"/api/admin/users/{user['id']}/totp/disable")).status_code == 403, "needs the CSRF token"
+    res = await panel.post(f"/api/admin/users/{user['id']}/totp/disable", headers=csrf)
+    assert res.status_code == 204
+    assert (await panel.get(f"/api/admin/users/{user['id']}")).json()["totp_enabled"] is False
+    body = {"email": keys.email, "auth_key": keys.auth_key, "device": keys.device}
+    assert (await client.post("/api/account/signin", json=body, headers=H)).status_code == 200
+    assert any("administrator turned off two-factor" in m.subject for m in mail.sent)
+    log = (await panel.get("/api/admin/activity")).json()["entries"]
+    assert log[0]["action"] == "totp_reset" and log[0]["actor"] == USERNAME
+
+
 async def test_changes_need_the_csrf_token_and_sessions_expire(panel, monkeypatch):
     csrf, _ = await set_up(panel, monkeypatch)
     change = {"values": {"registration_mode": "invite"}}
