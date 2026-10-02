@@ -19,6 +19,7 @@ void main() {
     await show(tester, const Size(1280, 800));
     for (final (section, title) in [
       ('keys', 'Keys'),
+      ('identities', 'Identities'),
       ('knownHosts', 'Known hosts'),
       ('forwards', 'Port forwarding'),
       ('snippets', 'Snippets'),

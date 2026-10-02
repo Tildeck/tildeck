@@ -434,5 +434,20 @@
   "biometricInvalidated": "הפתיחה הביומטרית כובתה כי הנתונים הביומטריים במכשיר השתנו. אפשר להפעיל אותה מחדש בהגדרות.",
   "biometricSettingHelp": "טביעת אצבע או זיהוי פנים (ב-Windows, Windows Hello) פותחים את הכספת במכשיר הזה. הסיסמה הראשית תמיד עובדת גם כן.",
   "biometricEnableTitle": "הפעלת פתיחה ביומטרית",
-  "biometricEnableBody": "צריך להזין את הסיסמה הראשית פעם אחת כדי להפעיל את זה במכשיר הזה."
+  "biometricEnableBody": "צריך להזין את הסיסמה הראשית פעם אחת כדי להפעיל את זה במכשיר הזה.",
+  "identitiesTitle": "זהויות",
+  "addIdentity": "זהות חדשה",
+  "editIdentity": "עריכת זהות",
+  "noIdentitiesYet": "זהות היא שם משתמש עם מפתח או סיסמה, שנשמרים פעם אחת. אפשר לבחור אותה בכל מספר של שרתים או קבוצות, ושינוי שלה משנה את כולם.",
+  "identityNameLabel": "שם",
+  "identityNameHint": "לדוגמה: deploy בעבודה",
+  "identityLabel": "זהות",
+  "identityHelp": "כניסה כזהות שמורה, או הזנה של שם המשתמש ופרטי הכניסה למטה.",
+  "groupIdentityHelp": "השרתים בקבוצה נכנסים בזהות הזו, אלא אם בחרו זהות משלהם.",
+  "noIdentity": "בלי",
+  "identityWithKey": "מפתח {key}",
+  "identityWithPassword": "סיסמה שמורה",
+  "identityAsksPassword": "סיסמה נשאלת בכל פעם",
+  "identityHostCount": "{count, plural, =0{אין שרתים} =1{שרת אחד} other{{count} שרתים}}",
+  "identityInUse": "יש שרתים או קבוצות שמשתמשים בזהות הזו. צריך לבחור להם זהות אחרת קודם."
 }

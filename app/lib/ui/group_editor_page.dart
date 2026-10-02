@@ -34,6 +34,7 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
   late String? _snippetId = _existing?.startupSnippetId;
   late String? _jumpHostId = _existing?.jumpHostId;
   late String? _proxyId = _existing?.proxyId;
+  late String? _identityId = _existing?.identityId;
 
   @override
   void dispose() {
@@ -55,6 +56,7 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
         env: parseEnv(_env.text) ?? const {},
         jumpHostId: _jumpHostId,
         proxyId: _proxyId,
+        identityId: _identityId,
       ),
     );
     if (mounted) widget._close(context);
@@ -104,6 +106,22 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
               children: [
                 Text(t.groupSettingsIntro, style: TextStyle(color: c.muted, height: 1.5)),
                 const SizedBox(height: 20),
+                DropdownButtonFormField<String?>(
+                  key: const ValueKey('groupIdentity'),
+                  initialValue: widget.vault.identities.any((x) => x.id == _identityId) ? _identityId : null,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: t.identityLabel,
+                    helperText: t.groupIdentityHelp,
+                    helperMaxLines: 3,
+                  ),
+                  items: [
+                    DropdownMenuItem(value: null, child: Text(t.noIdentity)),
+                    for (final x in widget.vault.identities) DropdownMenuItem(value: x.id, child: Text(x.name)),
+                  ],
+                  onChanged: (v) => setState(() => _identityId = v),
+                ),
+                const SizedBox(height: 14),
                 TextFormField(
                   key: const ValueKey('groupUsername'),
                   controller: _username,

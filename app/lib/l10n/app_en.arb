@@ -729,5 +729,34 @@
   "biometricInvalidated": "Biometric unlock was turned off because this device's biometrics changed. Turn it on again in Settings.",
   "biometricSettingHelp": "Your fingerprint or face (on Windows, Windows Hello) opens the vault on this device. The master password always works too.",
   "biometricEnableTitle": "Turn on biometric unlock",
-  "biometricEnableBody": "Enter the master password once to turn it on for this device."
+  "biometricEnableBody": "Enter the master password once to turn it on for this device.",
+  "identitiesTitle": "Identities",
+  "addIdentity": "New identity",
+  "editIdentity": "Edit identity",
+  "noIdentitiesYet": "An identity is a username with a key or a password, saved once. Choose it for any number of hosts or groups, and changing it changes all of them.",
+  "identityNameLabel": "Name",
+  "identityNameHint": "For example: deploy at work",
+  "identityLabel": "Identity",
+  "identityHelp": "Sign in as a saved identity, or enter the username and credentials below.",
+  "groupIdentityHelp": "The group's hosts sign in as this identity, unless they choose their own.",
+  "noIdentity": "None",
+  "identityWithKey": "key {key}",
+  "@identityWithKey": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "identityWithPassword": "saved password",
+  "identityAsksPassword": "password asked each time",
+  "identityHostCount": "{count, plural, =0{no hosts} =1{1 host} other{{count} hosts}}",
+  "@identityHostCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "identityInUse": "Hosts or groups use this identity. Choose another for them first."
 }

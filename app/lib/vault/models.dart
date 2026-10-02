@@ -24,6 +24,7 @@ sealed class VaultEntry {
     ConnectionLogEntry.recordType => ConnectionLogEntry.fromJson(id, data),
     PortForwardEntry.recordType => PortForwardEntry.fromJson(id, data),
     ProxyEntry.recordType => ProxyEntry.fromJson(id, data),
+    IdentityEntry.recordType => IdentityEntry.fromJson(id, data),
     _ => null,
   };
 }
@@ -50,6 +51,7 @@ class HostEntry extends VaultEntry {
     this.agentForwarding = false,
     this.proxyId,
     this.protocol = ConnectionProtocol.ssh,
+    this.identityId,
   });
 
   static const recordType = 'host';
@@ -92,6 +94,10 @@ class HostEntry extends VaultEntry {
   /// SSH, or Telnet for devices that have nothing else.
   final ConnectionProtocol protocol;
 
+  /// The [IdentityEntry] to sign in as; then the host's own username and
+  /// credentials are not used.
+  final String? identityId;
+
   bool get isTelnet => protocol == ConnectionProtocol.telnet;
 
   @override
@@ -114,6 +120,7 @@ class HostEntry extends VaultEntry {
     'agent_forwarding': agentForwarding,
     'proxy_id': proxyId,
     'protocol': protocol.name,
+    'identity_id': identityId,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -133,6 +140,7 @@ class HostEntry extends VaultEntry {
     agentForwarding: d['agent_forwarding'] as bool? ?? false,
     proxyId: d['proxy_id'] as String?,
     protocol: ConnectionProtocol.values.byName(d['protocol'] as String? ?? 'ssh'),
+    identityId: d['identity_id'] as String?,
   );
 
   String get label {
@@ -275,6 +283,7 @@ class GroupEntry extends VaultEntry {
     this.env = const {},
     this.jumpHostId,
     this.proxyId,
+    this.identityId,
   });
 
   static const recordType = 'group';
@@ -293,6 +302,10 @@ class GroupEntry extends VaultEntry {
   /// The proxy for the group's hosts, unless they choose one.
   final String? proxyId;
 
+  /// The [IdentityEntry] the group's hosts sign in as, unless they choose
+  /// their own.
+  final String? identityId;
+
   @override
   String get type => recordType;
 
@@ -305,6 +318,7 @@ class GroupEntry extends VaultEntry {
     'env': env,
     'jump_host_id': jumpHostId,
     'proxy_id': proxyId,
+    'identity_id': identityId,
   };
 
   static GroupEntry fromJson(String id, Map<String, dynamic> d) => GroupEntry(
@@ -316,6 +330,40 @@ class GroupEntry extends VaultEntry {
     env: {...?(d['env'] as Map?)?.cast<String, String>()},
     jumpHostId: d['jump_host_id'] as String?,
     proxyId: d['proxy_id'] as String?,
+    identityId: d['identity_id'] as String?,
+  );
+}
+
+/// Who to sign in as, saved once and chosen by any number of hosts and
+/// groups: a username with a key, a saved password, or neither (the
+/// password is asked at each connection). Changing it changes every host
+/// that uses it.
+class IdentityEntry extends VaultEntry {
+  const IdentityEntry({required super.id, required this.name, required this.username, this.password, this.keyId});
+
+  static const recordType = 'identity';
+
+  final String name;
+  final String username;
+  final String? password;
+
+  /// A [KeyEntry] id; with one, the identity signs in with the key.
+  final String? keyId;
+
+  HostAuth get auth => keyId != null ? HostAuth.key : HostAuth.password;
+
+  @override
+  String get type => recordType;
+
+  @override
+  Map<String, Object?> dataJson() => {'name': name, 'username': username, 'password': password, 'key_id': keyId};
+
+  static IdentityEntry fromJson(String id, Map<String, dynamic> d) => IdentityEntry(
+    id: id,
+    name: d['name'] as String,
+    username: d['username'] as String,
+    password: d['password'] as String?,
+    keyId: d['key_id'] as String?,
   );
 }
 

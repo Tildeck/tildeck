@@ -20,6 +20,7 @@ import 'account_page.dart';
 import 'desktop_sidebar.dart';
 import 'files_page.dart';
 import 'history_page.dart';
+import 'identities_page.dart';
 import 'keys_page.dart';
 import 'known_hosts_page.dart';
 import 'host_key_dialog.dart';
@@ -108,6 +109,7 @@ class _SessionsPageState extends State<SessionsPage> {
   Widget _sectionPage() => switch (_section) {
     DeskSection.hosts => _hostsPage(desktop: true),
     DeskSection.keys => KeysPage(vault: widget.vault, connect: _connectFor),
+    DeskSection.identities => IdentitiesPage(vault: widget.vault),
     DeskSection.knownHosts => KnownHostsPage(vault: widget.vault),
     DeskSection.forwards => PortForwardsPage(vault: widget.vault, manager: _forwards, connect: _connectFor),
     DeskSection.snippets => SnippetsPage(vault: widget.vault),
