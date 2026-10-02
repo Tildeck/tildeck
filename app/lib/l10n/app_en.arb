@@ -980,5 +980,12 @@
       }
     }
   },
-  "runSnippet": "Run"
+  "runSnippet": "Run",
+  "errSerial": "The serial port could not open. Check that the device is connected and that no other program is using it.",
+  "serial": "Serial",
+  "serialPortLabel": "Serial port",
+  "serialPortsFound": "Ports on this computer",
+  "noSerialPorts": "No serial ports found",
+  "baudRateLabel": "Baud rate",
+  "baudRateInvalid": "A number such as 9600 or 115200"
 }

@@ -43,7 +43,7 @@ class _ServerPicker extends StatelessWidget {
     final c = context.colors;
     final hosts = [
       for (final h in vault.hosts)
-        if (!h.isTelnet && h.label != except) h,
+        if (h.isSsh && h.label != except) h,
     ];
     return AlertDialog(
       title: Text(t.copyToServerTitle),

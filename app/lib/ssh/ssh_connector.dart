@@ -9,7 +9,10 @@ import 'certificates.dart';
 import 'known_hosts.dart';
 import 'proxy.dart';
 
-enum ConnectionProtocol { ssh, telnet, local }
+enum ConnectionProtocol { ssh, telnet, local, serial }
+
+/// The usual speed of a serial console.
+const defaultBaudRate = 115200;
 
 /// Where to connect and how to authenticate.
 class ConnectionTarget {
@@ -79,6 +82,7 @@ class ConnectionTarget {
 
   String get label {
     if (protocol == ConnectionProtocol.local) return localName ?? localShell?.executable ?? '';
+    if (protocol == ConnectionProtocol.serial) return port == defaultBaudRate ? host : '$host $port';
     final defaultPort = protocol == ConnectionProtocol.telnet ? 23 : 22;
     final address = port == defaultPort ? host : '$host:$port';
     return username.isEmpty ? address : '$username@$address';
@@ -118,6 +122,9 @@ enum ConnectProblem {
 
   /// A local terminal's shell could not start.
   localShellFailed,
+
+  /// A serial port could not open: missing, or in use.
+  serialFailed,
 }
 
 class ConnectException implements Exception {

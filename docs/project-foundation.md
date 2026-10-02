@@ -400,6 +400,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `scripts/verify.sh --area app` also starts BusyBox telnetd (`telnet` in `scripts/toolchain/Dockerfile`), which gives a shell without signing in.
 - Tests: negotiation against a fake server (supported and refused options, no loops, terminal type, window size with a 255 in it, a command split across reads, typing escaped, the end of the connection). Against BusyBox telnetd: a shell with the window size it was told, again after a resize, Telnet through an SSH jump host, and a closed port. BusyBox does not ask for the terminal type, so that part is covered by the fake server only.
 
+### Serial connections (2026-10-02)
+
+- On the desktop (Windows, Linux, macOS), a host can be a serial port: Serial in the host editor, beside SSH and Telnet. Its address is the port's name (COM3, /dev/ttyUSB0), picked from the ports on this computer or typed, and its port number is the baud rate (115200 by default; a default 22 or 23 moves to it). The line is 8 data bits, no parity, one stop bit, no flow control, what nearly every console uses.
+- A serial host has nothing to sign in with, connect through, or forward: the editor hides the username, identity, keys, jump host, proxy, agent forwarding, environment, and startup snippet, and a group's jump host does not apply to it. It is not offered as a jump host or a file server.
+- A port that will not open (missing, or in use by another program) says so; a device that goes away is a drop, so automatic reconnection tries again. Phones do not show the choice; a serial host synced to one fails to open there with the same message.
+- The port is reached through `flutter_libserialport` (MIT), which builds the libserialport C library (LGPL-3.0) as a separate shared library.
+- Tests: a session against an in-memory line (the port and baud rate it opens, output shown, typing sent, closing on purpose, a device that goes away, a port that will not open), the label, and the host editor making a serial host with the SSH-only fields hidden, the group's jump host left out, and the connection target it gives. Not tested against a real serial device.
+
 ### Local terminal (2026-10-01)
 
 - On the desktop, a terminal button on the hosts screen opens a local shell in a tab, like a session. On Windows it offers the shells it finds: PowerShell 7 (on PATH or where it installs), Windows PowerShell, Command Prompt, and WSL; elsewhere the user's login shell. Phones have none.

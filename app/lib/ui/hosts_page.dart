@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:dartssh2/dartssh2.dart' show SSHClient;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../local/local_shell.dart';
+import '../ssh/serial.dart';
 import '../ssh/ssh_connector.dart';
 import '../theme.dart';
 import '../vault/models.dart';
@@ -31,6 +35,8 @@ import 'snippets_page.dart';
 /// through edits on two devices) ends the chain where it repeats.
 List<HostEntry> jumpChainOf(Vault vault, HostEntry host) {
   final chain = <HostEntry>[];
+  // A serial port is on this computer: nothing to connect through.
+  if (host.isSerial) return chain;
   final seen = {host.id};
   var current = host;
   while (true) {
@@ -42,12 +48,22 @@ List<HostEntry> jumpChainOf(Vault vault, HostEntry host) {
   }
 }
 
-/// Hosts that [host] may connect through: any other host whose own chain
-/// does not come back to it.
+/// Hosts that [host] may connect through: any other SSH host whose own
+/// chain does not come back to it.
 List<HostEntry> jumpCandidatesFor(Vault vault, String? hostId) => [
   for (final h in vault.hosts)
-    if (h.id != hostId && jumpChainOf(vault, h).every((j) => j.id != hostId)) h,
+    if (h.isSsh && h.id != hostId && jumpChainOf(vault, h).every((j) => j.id != hostId)) h,
 ];
+
+/// Serial ports can be opened on desktop computers only.
+bool get serialSupported => !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
+/// Each protocol's usual port; a serial host's is its baud rate.
+int defaultPortOf(ConnectionProtocol protocol) => switch (protocol) {
+  ConnectionProtocol.ssh || ConnectionProtocol.local => 22,
+  ConnectionProtocol.telnet => 23,
+  ConnectionProtocol.serial => defaultBaudRate,
+};
 
 String localShellName(AppLocalizations t, LocalShell shell) => switch (shell.kind) {
   LocalShellKind.pwsh => 'PowerShell',
@@ -89,7 +105,7 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
   final group = vault.effectiveGroup(host.group);
   // An identity (the host's, or else the group's) decides who signs in, and
   // how; without one, the host's fields, with the group's for empty ones.
-  final identity = host.isTelnet ? null : identityFor(vault, host);
+  final identity = host.isSsh ? identityFor(vault, host) : null;
   final effective = HostEntry(
     id: host.id,
     name: host.name,
@@ -104,7 +120,9 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
   );
   String? password;
   KeyEntry? key;
-  if (host.isTelnet) {
+  if (host.isSerial) {
+    // A serial console signs in inside the terminal, if at all.
+  } else if (host.isTelnet) {
     // Telnet signs in inside the terminal; a saved password is offered there.
     password = host.password;
   } else if (effective.auth == HostAuth.password) {
@@ -121,13 +139,13 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
     privateKey: key?.privateKey,
     passphrase: key?.passphrase,
     certificate: key?.certificate,
-    startupCommand: host.isTelnet
+    startupCommand: !host.isSsh
         ? null
         : vault.entry<SnippetEntry>(host.startupSnippetId ?? group?.startupSnippetId)?.command,
-    environment: host.isTelnet ? const {} : {...?group?.env, ...host.env},
+    environment: host.isSsh ? {...?group?.env, ...host.env} : const {},
     hostId: host.id,
     jump: jump,
-    agentKeys: host.agentForwarding && !host.isTelnet
+    agentKeys: host.agentForwarding && host.isSsh
         ? [for (final k in vault.keys) (privateKey: k.privateKey, passphrase: k.passphrase)]
         : null,
     // Only the hop that connects directly uses it; the connector decides.
@@ -438,7 +456,7 @@ class _HostsPageState extends State<HostsPage> {
 
   List<PopupMenuEntry<String>> _hostMenu(AppLocalizations t, HostEntry host) => [
     PopupMenuItem(value: 'connect', child: Text(t.connectButton)),
-    if (widget.connectHost != null && !host.isTelnet)
+    if (widget.connectHost != null && host.isSsh)
       PopupMenuItem(key: const ValueKey('hostFiles'), value: 'files', child: Text(t.filesTitle)),
     PopupMenuItem(key: const ValueKey('hostEdit'), value: 'edit', child: Text(t.editAction)),
     PopupMenuItem(key: const ValueKey('hostDuplicate'), value: 'duplicate', child: Text(t.duplicateAction)),
@@ -1013,7 +1031,7 @@ class _HostsPageState extends State<HostsPage> {
                                   _ => _delete(context, host),
                                 },
                                 itemBuilder: (_) => [
-                                  if (widget.connectHost != null && !host.isTelnet)
+                                  if (widget.connectHost != null && host.isSsh)
                                     PopupMenuItem(
                                       key: const ValueKey('hostFiles'),
                                       value: 'files',
@@ -1078,6 +1096,8 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late String? _identityId = widget.host?.identityId;
   late ConnectionProtocol _protocol = widget.host?.protocol ?? ConnectionProtocol.ssh;
   bool get _telnet => _protocol == ConnectionProtocol.telnet;
+  bool get _serial => _protocol == ConnectionProtocol.serial;
+  bool get _ssh => _protocol == ConnectionProtocol.ssh;
 
   @override
   void dispose() {
@@ -1096,10 +1116,10 @@ class _HostEditorPageState extends State<HostEditorPage> {
         group: canonicalGroup(_group.text),
         host: _host.text.trim(),
         port: int.parse(_port.text.trim()),
-        username: _username.text.trim(),
-        auth: _telnet ? HostAuth.password : _auth,
-        password: (_telnet || _auth == HostAuth.password) && _savePassword ? _password.text : null,
-        keyId: !_telnet && _auth == HostAuth.key ? _keyId : null,
+        username: _serial ? '' : _username.text.trim(),
+        auth: _ssh ? _auth : HostAuth.password,
+        password: !_serial && (_telnet || _auth == HostAuth.password) && _savePassword ? _password.text : null,
+        keyId: _ssh && _auth == HostAuth.key ? _keyId : null,
         protocol: _protocol,
         startupSnippetId: _startupSnippetId,
         tags: [
@@ -1107,10 +1127,10 @@ class _HostEditorPageState extends State<HostEditorPage> {
             if (tag.trim().isNotEmpty) tag.trim(),
         ],
         env: parseEnv(_env.text) ?? const {},
-        jumpHostId: _jumpHostId,
         agentForwarding: _agentForwarding,
-        proxyId: _proxyId,
-        identityId: _telnet ? null : _identityId,
+        identityId: _ssh ? _identityId : null,
+        jumpHostId: _serial ? null : _jumpHostId,
+        proxyId: _serial ? null : _proxyId,
         notes: _notes.text.trim(),
       ),
     );
@@ -1160,7 +1180,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
           final groupIdentity = widget.vault.entry<IdentityEntry>(group?.identityId);
           // With an identity (this host's or the group's), it signs in: the
           // fields below are not used, so they are not shown.
-          final identity = _telnet ? null : widget.vault.entry<IdentityEntry>(_identityId) ?? groupIdentity;
+          final identity = !_ssh ? null : widget.vault.entry<IdentityEntry>(_identityId) ?? groupIdentity;
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
@@ -1186,17 +1206,19 @@ class _HostEditorPageState extends State<HostEditorPage> {
                     SegmentedButton<ConnectionProtocol>(
                       key: const ValueKey('hostProtocol'),
                       showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(value: ConnectionProtocol.ssh, label: Text('SSH')),
-                        ButtonSegment(value: ConnectionProtocol.telnet, label: Text('Telnet')),
+                      segments: [
+                        const ButtonSegment(value: ConnectionProtocol.ssh, label: Text('SSH')),
+                        const ButtonSegment(value: ConnectionProtocol.telnet, label: Text('Telnet')),
+                        if (serialSupported || _serial)
+                          ButtonSegment(value: ConnectionProtocol.serial, label: Text(t.serial)),
                       ],
                       selected: {_protocol},
                       onSelectionChanged: (s) => setState(() {
-                        _protocol = s.first;
                         // Move a default port along with the protocol.
-                        final port = _port.text.trim();
-                        if (port == '22' && _telnet) _port.text = '23';
-                        if (port == '23' && !_telnet) _port.text = '22';
+                        if (_port.text.trim() == '${defaultPortOf(_protocol)}') {
+                          _port.text = '${defaultPortOf(s.first)}';
+                        }
+                        _protocol = s.first;
                       }),
                     ),
                     if (_telnet) ...[
@@ -1215,12 +1237,31 @@ class _HostEditorPageState extends State<HostEditorPage> {
                             keyboardType: TextInputType.url,
                             autocorrect: false,
                             validator: required,
-                            decoration: InputDecoration(labelText: t.hostLabel, hintText: t.hostHint),
+                            decoration: _serial
+                                ? InputDecoration(
+                                    labelText: t.serialPortLabel,
+                                    hintText: Platform.isWindows ? 'COM3' : '/dev/ttyUSB0',
+                                    suffixIcon: PopupMenuButton<String>(
+                                      key: const ValueKey('serialPorts'),
+                                      icon: const Icon(Icons.usb_rounded),
+                                      tooltip: t.serialPortsFound,
+                                      onSelected: (v) => setState(() => _host.text = v),
+                                      itemBuilder: (_) {
+                                        final ports = serialPortNames();
+                                        return [
+                                          if (ports.isEmpty)
+                                            PopupMenuItem(enabled: false, child: Text(t.noSerialPorts)),
+                                          for (final p in ports) PopupMenuItem(value: p, child: Text(p)),
+                                        ];
+                                      },
+                                    ),
+                                  )
+                                : InputDecoration(labelText: t.hostLabel, hintText: t.hostHint),
                           ),
                         ),
                         const SizedBox(width: 12),
                         SizedBox(
-                          width: 96,
+                          width: _serial ? 120 : 96,
                           child: TextFormField(
                             key: const ValueKey('port'),
                             controller: _port,
@@ -1228,15 +1269,16 @@ class _HostEditorPageState extends State<HostEditorPage> {
                             keyboardType: TextInputType.number,
                             validator: (v) {
                               final port = int.tryParse(v?.trim() ?? '');
+                              if (_serial) return port == null || port < 1 || port > 4000000 ? t.baudRateInvalid : null;
                               return port == null || port < 1 || port > 65535 ? t.portInvalid : null;
                             },
-                            decoration: InputDecoration(labelText: t.portLabel),
+                            decoration: InputDecoration(labelText: _serial ? t.baudRateLabel : t.portLabel),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
-                    if (!_telnet) ...[
+                    if (_ssh) ...[
                       DropdownButtonFormField<String?>(
                         key: const ValueKey('hostIdentity'),
                         initialValue: _identityId,
@@ -1271,7 +1313,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       ),
                       const SizedBox(height: 8),
                     ],
-                    if (identity == null) ...[
+                    if (identity == null && !_serial) ...[
                       TextFormField(
                         key: const ValueKey('username'),
                         controller: _username,
@@ -1356,33 +1398,35 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ),
                       ],
                     ],
-                    const SizedBox(height: 14),
-                    DropdownButtonFormField<String?>(
-                      key: const ValueKey('jumpHost'),
-                      initialValue: _jumpHostId,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: t.jumpHostLabel,
-                        helperText: _jumpHostId == null && groupJump != null && groupJump.id != widget.host?.id
-                            ? t.fromGroup(groupJump.name)
-                            : t.jumpHostHelp,
-                        helperMaxLines: 3,
+                    if (!_serial) ...[
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String?>(
+                        key: const ValueKey('jumpHost'),
+                        initialValue: _jumpHostId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: t.jumpHostLabel,
+                          helperText: _jumpHostId == null && groupJump != null && groupJump.id != widget.host?.id
+                              ? t.fromGroup(groupJump.name)
+                              : t.jumpHostHelp,
+                          helperMaxLines: 3,
+                        ),
+                        items: [
+                          DropdownMenuItem(value: null, child: Text(t.directConnection)),
+                          for (final h in jumps) DropdownMenuItem(value: h.id, child: Text(h.name)),
+                        ],
+                        onChanged: (v) => setState(() => _jumpHostId = v),
                       ),
-                      items: [
-                        DropdownMenuItem(value: null, child: Text(t.directConnection)),
-                        for (final h in jumps) DropdownMenuItem(value: h.id, child: Text(h.name)),
-                      ],
-                      onChanged: (v) => setState(() => _jumpHostId = v),
-                    ),
-                    const SizedBox(height: 14),
-                    ProxyField(
-                      vault: widget.vault,
-                      value: _proxyId,
-                      helperText: _proxyId == null && groupProxy != null ? t.fromGroup(groupProxy.name) : null,
-                      onChanged: (v) => setState(() => _proxyId = v),
-                    ),
+                      const SizedBox(height: 14),
+                      ProxyField(
+                        vault: widget.vault,
+                        value: _proxyId,
+                        helperText: _proxyId == null && groupProxy != null ? t.fromGroup(groupProxy.name) : null,
+                        onChanged: (v) => setState(() => _proxyId = v),
+                      ),
+                    ],
                     const SizedBox(height: 6),
-                    if (!_telnet)
+                    if (_ssh)
                       SwitchListTile(
                         key: const ValueKey('agentForwarding'),
                         contentPadding: EdgeInsets.zero,
@@ -1411,7 +1455,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    if (!_telnet)
+                    if (_ssh)
                       TextFormField(
                         key: const ValueKey('hostEnv'),
                         controller: _env,
@@ -1430,7 +1474,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ),
                       ),
                     const SizedBox(height: 14),
-                    if (!_telnet)
+                    if (_ssh)
                       DropdownButtonFormField<String?>(
                         key: const ValueKey('startupSnippet'),
                         initialValue: _startupSnippetId,
@@ -1535,7 +1579,9 @@ class _HostCardState extends State<_HostCard> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    host.isTelnet
+                    host.isSerial
+                        ? Icons.usb_rounded
+                        : host.isTelnet
                         ? Icons.lan_outlined
                         : host.auth == HostAuth.key
                         ? Icons.key_rounded

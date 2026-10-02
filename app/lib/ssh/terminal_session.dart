@@ -11,6 +11,7 @@ import '../activity.dart';
 import '../local/local_shell.dart';
 import 'autocomplete.dart';
 import 'file_browser.dart';
+import 'serial.dart';
 import 'ssh_connector.dart';
 import 'telnet.dart';
 
@@ -20,12 +21,14 @@ enum SessionState { connecting, connected, closed }
 /// exists before the connection, so the tab can show progress and errors.
 class TerminalSession extends ChangeNotifier {
   /// [scrollback] is how many lines stay above the screen.
-  TerminalSession(this.target, {int scrollback = 10000}) {
+  /// [openSerial] opens a serial target's port.
+  TerminalSession(this.target, {int scrollback = 10000, this.openSerial = openSerialPort}) {
     terminal = Terminal(maxLines: scrollback);
     controller = TerminalController();
   }
 
   final ConnectionTarget target;
+  final SerialOpener openSerial;
   late final Terminal terminal;
   late final TerminalController controller;
 
@@ -81,6 +84,7 @@ class TerminalSession extends ChangeNotifier {
         ConnectionProtocol.ssh => await _openSsh(connector, promptHostKey),
         ConnectionProtocol.telnet => await _openTelnet(connector, promptHostKey),
         ConnectionProtocol.local => _openLocal(),
+        ConnectionProtocol.serial => _openSerial(),
       };
       _link = link;
 
@@ -113,8 +117,12 @@ class TerminalSession extends ChangeNotifier {
       await link.done;
       // A shell that ends without an exit status or signal did not exit:
       // the connection dropped.
+      // A serial line ends on its own only when the device goes away.
       final shell = _shell;
-      _close(shell != null && shell.exitCode == null && shell.exitSignal == null ? ConnectProblem.disconnected : null);
+      final dropped = shell != null
+          ? shell.exitCode == null && shell.exitSignal == null
+          : target.protocol == ConnectionProtocol.serial;
+      _close(dropped ? ConnectProblem.disconnected : null);
     } on ConnectException catch (e) {
       problemVia = e.via;
       _close(e.problem);
@@ -162,6 +170,18 @@ class TerminalSession extends ChangeNotifier {
       resize: (width, height, _, _) => pty.resize(height, width),
       done: pty.exitCode,
       close: pty.kill,
+    );
+  }
+
+  _Link _openSerial() {
+    final line = openSerial(target.host, target.port);
+    return _Link(
+      output: line.output.cast<List<int>>(),
+      write: line.write,
+      // A serial line has no window size to tell.
+      resize: (_, _, _, _) {},
+      done: line.done,
+      close: line.close,
     );
   }
 
