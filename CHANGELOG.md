@@ -47,6 +47,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 ### Fixed
 
 - Servers that ask for more than a password at sign-in (a one-time code from an authenticator, Duo) now show their questions instead of getting the password for each one; this also works with a key, and a refused password is asked for instead of sent again.
+- A device's id and the master password are no longer enough to get a token for a device that is still signed in: it needs approval again.
 - Server hardening from the security review: an email confirmation link needs a button press (mail scanners open links); link tokens stay out of the access log; a TOTP code sent twice at once signs in once; a disabled account cannot collect an approved device; request bodies are capped before they are read; the device idle limit is at most ten years.
 - The client refuses weak key derivation settings from a server, and plain http to any sync server but one on this computer.
 - Sign-in limits hold: a client can no longer pick the address it is counted under, attempts sent at once no longer get past the limit together, and an unknown email or administrator takes as long to refuse as a wrong password.
