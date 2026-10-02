@@ -25,6 +25,7 @@ class TerminalPanel extends StatefulWidget {
     this.onFontSize,
     this.snippets = const {},
     this.options = const TerminalOptions(),
+    this.onAutoReconnect,
   }) : theme = theme ?? terminalThemes.first.theme;
 
   final TerminalSession session;
@@ -44,6 +45,9 @@ class TerminalPanel extends StatefulWidget {
 
   /// Font, line height, cursor, bell, and copying on selection.
   final TerminalOptions options;
+
+  /// Reconnects on its own after a drop: the attempt number. Null never.
+  final ValueChanged<int>? onAutoReconnect;
 
   @override
   State<TerminalPanel> createState() => _TerminalPanelState();
@@ -77,6 +81,50 @@ class _TerminalPanelState extends State<TerminalPanel> {
     super.initState();
     session.terminal.onBell = _bell;
     session.controller.addListener(_selectionChanged);
+    session.addListener(_maybeReconnect);
+    // A session that dropped before this panel was built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeReconnect();
+    });
+  }
+
+  Timer? _reconnectTimer;
+  int _reconnectIn = 0;
+
+  /// The attempt a reconnection now would be: after a drop from a working
+  /// session, the first; after a failed attempt, the next.
+  int get _nextAttempt => session.wasConnected ? 1 : session.reconnectAttempt + 1;
+
+  /// A dropped connection (or a failed attempt to bring it back) tries
+  /// again after a wait, a few times, unless the user said no.
+  void _maybeReconnect() {
+    final retry = widget.onAutoReconnect;
+    if (retry == null || !widget.options.autoReconnect || _reconnectTimer != null) return;
+    if (session.state != SessionState.closed) return;
+    final again = session.wasConnected || session.reconnectAttempt > 0;
+    final problem = session.problem;
+    final transient =
+        problem == ConnectProblem.disconnected ||
+        problem == ConnectProblem.unreachable ||
+        problem == ConnectProblem.timeout;
+    final attempt = _nextAttempt;
+    if (!again || !transient || attempt > reconnectDelays.length) return;
+    _reconnectIn = reconnectDelays[attempt - 1].inSeconds;
+    _reconnectTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return timer.cancel();
+      if (--_reconnectIn <= 0) {
+        timer.cancel();
+        retry(attempt);
+      } else {
+        setState(() {});
+      }
+    });
+    setState(() {});
+  }
+
+  void _cancelReconnect() {
+    _reconnectTimer?.cancel();
+    setState(() => _reconnectIn = -1);
   }
 
   void _bell() {
@@ -110,6 +158,8 @@ class _TerminalPanelState extends State<TerminalPanel> {
 
   @override
   void dispose() {
+    _reconnectTimer?.cancel();
+    session.removeListener(_maybeReconnect);
     _flashTimer?.cancel();
     _copyTimer?.cancel();
     session.controller.removeListener(_selectionChanged);
@@ -321,7 +371,13 @@ class _TerminalPanelState extends State<TerminalPanel> {
                           bottom: 12,
                           child: Directionality(
                             textDirection: appDirection,
-                            child: _StatusBanner(session: session, onReconnect: widget.onReconnect),
+                            child: _StatusBanner(
+                              session: session,
+                              onReconnect: widget.onReconnect,
+                              reconnectIn: _reconnectTimer?.isActive == true ? _reconnectIn : null,
+                              attempt: _nextAttempt,
+                              onCancel: _cancelReconnect,
+                            ),
                           ),
                         ),
                     ],
@@ -484,10 +540,21 @@ String connectProblemText(AppLocalizations t, ConnectProblem problem) => switch 
 };
 
 class _StatusBanner extends StatelessWidget {
-  const _StatusBanner({required this.session, required this.onReconnect});
+  const _StatusBanner({
+    required this.session,
+    required this.onReconnect,
+    this.reconnectIn,
+    this.attempt = 1,
+    this.onCancel,
+  });
 
   final TerminalSession session;
   final VoidCallback onReconnect;
+
+  /// Seconds before the next automatic reconnection; null when none waits.
+  final int? reconnectIn;
+  final int attempt;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -520,9 +587,22 @@ class _StatusBanner extends StatelessWidget {
               ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(shown, style: TextStyle(color: c.ink)),
+              child: Text(
+                reconnectIn == null
+                    ? shown
+                    : '$shown ${t.reconnectingIn(reconnectIn!, attempt, reconnectDelays.length)}',
+                key: const ValueKey('sessionStatus'),
+                style: TextStyle(color: c.ink),
+              ),
             ),
-            if (!connecting) TextButton(onPressed: onReconnect, child: Text(t.reconnect)),
+            if (reconnectIn != null && onCancel != null)
+              TextButton(key: const ValueKey('cancelReconnect'), onPressed: onCancel, child: Text(t.cancel)),
+            if (!connecting)
+              TextButton(
+                key: const ValueKey('reconnectNow'),
+                onPressed: onReconnect,
+                child: Text(reconnectIn == null ? t.reconnect : t.reconnectNow),
+              ),
           ],
         ),
       ),

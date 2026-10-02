@@ -55,6 +55,15 @@ class TerminalSession extends ChangeNotifier {
 
   ConnectProblem? problem;
 
+  /// The session reached the shell once: a later end is a drop, not a
+  /// failure to connect.
+  bool wasConnected = false;
+
+  /// Which automatic reconnection this session is (0 for the first try).
+  int reconnectAttempt = 0;
+
+  SSHSession? _shell;
+
   /// The jump host [problem] happened at, when not the target itself.
   String? problemVia;
 
@@ -94,6 +103,7 @@ class TerminalSession extends ChangeNotifier {
           link.resize(width, height, pixelWidth, pixelHeight);
 
       state = SessionState.connected;
+      wasConnected = true;
       notifyListeners();
       final client = _client;
       if (autocomplete && client != null) unawaited(_loadHistory(client));
@@ -101,7 +111,10 @@ class TerminalSession extends ChangeNotifier {
       if (startup != null && startup.trim().isNotEmpty) run(startup);
 
       await link.done;
-      _close(null);
+      // A shell that ends without an exit status or signal did not exit:
+      // the connection dropped.
+      final shell = _shell;
+      _close(shell != null && shell.exitCode == null && shell.exitSignal == null ? ConnectProblem.disconnected : null);
     } on ConnectException catch (e) {
       problemVia = e.via;
       _close(e.problem);
@@ -113,7 +126,7 @@ class TerminalSession extends ChangeNotifier {
   Future<_Link> _openSsh(SshConnector connector, HostKeyPrompt promptHostKey) async {
     final client = await connector.connect(target, promptHostKey: promptHostKey);
     _client = client;
-    final shell = await client.shell(
+    final shell = _shell = await client.shell(
       pty: SSHPtyConfig(type: 'xterm-256color', width: terminal.viewWidth, height: terminal.viewHeight),
       environment: target.environment.isEmpty ? null : target.environment,
     );
@@ -263,6 +276,8 @@ class TerminalSession extends ChangeNotifier {
 
   /// Ends the session and releases the connection.
   void disconnect() {
+    // Closed here on purpose: not a drop.
+    _shell = null;
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }

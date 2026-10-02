@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Sessions reconnect on their own when the connection drops: a few times, each after a longer wait, counted down with a cancel; on by default, in Settings, Terminal.
 - Terminal settings: the font (JetBrains Mono or the system's monospace fonts), line height, cursor shape, what the bell does (flash, sound, or nothing), how many lines are kept above the screen, and copying on select.
 - Folders inside folders (a slash in the group: Production/Web), shown nested and foldable, with settings taken from the folders above; and duplicating a host.
 - Find anything with Ctrl+Shift+P: connect to a host, switch to an open tab, go to a section, or lock, by typing.

@@ -235,7 +235,8 @@ class SettingsDraft extends ChangeNotifier {
       a.cursorStyle == b.cursorStyle &&
       a.bell == b.bell &&
       a.scrollback == b.scrollback &&
-      a.copyOnSelect == b.copyOnSelect;
+      a.copyOnSelect == b.copyOnSelect &&
+      a.autoReconnect == b.autoReconnect;
 
   /// A change stored elsewhere (another device, through sync) shows here,
   /// unless something is being edited.
@@ -584,6 +585,14 @@ class _TerminalSettings extends StatelessWidget {
           onChanged: (v) => draft.setPrefs(prefs.copyWith(copyOnSelect: v)),
           title: Text(t.copyOnSelectLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(t.copyOnSelectHelp, style: TextStyle(color: c.muted, fontSize: 13)),
+        ),
+        SwitchListTile(
+          key: const ValueKey('autoReconnect'),
+          contentPadding: EdgeInsets.zero,
+          value: options.autoReconnect,
+          onChanged: (v) => draft.setPrefs(prefs.copyWith(autoReconnect: v)),
+          title: Text(t.autoReconnectLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(t.autoReconnectHelp, style: TextStyle(color: c.muted, fontSize: 13)),
         ),
         SwitchListTile(
           key: const ValueKey('autocompleteSwitch'),

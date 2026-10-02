@@ -506,5 +506,9 @@
   "backupNotABackup": "הקובץ הזה הוא לא גיבוי של Tildeck.",
   "backupNewer": "הגיבוי הזה מגרסה חדשה יותר של Tildeck. צריך לעדכן את Tildeck כדי לשחזר אותו.",
   "backupWrongPassword": "זו לא הסיסמה הראשית של הגיבוי הזה.",
-  "folderLabel": "תיקייה"
+  "folderLabel": "תיקייה",
+  "autoReconnectLabel": "התחברות מחדש כשהחיבור נופל",
+  "autoReconnectHelp": "כמה פעמים, עם המתנה קצת ארוכה יותר בכל פעם.",
+  "reconnectingIn": "מתחבר מחדש בעוד {seconds} שנ׳ ({attempt} מתוך {total}).",
+  "reconnectNow": "התחברות עכשיו"
 }
