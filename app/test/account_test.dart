@@ -198,6 +198,27 @@ void main() {
     expect(await a.opensWith(newPassword), isTrue);
   });
 
+  test('a device whose vault locks while it waits for approval keeps its own vault', () async {
+    await registered();
+    final b = await Device('b').load();
+    await b.vault.create('a-different-password-1');
+    await b.vault.put(HostEntry(id: b.vault.newId(), name: 'Only here', host: 'lab.example.com', username: 'me'));
+    final pending = (await b.accounts.signIn(address: address, email: email, password: password, deviceName: 'Phone'))!;
+    server.devices[pending.pending.deviceId]!['status'] = 'active';
+
+    // Locked, the approval is not collected: collecting would consume it
+    // and, before, replaced the vault file with the account's empty vault.
+    b.vault.lock();
+    expect(await pending.collect(), isFalse);
+    expect(b.vault.status, VaultStatus.locked);
+
+    // Opened again, the approval is collected and the vaults compared.
+    expect(await b.vault.unlock('a-different-password-1'), isTrue);
+    await expectLater(pending.collect(), throwsA(isA<DifferentVault>()));
+    expect(b.vault.hosts.single.name, 'Only here');
+    expect(b.vault.account, isNull);
+  });
+
   test('a device holding another vault is refused before anything changes on the server', () async {
     final (_, rk) = await registered();
     final other = await Device('other').load();

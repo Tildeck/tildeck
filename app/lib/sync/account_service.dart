@@ -42,11 +42,14 @@ class PendingDevice {
   String get deviceName => _deviceName;
 
   /// True once approved and the vault is open on this device; false while
-  /// the approval is still missing. Throws [SyncFailure] for anything else
-  /// (a revoked request, for one).
+  /// the approval is still missing, or while this device's vault is locked
+  /// (collecting consumes the approval, and the vault must be open to join
+  /// it to the account). Throws [SyncFailure] for anything else (a revoked
+  /// request, for one).
   Future<bool> collect() async {
     final keys = _keys;
     if (keys == null) throw StateError('abandoned');
+    if (_service.vault.status == VaultStatus.locked) return false;
     final SignedIn signedIn;
     try {
       signedIn = await _server.claim(pending.deviceId, pending.claimToken);
@@ -187,6 +190,9 @@ class AccountService {
       deviceName: deviceName,
       token: signedIn.token,
     );
+    if (vault.status != VaultStatus.unlocked && vault.status != VaultStatus.missing) {
+      throw StateError('sign-in needs an open vault or none');
+    }
     if (vault.status == VaultStatus.unlocked) {
       if (signedIn.vaultId != vault.vaultId) throw const DifferentVault();
       // The master password changed on another device: the typed password

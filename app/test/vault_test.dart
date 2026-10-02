@@ -90,6 +90,36 @@ void main() {
     expect(again.keys.single.privateKey, key.privateKey);
   });
 
+  test('adopting a synced vault never replaces a vault that is here', () async {
+    final first = await newVault();
+    await first.put(host);
+    first.lock();
+    final before = await vaultFile.readAsString();
+    final crypto = await VaultCrypto.load();
+    final keys = await crypto.deriveKeys(password, first.kdf);
+    final vaultKey = crypto.unwrapVaultKey(keys.keyEncryptionKey, first.wrapPw, first.vaultId);
+    keys.dispose();
+    await expectLater(
+      first.adopt(
+        vaultId: VaultCrypto.newId(),
+        kdf: first.kdf,
+        wrapPw: first.wrapPw,
+        vaultKey: vaultKey,
+        account: const SyncAccount(
+          server: 'https://s.example.test',
+          email: 'e@example.test',
+          deviceId: 'd',
+          deviceName: 'n',
+          token: 't',
+        ),
+      ),
+      throwsStateError,
+    );
+    vaultKey.dispose();
+    expect(await vaultFile.readAsString(), before);
+    expect(first.status, VaultStatus.locked);
+  });
+
   test('the vault file holds no plaintext', () async {
     final vault = await newVault();
     await vault.put(host);

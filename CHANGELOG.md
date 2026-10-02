@@ -44,4 +44,5 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - The client refuses weak key derivation settings from a server, and plain http to any sync server but one on this computer.
 - Sign-in limits hold: a client can no longer pick the address it is counted under, attempts sent at once no longer get past the limit together, and an unknown email or administrator takes as long to refuse as a wrong password.
 - A hostile server could make a download write outside its folder on Windows through a file name; every server name now becomes one safe local name, checked to stay inside the folder.
+- A device that had its own vault and locked while waiting for approval could have that vault replaced by the account's when the approval arrived. It now waits until the vault is open, and a different vault is refused as at sign-in.
 - A host's environment variable that the server does not accept no longer fails the session; it is skipped, as ssh does.

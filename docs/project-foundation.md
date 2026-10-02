@@ -514,6 +514,11 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Every name from a server that becomes a local file or folder now goes through one function, `localNameFor`: separators, drive and stream marks, reserved characters, and control characters become "_", trailing dots and spaces too (Windows drops them, so "." and ".." cannot survive), and Windows device names (CON, NUL, COM1, and the like) get "_" in front. A folder download also numbers two names that end up the same, and every path is checked to stay inside its target before anything is written.
 - Tests: the names and the containment check; against the OpenSSH container, a folder of hostile names downloads inside its target only; and on Windows itself, names like `..\escape.cmd` and `C:escape.cmd` land inside the folder (the same test, run on the old code, wrote outside it).
 
+### Vault: adopting never replaces a vault (2026-10-02)
+
+- `Vault.adopt` replaces the vault file with a synced vault and was guarded only by an `assert`, which release builds drop. A device with its own vault that locked (by the idle lock, say) while it waited for approval reached `adopt` when the approval was collected, and lost its records. `adopt` now throws over any existing vault, sign-in refuses a locked vault, and a pending device does not collect its approval while the vault is locked: collecting consumes it on the server. It waits, and collects once the vault is open, where a different vault is refused as at sign-in.
+- Tests (both fail on the old code): adopting over a locked vault throws and leaves the file as it was; a device whose vault locks while it waits keeps its own vault and is refused with `DifferentVault` once unlocked.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
