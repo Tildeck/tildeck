@@ -495,6 +495,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Two panes share the width, so a side's name keeps to an icon (with a tooltip) and the server's upload button to its icon.
 - Tests: on the desktop with a real local folder, a local file dragged onto the server's table uploads its content, a server file dragged onto the local table lands there and shows, and the local side hides. Golden: both sides in both languages.
 
+### Security fix: what the client accepts from a server (2026-10-02)
+
+- Key derivation settings, from a server or the vault file, are refused unless they are within what docs/security-model.md allows: Argon2id with 3 to 10 passes, 64 MiB to 1 GiB of memory, and a 16-byte salt. Before this, a hostile server (or anyone in the middle) could send weak settings, and the key that proves the master password would have become cheap to guess from offline. The refusal comes before any key is derived, so nothing is sent; the message says the server asked for settings too weak.
+- A sync server address must be https. Plain http is accepted only for a server on this computer (localhost, 127.x, ::1), for development; elsewhere it is refused before any request, with a message saying why.
+- Tests: weak passes, too little memory, and a short salt each refused, with prelogin the only request made; http to other hosts refused before any request, and loopback and https accepted.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

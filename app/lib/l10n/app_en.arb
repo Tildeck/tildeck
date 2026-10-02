@@ -667,5 +667,7 @@
   "uploadToServer": "Upload to the server",
   "hideThisComputer": "Hide this computer",
   "showThisComputer": "Show this computer beside the server",
-  "dragBetweenPanes": "Drag files from one side to the other to copy them."
+  "dragBetweenPanes": "Drag files from one side to the other to copy them.",
+  "errorUnsafeKdf": "This server asked for settings that would protect the master password too weakly. Nothing was sent. The server may be misconfigured, or not the one you meant.",
+  "errorInsecureAddress": "An http:// address would send everything unencrypted. Use https://; http:// works only for a server on this computer."
 }

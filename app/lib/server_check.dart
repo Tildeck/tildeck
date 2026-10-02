@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:tildeck_api/api.dart';
 
@@ -6,7 +8,14 @@ import 'package:tildeck_api/api.dart';
 const int kProtocolVersion = 1;
 
 /// Why a server check failed. Each one maps to a localized message.
-enum ServerProblem { invalidAddress, unreachable, notTildeck, unsupportedProtocol, databaseUnavailable }
+enum ServerProblem {
+  invalidAddress,
+  insecureAddress,
+  unreachable,
+  notTildeck,
+  unsupportedProtocol,
+  databaseUnavailable,
+}
 
 sealed class ServerCheckResult {
   const ServerCheckResult();
@@ -39,9 +48,22 @@ class ServerChecker {
     return uri.replace(path: path, query: null, fragment: null);
   }
 
+  /// Whether [address] may be used: https, or http only to this computer
+  /// (a development server). Over plain http elsewhere, the keys that
+  /// prove the master password and the account's tokens travel readable.
+  static bool isSecure(Uri address) => address.scheme == 'https' || _isLoopback(address.host);
+
+  static bool _isLoopback(String host) {
+    final h = host.toLowerCase();
+    if (h == 'localhost' || h == '::1' || h == '[::1]') return true;
+    final ip = InternetAddress.tryParse(h);
+    return ip != null && ip.isLoopback;
+  }
+
   Future<ServerCheckResult> check(String address) async {
     final base = parseAddress(address);
     if (base == null) return const ServerFailed(ServerProblem.invalidAddress);
+    if (!isSecure(base)) return const ServerFailed(ServerProblem.insecureAddress);
 
     final client = ApiClient(basePath: base.toString())..client = _client;
     final api = HealthApi(client);

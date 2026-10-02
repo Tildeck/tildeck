@@ -27,6 +27,13 @@ class FakeSyncServer {
 
   int pushes = 0;
 
+  /// Every request's path, in order.
+  final paths = <String>[];
+
+  /// Key derivation settings prelogin answers with instead of the account's:
+  /// a server asking for weak ones.
+  Map<String, dynamic>? preloginKdf;
+
   /// The one account, once registered: its request body.
   Map<String, dynamic>? account;
   bool emailVerified = true;
@@ -38,6 +45,7 @@ class FakeSyncServer {
 
   Future<http.Response> _handle(http.Request request) async {
     final path = request.url.path;
+    paths.add(path);
     if (path == '/api/info') {
       return _json({'name': 'tildeck', 'version': '0.0.0', 'protocol_version': 1});
     }
@@ -47,7 +55,7 @@ class FakeSyncServer {
 
     switch ((request.method, path)) {
       case ('POST', '/api/account/prelogin'):
-        return _json({'kdf': account?['kdf'] ?? _kdf});
+        return _json({'kdf': preloginKdf ?? account?['kdf'] ?? _kdf});
       case ('POST', '/api/account/register'):
         account = body;
         final device = body['device'] as Map<String, dynamic>;

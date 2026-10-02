@@ -13,6 +13,7 @@ import '../sync/sync_server.dart';
 import '../theme.dart';
 import '../vault/password_rules.dart';
 import '../vault/vault.dart';
+import '../vault/vault_crypto.dart' show UnsafeKdf;
 import 'desktop_sidebar.dart' show isDesktopLayout;
 
 /// Everything the sync screens need.
@@ -37,8 +38,10 @@ String accountErrorText(AppLocalizations t, Object error) => switch (error) {
   WrongMasterPassword() => t.errorWrongMasterPassword,
   InvalidRecoveryKey() => t.errorInvalidRecoveryKey,
   DifferentVault() => t.errorDifferentVault,
+  UnsafeKdf() => t.errorUnsafeKdf,
   ServerFailed(:final problem) => switch (problem) {
     ServerProblem.invalidAddress => t.errorInvalidAddress,
+    ServerProblem.insecureAddress => t.errorInsecureAddress,
     ServerProblem.unreachable => t.errorUnreachable,
     ServerProblem.notTildeck => t.errorNotTildeck,
     ServerProblem.unsupportedProtocol => t.errorUnsupportedProtocol,

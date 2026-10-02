@@ -40,6 +40,27 @@ void main() {
     expect(requests, 0);
   });
 
+  test('plain http is for this computer only: elsewhere it is refused before any request', () async {
+    var requests = 0;
+    final counting = MockClient((_) async {
+      requests++;
+      return http.Response('', 200);
+    });
+    for (final input in ['http://sync.example.com', 'http://10.0.0.5:8280', 'http://my-nas.local']) {
+      final result = await ServerChecker(client: counting).check(input);
+      expect((result as ServerFailed).problem, ServerProblem.insecureAddress, reason: input);
+    }
+    expect(requests, 0);
+    for (final input in [
+      'http://localhost:8280',
+      'http://127.0.0.1:8280',
+      'http://[::1]:8280',
+      'https://sync.example.com',
+    ]) {
+      expect(await ServerChecker(client: server()).check(input), isA<ServerReady>(), reason: input);
+    }
+  });
+
   test('a server speaking another protocol version cannot sync', () async {
     final checker = ServerChecker(
       client: server(info: {'name': 'tildeck', 'version': '9.0.0', 'protocol_version': kProtocolVersion + 1}),

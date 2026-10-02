@@ -41,4 +41,5 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Fixed
 
+- The client refuses weak key derivation settings from a server, and plain http to any sync server but one on this computer.
 - A host's environment variable that the server does not accept no longer fails the session; it is skipped, as ssh does.
