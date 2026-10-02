@@ -71,7 +71,8 @@ String permissionString(int mode) {
 
 enum TransferDirection { upload, download, copy }
 
-enum TransferState { running, done, failed, cancelled }
+/// Queued transfers wait for one of the running ones to finish.
+enum TransferState { queued, running, done, failed, cancelled }
 
 /// An upload or download and its progress: one file, or a folder with
 /// everything in it.
@@ -82,7 +83,7 @@ class Transfer {
   final TransferDirection direction;
   int? total;
   int done = 0;
-  TransferState state = TransferState.running;
+  TransferState state = TransferState.queued;
   FileProblem? problem;
 
   /// Files in a folder transfer, and how many are through.
@@ -92,10 +93,21 @@ class Transfer {
   bool _cancelled = false;
   final _onCancel = <FutureOr<void> Function()>[];
 
-  /// Stops it; what was partly written is removed.
+  /// Completed when its turn comes; while queued, a cancel completes it
+  /// with [_Cancelled] instead.
+  final _turn = Completer<void>();
+
+  bool get finished => state == TransferState.done || state == TransferState.failed || state == TransferState.cancelled;
+
+  /// Stops it; what was partly written is removed. A queued one never
+  /// starts.
   Future<void> cancel() async {
-    if (state != TransferState.running || _cancelled) return;
+    if (finished || _cancelled) return;
     _cancelled = true;
+    if (state == TransferState.queued) {
+      if (!_turn.isCompleted) _turn.completeError(const _Cancelled());
+      return;
+    }
     for (final stop in _onCancel.toList()) {
       await stop();
     }
@@ -476,7 +488,44 @@ class FileBrowser extends ChangeNotifier {
 
   /// Runs [work] for [transfer], recording how it ended; [cleanup] removes
   /// what a failed or cancelled one left behind.
+  /// At most this many transfers run at once; the rest wait their turn.
+  static const maxRunning = 2;
+  int _running = 0;
+  final _queue = <Transfer>[];
+
+  /// Gives [transfer] a turn now, or when a running one finishes.
+  Future<void> _waitTurn(Transfer transfer) {
+    if (_running < maxRunning) {
+      _running++;
+      transfer._turn.complete();
+    } else {
+      _queue.add(transfer);
+    }
+    return transfer._turn.future;
+  }
+
+  /// A running transfer is through: the next one still waiting starts.
+  void _nextTurn() {
+    while (_queue.isNotEmpty) {
+      final next = _queue.removeAt(0);
+      if (!next._turn.isCompleted) {
+        next._turn.complete();
+        return;
+      }
+    }
+    _running--;
+  }
+
   Future<void> _run(Transfer transfer, Future<void> Function() work, {required Future<void> Function() cleanup}) async {
+    try {
+      await _waitTurn(transfer);
+    } on _Cancelled {
+      transfer.state = TransferState.cancelled;
+      _changed();
+      return;
+    }
+    transfer.state = TransferState.running;
+    _changed();
     try {
       await work();
       transfer._checkCancelled();
@@ -489,6 +538,8 @@ class FileBrowser extends ChangeNotifier {
       transfer
         ..state = transfer._cancelled ? TransferState.cancelled : TransferState.failed
         ..problem = transfer._cancelled ? null : _problemOf(e);
+    } finally {
+      _nextTurn();
     }
     _changed();
   }
@@ -665,7 +716,7 @@ class FileBrowser extends ChangeNotifier {
   });
 
   void clearFinished() {
-    transfers.removeWhere((t) => t.state != TransferState.running);
+    transfers.removeWhere((t) => t.finished);
     _changed();
   }
 

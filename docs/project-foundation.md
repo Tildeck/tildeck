@@ -440,6 +440,11 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The hosts page lists workspaces above the recent hosts; a tap opens each host as Connect does (a host that asks for its password asks), and a host deleted since is skipped. Removing one is a click on its chip, with Undo. The command palette finds them too.
 - Tests: the record read back the same; a workspace opening its hosts in order without a deleted one; removing and undoing. Saving from the tab menu is not covered by a test.
 
+### Transfer queue (2026-10-02)
+
+- A files tab runs at most two transfers at once (uploads, downloads, copies to another server); the rest wait their turn in order, shown as Waiting in the transfers list. One cancelled while waiting never starts, and the next one waiting takes the free turn. Clear finished leaves running and waiting ones.
+- Tests: against the OpenSSH container, four uploads: two running and two waiting, a waiting one cancelled, the next one taking a turn freed by another cancel, and nothing partial left on the server.
+
 ### Local terminal (2026-10-01)
 
 - On the desktop, a terminal button on the hosts screen opens a local shell in a tab, like a session. On Windows it offers the shells it finds: PowerShell 7 (on PATH or where it installs), Windows PowerShell, Command Prompt, and WSL; elsewhere the user's login shell. Phones have none.

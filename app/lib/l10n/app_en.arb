@@ -1031,5 +1031,6 @@
       }
     }
   },
-  "paletteWorkspace": "Workspace"
+  "paletteWorkspace": "Workspace",
+  "transferQueued": "Waiting"
 }
