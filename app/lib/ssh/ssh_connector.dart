@@ -142,12 +142,72 @@ typedef HostKeyPrompt =
       KnownHost? previous,
     });
 
+/// Asks the user for what a server's keyboard-interactive sign-in wants
+/// beyond the saved password: a one-time code, say. Returns one answer per
+/// prompt, or null when the user cancels.
+typedef LoginPrompt =
+    Future<List<String>?> Function({
+      required ConnectionTarget target,
+      required String name,
+      required String instruction,
+      required List<SSHUserInfoPrompt> prompts,
+    });
+
 /// Opens SSH connections with host key verification against [knownHosts].
 class SshConnector {
   SshConnector({required this.knownHosts, this.timeout = const Duration(seconds: 15)});
 
   final KnownHosts knownHosts;
   final Duration timeout;
+
+  /// Shows a keyboard-interactive server's questions to the user; set by
+  /// the screen that opens connections. Without it, only the saved password
+  /// answers them.
+  LoginPrompt? askLogin;
+
+  /// The answers to a keyboard-interactive request: the saved [password]
+  /// for the first prompt that asks for a password (once per connection,
+  /// so a wrong one is not sent again), and the user's answers, through
+  /// [ask], for the rest. Null when someone must answer and nobody can, or
+  /// the user cancels: the server then moves on or refuses.
+  static Future<List<String>?> answerLogin(
+    SSHUserInfoRequest request, {
+    required String? password,
+    required bool passwordUsed,
+    required void Function() onPasswordUsed,
+    Future<List<String>?> Function(List<SSHUserInfoPrompt> prompts)? ask,
+  }) async {
+    final answers = List<String?>.filled(request.prompts.length, null);
+    var used = passwordUsed;
+    for (final (i, prompt) in request.prompts.indexed) {
+      if (password != null && !used && !prompt.echo && isPasswordPrompt(prompt.promptText)) {
+        answers[i] = password;
+        used = true;
+        onPasswordUsed();
+      }
+    }
+    final open = [
+      for (final (i, answer) in answers.indexed)
+        if (answer == null) i,
+    ];
+    if (open.isNotEmpty) {
+      if (ask == null) return null;
+      final typed = await ask([for (final i in open) request.prompts[i]]);
+      if (typed == null || typed.length != open.length) return null;
+      for (final (j, i) in open.indexed) {
+        answers[i] = typed[j];
+      }
+    }
+    return answers.cast<String>();
+  }
+
+  /// "Password:", "user@host's password:", "Passcode", not "Verification
+  /// code:" or "One-time password:".
+  static bool isPasswordPrompt(String text) {
+    final t = text.toLowerCase();
+    if (RegExp(r'one[- ]?time|verification|otp|token|authenticator|2fa|duo').hasMatch(t)) return false;
+    return RegExp(r'pass(word|phrase|code)?').hasMatch(t);
+  }
 
   Future<SSHClient> connect(ConnectionTarget target, {required HostKeyPrompt promptHostKey}) =>
       _throughJump(target, promptHostKey, (via) => _connect(target, promptHostKey, via), (c) => c.done);
@@ -224,15 +284,30 @@ class SshConnector {
     SSHSocket socket,
   ) async {
     var hostKeyRejected = false;
+    var passwordUsed = false;
     final client = SSHClient(
       socket,
       username: target.username,
       identities: identities,
       onPasswordRequest: target.password == null ? null : () => target.password,
-      // Keyboard-interactive servers ask for the password this way.
-      onUserInfoRequest: target.password == null
+      // Keyboard-interactive servers ask for the password this way, and for
+      // anything else they want (a one-time code), which the user answers.
+      onUserInfoRequest: target.password == null && askLogin == null
           ? null
-          : (request) => [for (final _ in request.prompts) target.password!],
+          : (request) => answerLogin(
+              request,
+              password: target.password,
+              passwordUsed: passwordUsed,
+              onPasswordUsed: () => passwordUsed = true,
+              ask: askLogin == null
+                  ? null
+                  : (prompts) => askLogin!(
+                      target: target,
+                      name: request.name,
+                      instruction: request.instruction,
+                      prompts: prompts,
+                    ),
+            ),
       handshakeTimeout: timeout,
       authTimeout: timeout,
       // Like ssh(1): a refused environment variable, agent forwarding, or pty

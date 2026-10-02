@@ -569,6 +569,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Identities have their own page (a sidebar section on the desktop, a button beside keys on a phone) and can be created from the host editor. One in use by a host or a group is not deleted.
 - Tests: the host's identity, else the group's, gives the username and the key or password; changing the identity changes the host; a deleted one leaves the host's fields; adding one in its page; one in use not deleted; the host editor hiding its credentials and saving the choice. Golden: the identities page in both languages.
 
+### SSH sign-in questions (2026-10-02)
+
+- A keyboard-interactive server got the saved password as the answer to every prompt, so a server asking for a one-time code (pam_google_authenticator, Duo) could never be signed in to; with a key, keyboard-interactive was not offered at all, so a server asking for a key and then a code failed too.
+- Now the saved password answers only the first prompt that asks for a password (not "Verification code" or "One-time password"), once per connection: a server asking again (it refused the password) gets the user's answer instead of the same password. Every other prompt is shown to the user in a dialog with the server's own words, hidden or shown as the server asks; a cancel answers nothing. The screen that opens connections sets `SshConnector.askLogin`, so sessions, files, and forwarding all ask.
+- Tests: password prompts told apart from code prompts; a password and a code in one request; a repeated password prompt asked of the user; nobody to ask, a cancel, an empty request; the dialog showing the server's words and hiding a secret prompt. Not tried against a real server with a one-time code.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
