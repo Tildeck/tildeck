@@ -23,6 +23,7 @@ import 'history_page.dart';
 import 'identities_page.dart';
 import 'keys_page.dart';
 import 'known_hosts_page.dart';
+import 'login_prompt_dialog.dart';
 import 'host_key_dialog.dart';
 import 'port_forwards_page.dart';
 import 'snippets_page.dart';
@@ -230,6 +231,12 @@ class _SessionsPageState extends State<SessionsPage> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onKey);
+    // Every connection opened from here (sessions, files, forwarding) shows
+    // a server's sign-in questions to the user.
+    widget.connector.askLogin = ({required target, required name, required instruction, required prompts}) async =>
+        mounted
+        ? showLoginPromptDialog(context, target: target, name: name, instruction: instruction, prompts: prompts)
+        : null;
   }
 
   /// An authenticated connection to a saved host, for a forwarding rule.

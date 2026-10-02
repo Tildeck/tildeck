@@ -449,5 +449,7 @@
   "identityWithPassword": "סיסמה שמורה",
   "identityAsksPassword": "סיסמה נשאלת בכל פעם",
   "identityHostCount": "{count, plural, =0{אין שרתים} =1{שרת אחד} other{{count} שרתים}}",
-  "identityInUse": "יש שרתים או קבוצות שמשתמשים בזהות הזו. צריך לבחור להם זהות אחרת קודם."
+  "identityInUse": "יש שרתים או קבוצות שמשתמשים בזהות הזו. צריך לבחור להם זהות אחרת קודם.",
+  "loginPromptTitle": "השרת מבקש פרטי כניסה",
+  "loginPromptIntro": "כניסה בתור {who}. השרת שאל:"
 }

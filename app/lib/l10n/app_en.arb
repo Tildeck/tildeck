@@ -758,5 +758,14 @@
       }
     }
   },
-  "identityInUse": "Hosts or groups use this identity. Choose another for them first."
+  "identityInUse": "Hosts or groups use this identity. Choose another for them first.",
+  "loginPromptTitle": "The server asks to sign in",
+  "loginPromptIntro": "Signing in as {who}. The server asked:",
+  "@loginPromptIntro": {
+    "placeholders": {
+      "who": {
+        "type": "String"
+      }
+    }
+  }
 }
