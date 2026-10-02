@@ -972,5 +972,13 @@
   "highlightHelp": "Errors, warnings, and successes stand out in the output. Words are separated by commas.",
   "highlightErrors": "Errors",
   "highlightWarnings": "Warnings",
-  "highlightSuccess": "Successes"
+  "highlightSuccess": "Successes",
+  "@snippetCommandHelp": {
+    "placeholders": {
+      "example": {
+        "type": "String"
+      }
+    }
+  },
+  "runSnippet": "Run"
 }

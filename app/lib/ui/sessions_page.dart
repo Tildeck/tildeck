@@ -415,12 +415,16 @@ class _SessionsPageState extends State<SessionsPage> {
     if (choice == null || !mounted) return;
     switch (choice) {
       case RunHere(:final snippet):
-        session.run(snippet.command);
+        final command = await snippetCommandToRun(context, snippet);
+        if (command != null) session.run(command);
       case RunOnHosts(:final snippet, :final hosts):
+        // Asked once, the same values on every host.
+        final command = await snippetCommandToRun(context, snippet);
+        if (command == null) return;
         for (final host in hosts) {
           if (!mounted) return;
           final target = await connectionTargetFor(context, widget.vault, host);
-          if (target != null) _open(target.withStartupCommand(snippet.command));
+          if (target != null) _open(target.withStartupCommand(command));
         }
     }
   }
