@@ -10,8 +10,19 @@ import 'package:sodium/sodium_sumo.dart';
 /// A change here is a change to the security model and needs its approval.
 
 /// Argon2id parameters, stored with the vault so they can be raised later.
+/// Key derivation settings outside what docs/security-model.md allows: too
+/// weak (a server could ask for them to make the derived key cheap to guess
+/// from) or too heavy (to stall the device).
+class UnsafeKdf implements Exception {
+  const UnsafeKdf();
+}
+
 class KdfParams {
   const KdfParams({required this.salt, this.opsLimit = 3, this.memLimit = 64 * 1024 * 1024});
+
+  static const minOps = 3, maxOps = 10;
+  static const minMem = 64 * 1024 * 1024, maxMem = 1024 * 1024 * 1024;
+  static const saltLength = 16;
 
   final Uint8List salt;
   final int opsLimit;
@@ -19,13 +30,23 @@ class KdfParams {
 
   Map<String, Object> toJson() => {'alg': 'argon2id13', 'ops': opsLimit, 'mem': memLimit, 'salt': base64.encode(salt)};
 
+  /// Settings read from a server or the vault file. Refused, before any
+  /// key is derived from them, when outside the allowed range.
   static KdfParams fromJson(Map<String, dynamic> json) {
     if (json['alg'] != 'argon2id13') throw const FormatException('unsupported key derivation');
-    return KdfParams(
+    final params = KdfParams(
       salt: base64.decode(json['salt'] as String),
       opsLimit: json['ops'] as int,
       memLimit: json['mem'] as int,
     );
+    if (params.opsLimit < minOps ||
+        params.opsLimit > maxOps ||
+        params.memLimit < minMem ||
+        params.memLimit > maxMem ||
+        params.salt.length != saltLength) {
+      throw const UnsafeKdf();
+    }
+    return params;
   }
 }
 

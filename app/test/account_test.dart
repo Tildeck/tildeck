@@ -127,6 +127,29 @@ void main() {
     expect(await b.opensWith(newPassword), isTrue);
   });
 
+  test('weak key derivation settings from a server are refused before anything is derived or sent', () async {
+    await registered();
+    final c = await Device('c').load();
+    for (final weak in [
+      {'alg': 'argon2id13', 'ops': 1, 'mem': 67108864, 'salt': 'AAAAAAAAAAAAAAAAAAAAAA=='},
+      {'alg': 'argon2id13', 'ops': 3, 'mem': 8192, 'salt': 'AAAAAAAAAAAAAAAAAAAAAA=='},
+      {'alg': 'argon2id13', 'ops': 3, 'mem': 67108864, 'salt': 'AAAA'},
+    ]) {
+      server
+        ..preloginKdf = weak
+        ..paths.clear();
+      await expectLater(
+        c.accounts.signIn(address: address, email: email, password: password, deviceName: 'Laptop'),
+        throwsA(isA<UnsafeKdf>()),
+      );
+      expect(
+        server.paths.where((p) => p != '/api/info' && p != '/api/health/ready'),
+        ['/api/account/prelogin'],
+        reason: 'no key proving the password went out',
+      );
+    }
+  });
+
   test('the recovery key sets a new password and opens the vault on a new device', () async {
     final (a, rk) = await registered();
     final c = await Device('c').load();
