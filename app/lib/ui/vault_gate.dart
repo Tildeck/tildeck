@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../activity.dart';
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
+import '../settings/device_settings.dart';
 import '../sync/account_service.dart';
 import '../theme.dart';
 import '../vault/password_rules.dart';
@@ -24,7 +25,8 @@ class VaultGate extends StatefulWidget {
     required this.commonPasswords,
     required this.unlocked,
     this.sync,
-    this.autoLock = const Duration(minutes: 15),
+    this.autoLock,
+    this.settings,
   });
 
   final Vault vault;
@@ -36,16 +38,22 @@ class VaultGate extends StatefulWidget {
   final SyncServices? sync;
 
   /// Locks the vault after this long without a key press, a touch, or
-  /// typing into a terminal ([userActivity]).
-  final Duration autoLock;
+  /// typing into a terminal ([userActivity]). Null takes the time from the
+  /// vault's preferences.
+  final Duration? autoLock;
+
+  /// This device's settings: when to lock after the app goes to the
+  /// background. Null never locks for that.
+  final DeviceSettingsStore? settings;
 
   @override
   State<VaultGate> createState() => _VaultGateState();
 }
 
-class _VaultGateState extends State<VaultGate> {
+class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
   Widget? _content;
   Timer? _idle;
+  DateTime? _hiddenAt;
 
   @override
   void initState() {
@@ -53,10 +61,32 @@ class _VaultGateState extends State<VaultGate> {
     widget.vault.addListener(_changed);
     HardwareKeyboard.instance.addHandler(_onKey);
     userActivity.addListener(_touch);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Timers do not run while the app is in the background, so the time
+  /// away is measured when it comes back.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final after = widget.settings?.value.backgroundLock.after;
+    final open = widget.vault.status == VaultStatus.unlocked;
+    switch (state) {
+      case AppLifecycleState.paused:
+        _hiddenAt ??= DateTime.now();
+        if (open && after == Duration.zero) widget.vault.lock();
+      case AppLifecycleState.resumed:
+        final hiddenAt = _hiddenAt;
+        _hiddenAt = null;
+        if (open && after != null && hiddenAt != null && DateTime.now().difference(hiddenAt) >= after) {
+          widget.vault.lock();
+        }
+      default:
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.vault.removeListener(_changed);
     HardwareKeyboard.instance.removeHandler(_onKey);
     userActivity.removeListener(_touch);
@@ -88,7 +118,7 @@ class _VaultGateState extends State<VaultGate> {
   void _touch() {
     _idle?.cancel();
     if (widget.vault.status != VaultStatus.unlocked) return;
-    _idle = Timer(widget.autoLock, widget.vault.lock);
+    _idle = Timer(widget.autoLock ?? widget.vault.preferences.autoLock, widget.vault.lock);
   }
 
   @override

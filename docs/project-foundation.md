@@ -537,6 +537,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - A lost authenticator: an administrator turns two-factor sign-in off from the admin panel, logged and emailed to the user. No backup codes in this version. The TOTP secret is readable by the server and does not change the vault's encryption.
 - Open when it is built: tying the request that completes recovery to a start that passed the code, since today each recovery request proves the recovery key on its own.
 
+### Settings in one place (2026-10-02)
+
+- Shlomi asked for a normal settings area with everything that can be set (2026-10-02). It replaces the separate terminal appearance, sync, and master password entries: on the desktop one sidebar entry opens the groups beside their content; on a phone a list of groups opens as pages, from the menu.
+- Groups: general (language, theme), terminal (scheme, font size, suggestions), security (lock after inactivity, and on Android the background lock and screenshot blocking), master password, account and sync, and keyboard shortcuts (desktop only). The general, terminal, and security settings are edited together and saved with one bar, or put back; the master password and the account keep their own buttons, as actions.
+- The language and theme were not remembered across launches; they are now kept per device in `settings.json` in the app support directory, with the background lock and screenshot blocking. A file from another version or a damaged one falls back to the defaults.
+- The lock time (security model: "default 15 minutes, a user setting") is a vault preference, synced: 1, 5, 15, 30, or 60 minutes; a synced value outside these is ignored. On Android the vault also locks when the app has been in the background for the chosen time (default one minute; immediately, five minutes, or never), measured when it returns, since timers do not run in the background. Screenshot blocking sets `FLAG_SECURE` through a small platform channel; off by default.
+- Tests: device settings survive a restart and ignore bad files; a synced lock time outside the choices is ignored; changes in two groups show one bar, are put back, then saved to the device and the vault; the vault locks after the preference's time; the background lock follows the setting. Goldens: the desktop settings with an unsaved change, and the security group on a phone, in both languages.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

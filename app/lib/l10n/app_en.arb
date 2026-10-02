@@ -669,5 +669,37 @@
   "showThisComputer": "Show this computer beside the server",
   "dragBetweenPanes": "Drag files from one side to the other to copy them.",
   "errorUnsafeKdf": "This server asked for settings that would protect the master password too weakly. Nothing was sent. The server may be misconfigured, or not the one you meant.",
-  "errorInsecureAddress": "An http:// address would send everything unencrypted. Use https://; http:// works only for a server on this computer."
+  "errorInsecureAddress": "An http:// address would send everything unencrypted. Use https://; http:// works only for a server on this computer.",
+  "settingsTitle": "Settings",
+  "settingsGeneral": "General",
+  "settingsTerminal": "Terminal",
+  "settingsSecurity": "Security",
+  "settingsAccount": "Account and sync",
+  "settingsLanguage": "Language",
+  "languageSystem": "Device language",
+  "settingsTheme": "Theme",
+  "themeSystem": "Device",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "thisDeviceOnly": "On this device only.",
+  "syncedToAllDevices": "The same on all your devices.",
+  "autoLockLabel": "Lock after inactivity",
+  "autoLockHelp": "The vault locks after this long without a key press or a touch. The same on all your devices.",
+  "minutesCount": "{count, plural, =1{1 minute} other{{count} minutes}}",
+  "@minutesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "backgroundLockLabel": "Lock when the app goes to the background",
+  "backgroundLockImmediately": "Immediately",
+  "backgroundLockOneMinute": "After 1 minute",
+  "backgroundLockFiveMinutes": "After 5 minutes",
+  "backgroundLockNever": "Never",
+  "blockScreenshotsLabel": "Block screenshots",
+  "blockScreenshotsHelp": "Keeps Tildeck out of screenshots, screen recordings, and the recent apps view. On this device only.",
+  "unsavedChanges": "Unsaved changes",
+  "settingsSaved": "Settings saved"
 }

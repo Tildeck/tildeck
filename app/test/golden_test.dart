@@ -18,6 +18,7 @@ import 'package:tildeck/app.dart';
 import 'package:tildeck/l10n/app_localizations.dart';
 import 'package:tildeck/local/local_browser.dart';
 import 'package:tildeck/server_check.dart';
+import 'package:tildeck/settings/device_settings.dart';
 import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/ssh/file_browser.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
@@ -41,7 +42,7 @@ import 'package:tildeck/ui/host_key_dialog.dart';
 import 'package:tildeck/ui/password_pages.dart';
 import 'package:tildeck/ui/port_forwards_page.dart';
 import 'package:tildeck/ui/snippets_page.dart';
-import 'package:tildeck/ui/terminal_settings_page.dart';
+import 'package:tildeck/ui/settings_page.dart';
 import 'package:tildeck/ui/account_page.dart';
 import 'package:tildeck/ui/terminal_panel.dart';
 import 'package:tildeck/vault/models.dart';
@@ -685,18 +686,43 @@ void main() {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/telnet_host_${locale}_${mode.name}.png'));
     });
 
-    testWidgets('terminal appearance $locale ${mode.name}', (tester) async {
-      phone(tester);
+    testWidgets('settings on the desktop $locale ${mode.name}', (tester) async {
+      desktop(tester);
       final vault = (await tester.runAsync(() async {
         final v = await sampleVault(unlocked: true);
         await v.put(v.preferences.copyWith(terminalTheme: 'solarized-dark', fontSize: 15));
         return v;
       }))!;
-      await tester.pumpWidget(screen(locale, mode, TerminalSettingsPage(vault: vault)));
+      final page = SettingsPage(
+        vault: vault,
+        settings: DeviceSettingsStore(),
+        sync: syncServices(vault, FakeSyncServer()),
+        initial: SettingsCategory.terminal,
+      );
+      await tester.pumpWidget(screen(locale, mode, page));
+      await tester.pumpAndSettle();
+      // An unsaved change shows the save bar.
+      await tester.tap(find.byKey(const ValueKey('theme-dracula')));
+      await tester.pumpAndSettle();
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/settings_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('security settings on a phone $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() => sampleVault(unlocked: true)))!;
+      final page = SettingsPage(
+        vault: vault,
+        settings: DeviceSettingsStore(),
+        sync: syncServices(vault, FakeSyncServer()),
+        mobileOptions: true,
+      );
+      await tester.pumpWidget(screen(locale, mode, page));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('settings-security')));
       await tester.pumpAndSettle();
       await expectLater(
         find.byType(MaterialApp),
-        matchesGoldenFile('goldens/terminal_appearance_${locale}_${mode.name}.png'),
+        matchesGoldenFile('goldens/settings_security_${locale}_${mode.name}.png'),
       );
     });
 

@@ -387,7 +387,8 @@ String formatEnv(Map<String, String> env) => [for (final e in env.entries) '${e.
 /// The user's preferences, one record with a fixed id on every device, so
 /// they sync and a change on one device reaches the others.
 class PreferencesEntry extends VaultEntry {
-  const PreferencesEntry({this.terminalTheme, this.fontSize, this.autocomplete}) : super(id: fixedId);
+  const PreferencesEntry({this.terminalTheme, this.fontSize, this.autocomplete, this.autoLockMinutes})
+    : super(id: fixedId);
 
   static const recordType = 'preferences';
   static const fixedId = '00000000-0000-4000-8000-000000000001';
@@ -399,11 +400,22 @@ class PreferencesEntry extends VaultEntry {
   /// Suggestions from the server's history and from snippets; null is on.
   final bool? autocomplete;
 
-  PreferencesEntry copyWith({String? terminalTheme, double? fontSize, bool? autocomplete}) => PreferencesEntry(
-    terminalTheme: terminalTheme ?? this.terminalTheme,
-    fontSize: fontSize ?? this.fontSize,
-    autocomplete: autocomplete ?? this.autocomplete,
-  );
+  /// Minutes without activity before the vault locks; null is
+  /// [defaultAutoLockMinutes].
+  final int? autoLockMinutes;
+
+  static const defaultAutoLockMinutes = 15;
+  static const autoLockChoices = [1, 5, 15, 30, 60];
+
+  Duration get autoLock => Duration(minutes: autoLockMinutes ?? defaultAutoLockMinutes);
+
+  PreferencesEntry copyWith({String? terminalTheme, double? fontSize, bool? autocomplete, int? autoLockMinutes}) =>
+      PreferencesEntry(
+        terminalTheme: terminalTheme ?? this.terminalTheme,
+        fontSize: fontSize ?? this.fontSize,
+        autocomplete: autocomplete ?? this.autocomplete,
+        autoLockMinutes: autoLockMinutes ?? this.autoLockMinutes,
+      );
 
   @override
   String get type => recordType;
@@ -413,12 +425,16 @@ class PreferencesEntry extends VaultEntry {
     'terminal_theme': terminalTheme,
     'font_size': fontSize,
     'autocomplete': autocomplete,
+    'auto_lock_minutes': autoLockMinutes,
   };
 
   static PreferencesEntry fromJson(String id, Map<String, dynamic> d) => PreferencesEntry(
     terminalTheme: d['terminal_theme'] as String?,
     fontSize: (d['font_size'] as num?)?.toDouble(),
     autocomplete: d['autocomplete'] as bool?,
+    // Only a listed choice: a synced value cannot make the lock wait for
+    // hours, or never come.
+    autoLockMinutes: autoLockChoices.contains(d['auto_lock_minutes']) ? d['auto_lock_minutes'] as int : null,
   );
 }
 
