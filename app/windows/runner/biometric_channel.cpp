@@ -6,7 +6,12 @@
 #include <winrt/Windows.Security.Cryptography.h>
 #include <winrt/Windows.Storage.Streams.h>
 
+#include <windows.h>
+
+#include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <memory>
 #include <functional>
 #include <string>
 #include <thread>
@@ -77,6 +82,36 @@ Outcome FromStatus(KeyCredentialStatus status, const char* missing_code) {
   }
 }
 
+// The plain KeyCredentialManager calls open the Hello dialog without an
+// owner window, so it can come up behind the app. While a request is open,
+// this finds the dialog's window and brings it to the front; it stops when
+// the request ends, or after a while.
+class HelloToFront {
+ public:
+  HelloToFront() : done_(std::make_shared<std::atomic<bool>>(false)) {
+    // The app is in the foreground (the user just asked): let the dialog's
+    // process take it.
+    AllowSetForegroundWindow(ASFW_ANY);
+    std::thread([done = done_] {
+      for (int i = 0; i < 100 && !done->load(); ++i) {
+        HWND dialog = FindWindowW(L"Credential Dialog Xaml Host", nullptr);
+        if (dialog != nullptr) {
+          SetForegroundWindow(dialog);
+          BringWindowToTop(dialog);
+          return;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      }
+    }).detach();
+  }
+  ~HelloToFront() { done_->store(true); }
+  HelloToFront(const HelloToFront&) = delete;
+  HelloToFront& operator=(const HelloToFront&) = delete;
+
+ private:
+  std::shared_ptr<std::atomic<bool>> done_;
+};
+
 winrt::hstring KeyName(const std::string& vault_id) {
   return winrt::to_hstring(kKeyPrefix + vault_id);
 }
@@ -96,6 +131,7 @@ Outcome Sign(const KeyCredential& credential,
   auto data = CryptographicBuffer::CreateFromByteArray(
       winrt::array_view<const uint8_t>(challenge.data(),
                                        challenge.data() + challenge.size()));
+  HelloToFront to_front;
   auto signed_result = credential.RequestSignAsync(data).get();
   if (signed_result.Status() != KeyCredentialStatus::Success) {
     return FromStatus(signed_result.Status(), missing_code);
@@ -110,6 +146,7 @@ Outcome Enroll(const std::string& vault_id,
   if (!IsSupported()) {
     return Unsupported();
   }
+  HelloToFront to_front;
   auto created = KeyCredentialManager::RequestCreateAsync(
                      KeyName(vault_id),
                      KeyCredentialCreationOption::ReplaceExisting)
