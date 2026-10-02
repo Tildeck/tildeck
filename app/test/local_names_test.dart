@@ -23,7 +23,7 @@ void main() {
       expect(localNameFor(device), '_$device', reason: device);
     }
     // Ordinary names are kept as they are.
-    for (final ok in ['.bashrc', 'app-v1.4.2.tar.gz', 'דוח.pdf', 'Console.txt', 'COM10']) {
+    for (final ok in ['.bashrc', 'app-v1.4.2.tar.gz', 'résumé.pdf', 'Console.txt', 'COM10']) {
       expect(localNameFor(ok), ok);
     }
   });
