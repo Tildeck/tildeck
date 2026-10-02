@@ -618,6 +618,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Termius organizes snippets in folders ("packages"). A snippet has an optional `folder`; the editor offers the folders already used, and the snippets page lists them by folder, alphabetically, with those in none last. The picker in a session shows "Folder / Name". A snippet from before has none.
 - Tests: the folder kept, and none for an old snippet; the page listing by folder and the editor saving one.
 
+### Authenticated deletions (2026-10-02)
+
+- From the security review, approved by Shlomi: a tombstone carried nothing, so the server could delete any record on every device without detection. A deletion now carries a marker, `{"deleted": true}` sealed under `VK` with the record's own associated data, so it is bound to that record and version (a marker moved from another record does not open). docs/security-model.md, "Sync", records the rule with the approval.
+- A device deletes an entry it has only for a tombstone whose marker opens and says so; otherwise the entry stays and is reported among the damaged records. A tombstone for a record the device does not have is taken as it is. The rule that an edit wins against a concurrent deletion is unchanged. Tombstones from before carry no marker: a device that still has such an entry keeps it, the cost of the change.
+- The server accepts a tombstone with a marker (nonce and ct together, or neither); a live record still needs both. No contract change.
+- Tests: a deletion from another device arrives with its marker and deletes; a bare tombstone and one with a marker taken from another record delete nothing and are reported, a tombstone for a record never seen is taken; the vault file keeps the marker and nothing of the deleted host; the server stores a marker as sent and refuses a half one.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

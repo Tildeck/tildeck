@@ -189,7 +189,7 @@ void main() {
     expect(again.damaged, contains(host.id));
   });
 
-  test('deleting keeps a tombstone without content, at the next version', () async {
+  test('deleting keeps a tombstone with only its marker, at the next version', () async {
     final first = await newVault();
     await first.put(host);
     await first.put(key);
@@ -204,7 +204,10 @@ void main() {
     expect(record['deleted'], isTrue);
     expect(record['version'], 2);
     expect(record['dirty'], isTrue);
-    expect(record.containsKey('ct'), isFalse);
+    // The marker proves the deletion; it holds nothing of the host.
+    final marker = base64.decode(record['ct'] as String);
+    expect(marker.length, lessThan(64), reason: '{"deleted":true} and the AEAD tag');
+    expect(vaultFile.readAsStringSync(), isNot(contains('prod-web-01')));
   });
 
   test("snippets and a host's startup snippet are kept in the vault", () async {

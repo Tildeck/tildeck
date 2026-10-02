@@ -323,7 +323,8 @@ class SyncServer {
     id: r.id,
     version: r.version,
     deleted: r.deleted,
-    sealed: r.deleted || r.ct == null || r.nonce == null ? null : Sealed.fromJson({'nonce': r.nonce, 'ct': r.ct}),
+    // A tombstone may carry its deletion marker.
+    sealed: r.ct == null || r.nonce == null ? null : Sealed.fromJson({'nonce': r.nonce, 'ct': r.ct}),
   );
 
   Future<PullPage> pull(String token, int since) async {

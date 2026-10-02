@@ -51,9 +51,13 @@ class SyncRecord(BaseModel):
 
     @model_validator(mode="after")
     def _content(self) -> "SyncRecord":
-        # A tombstone carries no content; a live record always does.
-        if self.deleted != (self.nonce is None and self.ct is None):
-            raise ValueError("a record has content exactly when it is not deleted")
+        # A live record always has content. A tombstone has none, or the
+        # deletion marker clients seal so that a deletion proves itself
+        # (docs/security-model.md, "Sync"); nonce and ct go together.
+        if (self.nonce is None) != (self.ct is None):
+            raise ValueError("nonce and ct go together")
+        if not self.deleted and self.nonce is None:
+            raise ValueError("a live record has content")
         return self
 
 
