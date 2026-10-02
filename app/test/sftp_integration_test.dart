@@ -253,6 +253,32 @@ void main() {
       expect(browser.transfers.first.problem, FileProblem.exists, reason: 'never over an existing folder');
     });
 
+    test('a folder with hostile names downloads inside its target only', () async {
+      // Names Linux allows and Windows reads as paths, drives, or devices.
+      await client.run(
+        "mkdir -p ~/$folder/evil/sub && cd ~/$folder/evil && "
+        r"printf a > '..\..\escape.cmd' && printf b > 'C:x' && printf c > CON && printf d > 'a:b' && "
+        r"printf e > 'a_b' && printf f > 'sub/..\..\..\deep.cmd'",
+      );
+      final browser = await browse();
+      final evil = browser.entries.firstWhere((e) => e.name == 'evil');
+      final target = Directory('${local.path}/evil');
+      final down = await browser.downloadFolder(evil, target);
+      expect(down.state, TransferState.done);
+      expect(down.filesDone, 6);
+      // Everything landed inside the target, and nothing beside it.
+      final outside = local.listSync().map((e) => e.uri.pathSegments.where((p) => p.isNotEmpty).last).toList();
+      expect(outside, ['evil']);
+      final names = target
+          .listSync(recursive: true)
+          .whereType<File>()
+          .map((f) => f.path.substring(target.path.length + 1).replaceAll(r'\', '/'))
+          .toSet();
+      expect(names, hasLength(6));
+      expect(names.every((n) => !n.contains(r'\') && !n.contains(':')), isTrue, reason: '$names');
+      expect(names, containsAll(['_CON', 'a_b', 'a_b (2)']), reason: 'two names that end up the same both stay');
+    });
+
     test(
       'a cancelled download leaves nothing here, and a cancelled upload nothing there',
       () async {
