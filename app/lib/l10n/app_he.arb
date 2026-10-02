@@ -479,5 +479,9 @@
   "scrollbackHelp": "לחיבורים חדשים. יותר שורות צורכות יותר זיכרון.",
   "linesCount": "{count} שורות",
   "copyOnSelectLabel": "העתקה בסימון",
-  "copyOnSelectHelp": "טקסט שמסמנים מועתק מיד."
+  "copyOnSelectHelp": "טקסט שמסמנים מועתק מיד.",
+  "duplicateAction": "שכפול",
+  "copyName": "{name} (עותק)",
+  "expandFolder": "פתיחת תיקייה",
+  "collapseFolder": "קיפול תיקייה"
 }

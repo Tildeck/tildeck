@@ -7,6 +7,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 ### Added
 
 - Terminal settings: the font (JetBrains Mono or the system's monospace fonts), line height, cursor shape, what the bell does (flash, sound, or nothing), how many lines are kept above the screen, and copying on select.
+- Folders inside folders (a slash in the group: Production/Web), shown nested and foldable, with settings taken from the folders above; and duplicating a host.
 - Biometric unlock: a fingerprint or face on Android, Windows Hello on Windows, turned on per device in Settings, Security with the master password, which always keeps working too.
 - Identities: a username with a key or a password, saved once and chosen by any number of hosts or groups; changing it changes all of them.
 - Import hosts from an SSH configuration (~/.ssh/config, or a chosen file): names, addresses, users, ports, key files, and jump hosts, with the hosts already saved left out.

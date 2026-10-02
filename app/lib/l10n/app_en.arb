@@ -844,5 +844,16 @@
     }
   },
   "copyOnSelectLabel": "Copy on select",
-  "copyOnSelectHelp": "Selected text is copied as soon as you select it."
+  "copyOnSelectHelp": "Selected text is copied as soon as you select it.",
+  "duplicateAction": "Duplicate",
+  "copyName": "{name} (copy)",
+  "@copyName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "expandFolder": "Open folder",
+  "collapseFolder": "Fold folder"
 }
