@@ -311,7 +311,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 |---|---|---|
 | 1 | Daily terminal work: snippets (run here, on several hosts, at session start), host tags and search, settings inherited from a group, environment variables, terminal themes and font size, search in the terminal, tab names, split view on desktop, command and connection history | Snippets, host tags and search, group settings, environment variables, terminal themes and font size, search in the terminal, tab names, connection history, autocomplete, and split view done |
 | 2 | Connectivity: local, remote, and dynamic (SOCKS) port forwarding, jump hosts, agent forwarding, SOCKS and HTTP proxies, Telnet, a local terminal on Windows | Done: port forwarding, jump hosts, agent forwarding, proxies, Telnet, and a local terminal on the desktop |
-| 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Key generation, import, export, and SSH certificates done; two-factor sign-in and biometric unlock next |
+| 3 | Keys and sign-in: key generation (Ed25519, RSA), import and export, SSH certificates, two-factor sign-in for user accounts, biometric unlock (requested by Shlomi; security model addition first) | Key generation, import, export, and SSH certificates done; the designs for two-factor sign-in and biometric unlock approved (2026-10-02), their implementation next |
 | 4 | SFTP: side-by-side local and remote panes, rename, delete, permissions, drag and drop, editing a file in place | Planned |
 | Later | Mosh (no Dart implementation), FIDO2 keys (not in `dartssh2`), serial, AI autocomplete (needs a provider and a privacy decision), cloud imports (AWS, DigitalOcean, Azure), Ansible, SAML SSO | Not started |
 | Not now | Teams: shared and multiple vaults, access control, shared session logs (Shlomi, 2026-10-01: not now, maybe later) | Deferred |
@@ -528,6 +528,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Request bodies are capped before anything reads them: 1 MiB, and 16 MiB under `/api/sync/` (a declared length over the cap is refused unread; a chunked body is counted as it arrives). The answer is 413 with `invalid_request`, no new error code. The client splits a push at 500 records or 8 MiB of ciphertext, whichever comes first.
 - `device_idle_days` is at most 3650: more is a typo and overflows dates.
 - Tests (each fails on the old code): opening a confirmation link twice leaves the address unconfirmed; a disabled account's approved device is refused; declared and chunked bodies over the cap get 413 while a sync push of the same size does not; the access log filter hides a link token; one code sent twice at once signs in once; 3651 idle days refused and 3650 kept; pushes split by count and by size.
+
+### Biometric unlock and two-factor sign-in: designs approved (2026-10-02)
+
+- Shlomi approved both designs on 2026-10-02; they are in docs/security-model.md ("Biometric unlock" under "The vault on a device", "Two-factor sign-in" under "Accounts and devices (server)"). Nothing is built yet.
+- Biometric unlock is optional per device, off by default, and turned on in Settings > Security with the master password. A device key `BK` wraps the vault key into `wrap_bio`, kept only in the local vault file: on Android `BK` is random and released by the Keystore only after a strong biometric; on Windows it is derived from a Windows Hello signature, and Hello also accepts its PIN. The master password always remains available, and a password change, recovery, or a new Android biometric enrollment removes `wrap_bio`.
+- Two-factor sign-in is optional per account, turned on in the app's Settings > Security: TOTP as for administrators, the secret encrypted with `CONFIG_ENCRYPTION_KEY`. While it is on, a code is required at sign-in on any device, at a master password change, and at recovery; a code is used once, and wrong codes count against the sign-in limits. A client without a code gets `totp_required` once the password is right.
+- A lost authenticator: an administrator turns two-factor sign-in off from the admin panel, logged and emailed to the user. No backup codes in this version. The TOTP secret is readable by the server and does not change the vault's encryption.
+- Open when it is built: tying the request that completes recovery to a start that passed the code, since today each recovery request proves the recovery key on its own.
 
 ## Required workflow contracts
 

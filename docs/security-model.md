@@ -1,6 +1,6 @@
 # Tildeck Security Model
 
-Status: Approved by Shlomi on 2026-09-30. A change to this document needs his approval again before code that depends on it merges.
+Status: Approved by Shlomi on 2026-09-30. The designs for biometric unlock and two-factor sign-in for user accounts were added and approved by him on 2026-10-02. A change to this document needs his approval again before code that depends on it merges.
 
 This document defines how Tildeck protects users' SSH hosts, keys, and credentials: what is encrypted, with which keys, where each key lives, what the sync server and its operator can and cannot learn, and how accounts, devices, recovery, and sync work. It uses only established primitives through an audited library. Nothing here is a new cryptographic construction.
 
@@ -31,7 +31,9 @@ This document defines how Tildeck protects users' SSH hosts, keys, and credentia
 | Hashing for integrity checks | BLAKE2b (`crypto_generichash`) | libsodium |
 | Server-side password hashing | Argon2id | `argon2-cffi` (Python) |
 | Token storage on the server | SHA-256 of a 256-bit random token | Python standard library |
-| Administrator second factor | TOTP (RFC 6238: SHA-1, 30 seconds, 6 digits) | `pyotp` |
+| Administrator and user account second factor | TOTP (RFC 6238: SHA-1, 30 seconds, 6 digits) | `pyotp` |
+| Biometric key protection on Android | AES-256-GCM key in the Android Keystore, released by `BiometricPrompt` | Android platform |
+| Biometric key source on Windows | Windows Hello key signature (RSA 2048, PKCS#1 v1.5 with SHA-256) through `KeyCredentialManager` | Windows platform |
 | Transport | TLS, terminated by the operator's reverse proxy | Operator infrastructure |
 
 The client uses libsodium through the Dart package `sodium` (4.0.4, the last release that supports Dart 3.12 in the pinned Flutter 3.44; it bundles libsodium for Windows and Android through build hooks). The package is pinned and updated through the lockfile like any other dependency.
@@ -51,11 +53,13 @@ All keys are 32 bytes unless stated otherwise.
 | Recovery authentication key `RAK` | When the recovery key is used | `crypto_kdf(RK, id 1, context "tdrecv01")` | Memory, only during recovery | Yes, over TLS; stored as an Argon2id hash |
 | Recovery wrapping key `RWK` | When the recovery key is used | `crypto_kdf(RK, id 2, context "tdrecv01")` | Memory, only during recovery | Never |
 | Device token | At each sign-in | Random | The local vault file, sealed under `VK` | Yes, on each request; the server stores its SHA-256 |
+| Biometric key `BK` | When biometric unlock is turned on, per device | Android: random, encrypted by a Keystore key that needs a strong biometric. Windows: derived from a Windows Hello signature (below) | Never on disk in the clear; in memory only during a biometric unlock | Never |
 
-**Wrapped vault key.** The vault key is stored twice, each copy encrypted with XChaCha20-Poly1305 under a random nonce:
+**Wrapped vault key.** The vault key is stored twice, each copy encrypted with XChaCha20-Poly1305 under a random nonce, and a third time on a device with biometric unlock turned on:
 
 - `wrap_pw = AEAD(KEK, VK, ad = "tildeck:wrap:password:v1|" + vault_id)`
 - `wrap_rk = AEAD(RWK, VK, ad = "tildeck:wrap:recovery:v1|" + vault_id)`
+- `wrap_bio = AEAD(BK, VK, ad = "tildeck:wrap:biometric:v1|" + vault_id)`, in the local vault file of that device only; it is never synced and never sent to the server.
 
 `vault_id` is a random UUID created on the device together with the vault key. It is not secret: it is sent to the server at registration and stored with the account. Binding to the vault rather than to the account lets a vault created without an account be uploaded later unchanged.
 
@@ -70,11 +74,20 @@ Changing the master password re-wraps the same vault key; records are never re-e
 ## The vault on a device
 
 - Records are stored locally in the same encrypted form they are synced in (below). The local database never holds plaintext record contents.
-- Unlocking the vault: the master password derives `PK`, then `KEK`, which unwraps `VK` from the locally stored `wrap_pw`. A wrong password fails the AEAD check; nothing else reveals whether a password is right.
+- Unlocking the vault: the master password derives `PK`, then `KEK`, which unwraps `VK` from the locally stored `wrap_pw`. A wrong password fails the AEAD check; nothing else reveals whether a password is right. With biometric unlock turned on, `BK` can unwrap `VK` from `wrap_bio` instead (below).
 - `VK` lives in memory only while the vault is unlocked. The vault locks after an idle period (default 15 minutes, a user setting) and when the app is closed. Buffers holding keys are zeroed when freed where the language allows it.
 - The device token, with the account's email address and server, is stored in the local vault file, sealed under `VK` with XChaCha20-Poly1305 and `ad = "tildeck:local:v1|" + vault_id`. It never syncs. It is therefore readable only while the vault is unlocked, which is the only time a device can sync anyway (records need `VK`), so platform secure storage would add nothing while the vault is locked and a dependency while it is open. (Changed on 2026-09-30 while implementing step 5, from platform secure storage: Android Keystore through EncryptedSharedPreferences, Windows DPAPI. Approved by Shlomi on 2026-10-01.)
 - A device can also use Tildeck without any account: the vault is then local only, with a locally generated salt and no recovery key. Registering later uploads the same vault unchanged (records and `wrap_pw` are bound to `vault_id`, not to an account) and creates the recovery key at that point.
-- Biometric unlock was out of scope for the first release; Shlomi asked for it on 2026-10-01 (typing the master password at every unlock on a phone is too much). It comes with stage 3 of the Termius parity plan, and its design is added here for approval before it is built.
+- Biometric unlock was out of scope for the first release; Shlomi asked for it on 2026-10-01 (typing the master password at every unlock on a phone is too much). It comes with stage 3 of the Termius parity plan; its design follows. (Approved by Shlomi on 2026-10-02.)
+
+**Biometric unlock.** Optional and per device, off by default, turned on in Settings > Security.
+
+- **Turning it on.** The vault must be unlocked, and the user types the master password once more; it is checked by unwrapping `wrap_pw`. The client then obtains `BK` as below and stores `wrap_bio = AEAD(BK, VK, ad = "tildeck:wrap:biometric:v1|" + vault_id)` in the local vault file. `vault_id` is the same random UUID that binds `wrap_pw`, `wrap_rk`, and the records. Neither `BK` nor `wrap_bio` is synced or sent to the server.
+- **Android.** `BK` is 32 random bytes. It is encrypted with AES-256-GCM under a key in the Android Keystore created with `setUserAuthenticationRequired(true)`, `setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG)` (a strong biometric for every use, no device credential), `setInvalidatedByBiometricEnrollment(true)`, and StrongBox when the device has it. The encrypted `BK` and its GCM nonce are kept in the local vault file next to `wrap_bio`. Decryption runs through `BiometricPrompt` with a `CryptoObject`, so the system releases the Keystore key only after a strong biometric.
+- **Windows.** Windows Hello through `KeyCredentialManager`. A Hello key is created for the vault (named after `vault_id`). To obtain `BK`, the client asks Hello to sign the fixed challenge `"tildeck:biometric:challenge:v1|" + vault_id` with that key; the signature is RSA PKCS#1 v1.5, which is deterministic, so the same key always gives the same signature. Then `H = crypto_generichash(32 bytes, signature)` and `BK = crypto_kdf(H, id 1, context "tdbio001")`. Nothing derived from the signature is stored. Windows Hello accepts the user's Hello PIN as well as a face or fingerprint, and Tildeck cannot restrict that, so on Windows this protection is that of Windows Hello. If a signature ever came out different, the AEAD check would fail and the master password would be asked for.
+- **Unlocking with it.** The client obtains `BK`, unwraps `VK` from `wrap_bio`, and opens the vault exactly as a password unlock does; `BK` is then dropped from memory. A failure or a cancel falls back to the master password, which always remains available. The idle lock and the lock when the app closes are unchanged.
+- **What removes it.** Turning it off deletes `wrap_bio` and the Android Keystore key or the Windows Hello key. Changing the master password or using the recovery key on the device deletes `wrap_bio` too, and so does a device taking a new `wrap_pw` from the server after the password changed elsewhere. A new biometric enrollment on Android invalidates the Keystore key, and a deleted Hello key leaves nothing to sign with: the client then deletes `wrap_bio`. In every case the user turns it on again with the master password.
+- **What it protects.** An attacker with the device's files but without the user's biometric (on Windows, without Windows Hello) cannot unwrap `VK` from `wrap_bio`. It does not protect against an attacker who can pass the operating system's biometric check (or the Windows Hello PIN): that is the same protection as the device's own lock. The server learns nothing; it does not even know whether a device uses biometric unlock.
 
 ## Records
 
@@ -112,7 +125,15 @@ The associated data binds a ciphertext to its place: `ad = "tildeck:record:v1|" 
 
 **Recovery.** With the recovery key, the client derives `RAK` and `RWK`, proves `RAK` to the server, downloads `wrap_rk`, unwraps `VK`, and sets a new master password: a new salt, new `AK`, and a new `wrap_pw`. Every other device is revoked, a security email is sent, and the event is logged. The recovery key stays valid; the user can issue a new one at any time, which replaces `wrap_rk` and the `RAK` hash.
 
-**Security notifications.** With SMTP configured, the account address is emailed when a device is added or revoked, the master password changes, or the recovery key is used. Emails are localized in English and Hebrew by the user's language and never contain secrets or links that sign the user in.
+**Two-factor sign-in.** Optional per account. (Approved by Shlomi on 2026-10-02.)
+
+- **Turning it on.** From Settings > Security in the app, on a signed-in device. The server generates a TOTP secret (RFC 6238: SHA-1, 30 seconds, 6 digits, the same as administrators), stores it encrypted with the settings encryption key (`CONFIG_ENCRYPTION_KEY`) as it does the administrators' secrets, and returns it as an `otpauth://` address and a QR code. It becomes active only after a code from it is confirmed. Turning it off needs a current code.
+- **Where a code is required.** While it is active: at sign-in, on any device, new or known; at a master password change; and at recovery, when it starts (before the server returns `wrap_rk`). The request that completes recovery must not be possible with the recovery key alone; how it is tied to a start that passed the code is settled when this is built. Devices that are already signed in stay signed in when two-factor sign-in is turned on.
+- **Codes.** A code is accepted once: the time step of each accepted code is stored, and that step and earlier ones are refused, so a code cannot be replayed. One step of clock drift is allowed either way. Wrong codes count against the same per-account and per-address limits as sign-in, and only a complete sign-in gives an attempt back. A wrong password and a wrong code get the same answer (`invalid_credentials`, or `recovery_failed` at recovery). The one difference is a stable error code that tells the client a code is needed: `totp_required`, given when the request carries no code and the password (or the recovery key) is right. It is given only after that check, so it does not reveal which accounts exist or use two-factor sign-in; it does tell someone who already has the password that the password is right, as any two-step sign-in does, and those attempts are limited and logged like any other.
+- **A lost authenticator.** An administrator can turn two-factor sign-in off for the account in the admin panel. The action is written to the activity log, and the user receives a security email. There are no backup codes in this version.
+- **What it does not change.** The TOTP secret is not part of the vault, and the server can read it. It is a second factor for the account (signing in, changing the password, recovery), not for the vault's encryption: the keys, the wraps, and what a master password or recovery key can decrypt are exactly as above.
+
+**Security notifications.** With SMTP configured, the account address is emailed when a device is added or revoked, the master password changes, the recovery key is used, or two-factor sign-in is turned on or off (by the user or by an administrator). Emails are localized in English and Hebrew by the user's language and never contain secrets or links that sign the user in.
 
 ## Sync
 
@@ -128,13 +149,13 @@ The associated data binds a ciphertext to its place: `ad = "tildeck:record:v1|" 
 - Administrator accounts are separate from user accounts and cannot hold a vault. They sign in with a password (Argon2id on the server) and a mandatory TOTP code (RFC 6238). TOTP secrets are stored encrypted with the settings encryption key.
 - **First-run setup.** A fresh server prints a one-time setup token to its log and accepts the first administrator only with that token, so nobody can claim an exposed fresh server before the operator does.
 - Sessions use an `HttpOnly`, `Secure`, `SameSite=Strict` cookie, expire after inactivity, and state-changing requests require a CSRF token.
-- Administrators can create, disable, and delete user accounts, revoke devices, and see metadata (email, created, last seen, device names, record counts, storage used). No API returns ciphertext, wrapped keys, or hashes to the panel, and nothing in the panel can decrypt anything.
+- Administrators can create, disable, and delete user accounts, revoke devices, turn two-factor sign-in off for an account whose user lost the authenticator, and see metadata (email, created, last seen, device names, record counts, storage used). No API returns ciphertext, wrapped keys, or hashes to the panel, and nothing in the panel can decrypt anything.
 - Every administrative action is written to the activity log.
 - **Clarifications from implementing step 6 (2026-10-01).** A TOTP code is accepted once, within one 30-second step of drift either way; the last accepted step is stored. The setup token is 192 random bits, kept in memory as a hash, and replaced at each start until the first administrator exists; that administrator is created only after a code from the new TOTP secret is confirmed. Sessions are stored on the server as a hash of the cookie token and end after 30 idle minutes or 12 hours. "Create user accounts" means invitations: an administrator cannot create a vault's keys for a user.
 
 ## What a compromised server reveals
 
-An attacker with the full database and the settings encryption key gets email addresses, device names and timestamps, record counts and sizes, Argon2id hashes of `AK` and `RAK`, and the wrapped vault keys. To read a vault they must guess the master password (each guess costs one Argon2id derivation with the account's parameters) or the recovery key (256 bits, infeasible). They cannot sign in as a user without `AK`, and cannot forge or reorder records without detection.
+An attacker with the full database and the settings encryption key gets email addresses, device names and timestamps, record counts and sizes, Argon2id hashes of `AK` and `RAK`, the wrapped vault keys, and the TOTP secrets of accounts with two-factor sign-in (which takes away that second factor, not the need for `AK`). To read a vault they must guess the master password (each guess costs one Argon2id derivation with the account's parameters) or the recovery key (256 bits, infeasible). They cannot sign in as a user without `AK`, and cannot forge or reorder records without detection.
 
 An attacker who controls the running server can additionally withhold or delay records and see which account syncs when, and could serve a new user a fake pre-login salt. They still never receive the master password or `PK`.
 
@@ -151,7 +172,7 @@ No component logs passwords, keys, tokens, record contents, wrapped keys, or sec
 
 ## Open for later
 
-- Biometric unlock and hardware-backed keys.
+- Hardware-backed SSH keys (FIDO2).
 - Sharing records between accounts (teams).
 - Raising the Argon2id parameters as hardware improves.
 - An independent security review before the project is promoted beyond early adopters.
