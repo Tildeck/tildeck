@@ -258,14 +258,14 @@ void main() {
       final notes = File('${local.path}/notes.txt')..writeAsStringSync('hello');
       final docs = Directory('${local.path}/docs')..createSync();
       File('${docs.path}/a.md').writeAsStringSync('# a');
-      await client.run('mkdir ~/$folder');
+      await client.run('mkdir -p ~/$folder/drop');
       final browser = FileBrowser(client.sftp);
       addTearDown(browser.dispose);
       await browser.start();
-      await browser.goTo(folder);
+      await browser.goTo('$folder/drop');
       await uploadDropped(browser, [notes.path, docs.path]);
       expect(browser.transfers.map((t) => t.state), [TransferState.done, TransferState.done]);
-      final listing = utf8.decode(await client.run('cd ~/$folder && find . | sort'));
+      final listing = utf8.decode(await client.run('cd ~/$folder/drop && find . | sort'));
       expect(listing.trim().split('\n'), ['.', './docs', './docs/a.md', './notes.txt']);
     });
 
