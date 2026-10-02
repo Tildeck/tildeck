@@ -14,6 +14,7 @@ import time
 import uuid
 from collections import defaultdict, deque
 from datetime import timedelta
+from functools import lru_cache
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -95,10 +96,19 @@ async def hash_key(key_b64: str) -> str:
     return await run_in_threadpool(_hasher.hash, key_b64)
 
 
-async def verify_key(stored_hash: str, key_b64: str) -> bool:
+@lru_cache
+def _absent_hash() -> str:
+    return _hasher.hash(secrets.token_urlsafe(32))
+
+
+async def verify_key(stored_hash: str | None, key_b64: str) -> bool:
+    """Whether key_b64 matches stored_hash. Without a stored hash (no such
+    account or administrator) it still verifies, against a throwaway hash,
+    so the answer takes as long and does not tell who exists."""
+
     def check() -> bool:
         try:
-            return _hasher.verify(stored_hash, key_b64)
+            return _hasher.verify(stored_hash or _absent_hash(), key_b64) and stored_hash is not None
         except VerificationError, InvalidHashError:
             return False
 
@@ -159,6 +169,21 @@ class RateLimiter:
     def hit(self, key: str) -> None:
         now = time.monotonic()
         self._trim(key, now).append(now)
+
+    def take(self, key: str, limit: int) -> bool:
+        """Counts an attempt unless key is already at limit; False when it
+        is. Check and count happen together, so concurrent attempts cannot
+        all pass the check before any of them is counted."""
+        if self.exceeded(key, limit):
+            return False
+        self.hit(key)
+        return True
+
+    def give_back(self, key: str) -> None:
+        """Uncounts the latest attempt: it turned out to be a success."""
+        events = self._events.get(key)
+        if events:
+            events.pop()
 
     def reset(self) -> None:
         self._events.clear()
