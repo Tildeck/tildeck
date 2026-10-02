@@ -646,6 +646,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The same list, choices, and saving serve every source; a CSV row brings its folder, tags, and Telnet, and the same name twice gets a number. The dialog exports the vault's hosts as CSV (name, host, port, user, folder, tags, protocol), never passwords, keys, or identities.
 - Tests: CSV quoting; other tools' headers, a row without a host, duplicate names; an export read back the same without its password; PuTTY's registry output.
 
+### Importing from MobaXterm (2026-10-02)
+
+- A chosen file with MobaXterm's sessions (its exported .mxtsessions file, or MobaXterm.ini) is recognized by its [Bookmarks] sections and session lines, before the CSV and SSH configuration checks. Its SSH and Telnet sessions are listed with their address, port, user, and folder (SubRep, where `Production\Web` becomes the nested folder `Production/Web`); other kinds (RDP, VNC, FTP, serial and so on) are left out, and the same name twice gets a number.
+- Key files are not brought: MobaXterm's paths point into its own profile (`_ProfileDir_`), so keys are added on the Keys page.
+- The format was written from MobaXterm's session lines (`name=#icon#type%host%port%user%...`, type 0 for SSH and 1 for Telnet), not taken from a published specification.
+- Tests: a sessions file with SSH and Telnet sessions in folders, an RDP session, a repeated name, and other formats not taken for MobaXterm's. Not tried with a file exported by MobaXterm itself.
+
 ### Copying between servers (2026-10-02)
 
 - Holiday plan, wave 3 (SFTP between two servers). Termius shows two servers side by side; here the files page offers "Copy to another server" on an entry and on a selection (the right-click menu on the desktop, the entry's menu on a phone): the user picks a saved SSH host, which opens on a connection of its own, and a folder there (its home by default), and the entries are streamed through this device.

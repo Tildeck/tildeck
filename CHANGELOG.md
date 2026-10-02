@@ -10,6 +10,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - Snippet variables: {{name}} in a snippet is asked for when it runs, here or on several hosts at once.
 - Serial connections on the desktop: a host can be a serial port (COM3, /dev/ttyUSB0) at a baud rate, picked from the ports on this computer, for routers, switches, and boards with a console.
 - Serial connections on Windows: a host can be a serial port (COM3) at a baud rate, picked from the ports on this computer, for routers, switches, and boards with a console.
+- Import hosts from MobaXterm's sessions (an exported .mxtsessions file or MobaXterm.ini), with their folders.
 - Sessions reconnect on their own when the connection drops: a few times, each after a longer wait, counted down with a cancel; on by default, in Settings, Terminal.
 - Import hosts from a CSV (Termius's export, a spreadsheet) or from PuTTY's saved sessions on Windows, and export the hosts as CSV, without passwords or keys.
 - Files: copy files and folders from one server to another saved server, through this device, from an entry's menu.

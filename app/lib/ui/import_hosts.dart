@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../ssh/local_files.dart';
+import '../ssh/mobaxterm_sessions.dart';
 import '../ssh/putty_sessions.dart';
 import '../ssh/ssh_config.dart';
 import '../theme.dart';
@@ -103,12 +104,13 @@ class _ImportHostsState extends State<_ImportHosts> {
 
   void _show(String? text, {required _From from}) {
     if (!mounted) return;
-    // A picked file is a hosts CSV (Termius's export, a spreadsheet) or an
-    // SSH configuration.
+    // A picked file is MobaXterm's sessions, a hosts CSV (Termius's export,
+    // a spreadsheet), or an SSH configuration.
     final hosts = text == null
         ? null
         : switch (from) {
             _From.putty => parsePuttyRegistry(text),
+            _ when looksLikeMobaXterm(text) => parseMobaXterm(text),
             _ when looksLikeHostsCsv(text) => parseHostsCsv(text),
             _ => parseSshConfig(text),
           };
