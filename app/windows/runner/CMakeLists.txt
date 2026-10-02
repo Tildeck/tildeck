@@ -35,8 +35,10 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
-# C++/WinRT (Windows Hello for biometric unlock).
+# C++/WinRT (Windows Hello for biometric unlock). It needs C++20: under C++17
+# it includes <experimental/coroutine>, which newer MSVC releases refuse.
 target_link_libraries(${BINARY_NAME} PRIVATE "WindowsApp.lib")
+target_compile_features(${BINARY_NAME} PRIVATE cxx_std_20)
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
