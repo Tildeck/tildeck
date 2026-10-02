@@ -460,6 +460,10 @@ class PreferencesEntry extends VaultEntry {
     this.scrollback,
     this.copyOnSelect,
     this.autoReconnect,
+    this.highlight,
+    this.highlightErrors,
+    this.highlightWarnings,
+    this.highlightSuccess,
   }) : super(id: fixedId);
 
   static const recordType = 'preferences';
@@ -497,6 +501,12 @@ class PreferencesEntry extends VaultEntry {
   final bool? copyOnSelect;
   final bool? autoReconnect;
 
+  /// Keywords that stand out in the terminal; null lists are the defaults.
+  final bool? highlight;
+  final List<String>? highlightErrors;
+  final List<String>? highlightWarnings;
+  final List<String>? highlightSuccess;
+
   PreferencesEntry copyWith({
     String? terminalTheme,
     double? fontSize,
@@ -509,6 +519,10 @@ class PreferencesEntry extends VaultEntry {
     int? scrollback,
     bool? copyOnSelect,
     bool? autoReconnect,
+    bool? highlight,
+    List<String>? highlightErrors,
+    List<String>? highlightWarnings,
+    List<String>? highlightSuccess,
   }) => PreferencesEntry(
     terminalTheme: terminalTheme ?? this.terminalTheme,
     fontSize: fontSize ?? this.fontSize,
@@ -521,6 +535,10 @@ class PreferencesEntry extends VaultEntry {
     scrollback: scrollback ?? this.scrollback,
     copyOnSelect: copyOnSelect ?? this.copyOnSelect,
     autoReconnect: autoReconnect ?? this.autoReconnect,
+    highlight: highlight ?? this.highlight,
+    highlightErrors: highlightErrors ?? this.highlightErrors,
+    highlightWarnings: highlightWarnings ?? this.highlightWarnings,
+    highlightSuccess: highlightSuccess ?? this.highlightSuccess,
   );
 
   @override
@@ -539,6 +557,10 @@ class PreferencesEntry extends VaultEntry {
     'scrollback': scrollback,
     'copy_on_select': copyOnSelect,
     'auto_reconnect': autoReconnect,
+    'highlight': highlight,
+    'highlight_errors': highlightErrors,
+    'highlight_warnings': highlightWarnings,
+    'highlight_success': highlightSuccess,
   };
 
   static PreferencesEntry fromJson(String id, Map<String, dynamic> d) => PreferencesEntry(
@@ -555,6 +577,10 @@ class PreferencesEntry extends VaultEntry {
     scrollback: d['scrollback'] as int?,
     copyOnSelect: d['copy_on_select'] as bool?,
     autoReconnect: d['auto_reconnect'] as bool?,
+    highlight: d['highlight'] as bool?,
+    highlightErrors: (d['highlight_errors'] as List?)?.cast<String>(),
+    highlightWarnings: (d['highlight_warnings'] as List?)?.cast<String>(),
+    highlightSuccess: (d['highlight_success'] as List?)?.cast<String>(),
   );
 }
 

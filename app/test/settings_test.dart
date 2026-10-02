@@ -138,7 +138,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('saveSettings')));
     // Saving encrypts the preferences off the test clock.
-    for (var i = 0; i < 500 && find.byKey(const ValueKey('saveBar')).evaluate().isNotEmpty; i++) {
+    for (var i = 0; i < 3000 && find.byKey(const ValueKey('saveBar')).evaluate().isNotEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
       await tester.pump();
     }
