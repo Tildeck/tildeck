@@ -13,6 +13,7 @@ import 'files_page.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
 import 'host_folders.dart';
+import 'server_picker.dart';
 import 'identities_page.dart';
 import 'import_hosts.dart';
 import 'keys_page.dart';
@@ -255,7 +256,13 @@ class _HostsPageState extends State<HostsPage> {
     }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => FilesPage(browser: browser, title: host.label),
+        builder: (_) => FilesPage(
+          browser: browser,
+          title: host.label,
+          otherServer: widget.connectHost == null
+              ? null
+              : (context) => pickOtherServer(context, vault, widget.connectHost!, except: host.label),
+        ),
       ),
     );
   }

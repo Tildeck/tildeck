@@ -12,6 +12,7 @@ import '../theme.dart';
 import 'desktop_sidebar.dart' show isDesktopLayout;
 import 'file_editor_page.dart';
 import 'file_table.dart';
+import 'server_picker.dart';
 import 'terminal_panel.dart' show connectProblemText;
 
 String fileProblemText(AppLocalizations t, FileProblem problem) => switch (problem) {
@@ -36,6 +37,7 @@ class FilesPage extends StatefulWidget {
     required this.title,
     this.local = const DeviceFiles(),
     this.localBrowser,
+    this.otherServer,
   });
 
   final FileBrowser browser;
@@ -47,6 +49,9 @@ class FilesPage extends StatefulWidget {
   /// This computer's side in the desktop layout; made from the home folder
   /// when not given.
   final LocalBrowser? localBrowser;
+
+  /// Opens another server's files, to copy entries to; null offers no copy.
+  final Future<OtherServer?> Function(BuildContext context)? otherServer;
 
   @override
   State<FilesPage> createState() => _FilesPageState();
@@ -259,8 +264,48 @@ class _FilesPageState extends State<FilesPage> {
       case 'copyPath':
         await Clipboard.setData(ClipboardData(text: entry.path));
         _say(t.pathCopied);
+      case 'copyServer':
+        await _copyToServer([entry]);
       case 'delete':
         await _delete(entry);
+    }
+  }
+
+  /// Copies [entries] to a folder on another saved server, through this
+  /// device. The copy shows among this server's transfers.
+  Future<void> _copyToServer(List<RemoteEntry> entries) async {
+    final open = widget.otherServer;
+    if (open == null || entries.isEmpty) return;
+    final t = AppLocalizations.of(context);
+    final other = await open(context);
+    if (other == null || !mounted) return;
+    final target = other.browser;
+    try {
+      await target.start();
+      if (!mounted) return;
+      if (target.path == null) {
+        _say(t.copyToServerFailed(other.label));
+        return;
+      }
+      final folder = await showDialog<String>(
+        context: context,
+        builder: (_) => _NameDialog(
+          title: t.copyToServerWhere(other.label),
+          label: t.folderPathLabel,
+          action: t.copyAction,
+          initial: target.path,
+        ),
+      );
+      if (folder == null || folder.trim().isEmpty || !mounted) return;
+      await target.goTo(folder);
+      if (target.problem != null) {
+        _say(t.copyToServerFailed(other.label));
+        return;
+      }
+      final transfer = await browser.copyTo(target, entries);
+      if (mounted && transfer.state == TransferState.done) _say(t.copiedToServer(other.label));
+    } finally {
+      target.dispose();
     }
   }
 
@@ -294,6 +339,8 @@ class _FilesPageState extends State<FilesPage> {
           PopupMenuItem(value: 'permissions', child: Text(t.permissionsTitle)),
           PopupMenuItem(value: 'copyPath', child: Text(t.copyPath)),
         ],
+        if (widget.otherServer != null)
+          PopupMenuItem(key: const ValueKey('rowCopyServer'), value: 'copyServer', child: Text(t.copyToServer)),
         PopupMenuItem(key: const ValueKey('rowDelete'), value: 'delete', child: Text(t.deleteAction)),
       ],
     );
@@ -305,6 +352,8 @@ class _FilesPageState extends State<FilesPage> {
         await _downloadToLocal(_remoteSel.of(browser.entries));
       case 'download' when several:
         await _downloadChosen();
+      case 'copyServer':
+        await _copyToServer(several ? _remoteSel.of(browser.entries) : [entry]);
       case 'delete' when several:
         await _deleteChosen();
       default:
@@ -923,6 +972,7 @@ class _FilesPageState extends State<FilesPage> {
                             entry: browser.entries[i],
                             selected: _selected.contains(browser.entries[i].path),
                             folders: widget.local.folders,
+                            copyServer: widget.otherServer != null,
                             onAction: (action) => _act(action, browser.entries[i]),
                             onLongPress: () => _toggle(browser.entries[i]),
                             onTap: () {
@@ -1014,7 +1064,11 @@ class _EntryTile extends StatelessWidget {
     required this.onLongPress,
     required this.selected,
     required this.folders,
+    this.copyServer = false,
   });
+
+  /// Offers copying to another server.
+  final bool copyServer;
 
   final RemoteEntry entry;
   final VoidCallback onTap;
@@ -1082,6 +1136,8 @@ class _EntryTile extends StatelessWidget {
           PopupMenuItem(key: const ValueKey('entryRename'), value: 'rename', child: Text(t.renameAction)),
           PopupMenuItem(key: const ValueKey('entryPermissions'), value: 'permissions', child: Text(t.permissionsTitle)),
           PopupMenuItem(key: const ValueKey('entryCopyPath'), value: 'copyPath', child: Text(t.copyPath)),
+          if (copyServer)
+            PopupMenuItem(key: const ValueKey('entryCopyServer'), value: 'copyServer', child: Text(t.copyToServer)),
           PopupMenuItem(key: const ValueKey('entryDelete'), value: 'delete', child: Text(t.deleteAction)),
         ],
       ),
@@ -1141,7 +1197,11 @@ class _Transfers extends StatelessWidget {
                     child: Row(
                       children: [
                         Icon(
-                          tr.direction == TransferDirection.upload ? Icons.upload_rounded : Icons.download_rounded,
+                          switch (tr.direction) {
+                            TransferDirection.upload => Icons.upload_rounded,
+                            TransferDirection.download => Icons.download_rounded,
+                            TransferDirection.copy => Icons.swap_horiz_rounded,
+                          },
                           size: 18,
                           color: tr.state == TransferState.failed ? c.danger : c.muted,
                         ),
