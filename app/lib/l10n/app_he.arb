@@ -563,5 +563,8 @@
   "paletteWorkspace": "סביבת עבודה",
   "transferQueued": "ממתין",
   "broadcastInput": "הקלדה בכל הטרמינלים בבת אחת",
-  "broadcastOn": "ההקלדה נשלחת לכל {count} הטרמינלים"
+  "broadcastOn": "ההקלדה נשלחת לכל {count} הטרמינלים",
+  "dropUploadTo": "שחררו כדי להעלות אל {host}",
+  "dropPastePaths": "שחררו כדי להקליד את הנתיבים",
+  "dropNeedsSsh": "אפשר לגרור קבצים לטרמינלים של SSH ולטרמינלים מקומיים."
 }

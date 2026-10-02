@@ -1041,5 +1041,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "dropUploadTo": "Drop to upload to {host}",
+  "@dropUploadTo": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "dropPastePaths": "Drop to type the paths",
+  "dropNeedsSsh": "Files can be dropped on SSH and local terminals."
 }

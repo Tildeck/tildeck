@@ -449,6 +449,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - With two or more terminals open, a button above the terminal sends what is typed in any of them to all of them, until it is pressed again: the same command on several servers at once. While it is on, the bar says so in red, with how many terminals receive it. It turns off when fewer than two terminals are left.
 - Only the user's own typing and pasting is sent: keys, text, and pastes. The terminal's replies to its program (cursor position, device attributes, mouse reports), the saved password offered at a prompt, a completion picked from the suggestions, and a snippet run with Run are not; a snippet goes to many servers with Run on hosts instead. A terminal that is not connected is skipped.
 - Tests: two Telnet sessions against local servers: typing reaches the other one; a cursor position reply, the saved password, and a snippet do not; turned off, nothing does.
+### Dropping files on a terminal (2026-10-02)
+
+- On the desktop, files and folders dragged from the file manager onto a terminal are taken by it; while they are over it, it says what will happen.
+- On an SSH terminal they are uploaded to the server's home folder: a files tab for that session opens there and shows each upload's progress, one after the other, never over an existing entry (the files tab's own rules). The shell's current folder is not known to the app, so the home folder is used.
+- On a local terminal their paths are typed, separated by spaces, a path with a space in quotes, as other terminals do. Telnet terminals say that files can be dropped on SSH and local terminals.
+- Drops come through `desktop_drop` (Apache-2.0).
+- Tests: the typed paths; against the OpenSSH container, a dropped file and folder uploaded into the open folder. The drag itself (the operating system's part) is not covered by a test.
 
 ### Local terminal (2026-10-01)
 
