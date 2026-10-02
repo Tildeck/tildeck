@@ -10,12 +10,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Literal
 
+import pyotp
 from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import accounts, audit, clock, settings_store
+from app import accounts, admins, audit, clock, crypto, settings_store
 from app.accounts import KdfParams, Sealed
 from app.db import get_db
 from app.mailer import Mail, email_configured, text
@@ -100,6 +101,7 @@ class SigninRequest(BaseModel):
     email: str = Field(max_length=320)
     auth_key: str
     device: DeviceInfo
+    totp_code: str | None = Field(default=None, max_length=20, description="Needed when two-factor sign-in is on")
 
     _key = field_validator("auth_key")(accounts.key32)
 
@@ -122,6 +124,7 @@ class AccountView(BaseModel):
     email: str
     email_verified: bool
     locale: str
+    totp_enabled: bool
     devices: list[DeviceView]
 
 
@@ -129,6 +132,7 @@ class PasswordChange(BaseModel):
     auth_key: str
     new: NewPassword
     keep_other_devices: bool = False
+    totp_code: str | None = Field(default=None, max_length=20)
 
     _key = field_validator("auth_key")(accounts.key32)
 
@@ -136,6 +140,7 @@ class PasswordChange(BaseModel):
 class RecoveryStart(BaseModel):
     email: str = Field(max_length=320)
     recovery_auth_key: str
+    totp_code: str | None = Field(default=None, max_length=20)
 
     _key = field_validator("recovery_auth_key")(accounts.key32)
 
@@ -148,6 +153,19 @@ class RecoveryWrap(BaseModel):
 class RecoveryComplete(RecoveryStart):
     new: NewPassword
     device: DeviceInfo
+
+
+class TotpEnrollment(BaseModel):
+    """A new secret for an authenticator app: as text, as an otpauth
+    address, and as a QR code image."""
+
+    secret: str
+    uri: str
+    qr_image: str
+
+
+class TotpCode(BaseModel):
+    code: str = Field(max_length=20)
 
 
 # --- Helpers -----------------------------------------------------------------
@@ -175,6 +193,32 @@ async def _limit(session: AsyncSession, request: Request, email: str | None = No
 
 def _succeeded(email: str) -> None:
     limiter.give_back(f"acct:{email}")
+
+
+async def _second_factor(
+    session: AsyncSession, account: Account, code: str | None, wrong: ErrorCode, *, use: bool
+) -> None:
+    """With two-factor sign-in on, a code is needed besides the key: none
+    is totp_required (the key was right, so the attempt is given back), a
+    wrong one is [wrong] and stays counted. [use] spends the code's time
+    step, so it never works again; the row is locked first, so the same code
+    sent twice at once is accepted once."""
+    if account.totp_secret_encrypted is None:
+        return
+    if not code:
+        _succeeded(account.email)
+        raise ApiError(401, ErrorCode.totp_required)
+    if use:
+        await session.refresh(account, with_for_update=True)
+    step = admins.totp_step(crypto.decrypt(account.totp_secret_encrypted), code, account.totp_last_step)
+    if step is None:
+        audit.record(
+            session, actor=account.email, source="user", action="totp_failed", entity="account", entity_id=account.id
+        )
+        await session.commit()
+        raise ApiError(401, wrong)
+    if use:
+        account.totp_last_step = step
 
 
 def _vault_keys(account: Account) -> VaultKeys:
@@ -208,6 +252,10 @@ async def _mail(request: Request, session: AsyncSession, account: Account, kind:
     except Exception as exc:  # noqa: BLE001 - mail delivery must not undo the action
         logger.error("Could not send %s mail to account %s: %s", kind, account.id, exc)
         return False
+
+
+# For the admin API: a security message to an account's owner.
+mail_account = _mail
 
 
 async def send_invite(request: Request, session: AsyncSession, email: str, code: str, locale: str) -> bool:
@@ -436,6 +484,7 @@ async def signin(
         )
         await session.commit()
         raise ApiError(401, ErrorCode.invalid_credentials)
+    await _second_factor(session, account, body.totp_code, ErrorCode.invalid_credentials, use=True)
     _succeeded(email)
     if account.disabled_at is not None:
         raise ApiError(403, ErrorCode.account_disabled)
@@ -526,6 +575,7 @@ async def get_account(caller: Caller = Depends(current_device), session: AsyncSe
         email=caller.account.email,
         email_verified=caller.account.email_verified_at is not None,
         locale=caller.account.locale,
+        totp_enabled=caller.account.totp_secret_encrypted is not None,
         devices=[
             DeviceView(
                 id=d.id,
@@ -538,6 +588,88 @@ async def get_account(caller: Caller = Depends(current_device), session: AsyncSe
             for d in devices
         ],
     )
+
+
+@router.post(
+    "/account/totp/start",
+    response_model=TotpEnrollment,
+    operation_id="startTotp",
+    responses=errors((401, "Not signed in"), (409, "Two-factor sign-in is already on")),
+)
+async def start_totp(
+    caller: Caller = Depends(current_device), session: AsyncSession = Depends(get_db)
+) -> TotpEnrollment:
+    """A new secret for two-factor sign-in. Nothing changes until a code
+    from it is confirmed."""
+    account = caller.account
+    if account.totp_secret_encrypted is not None:
+        raise ApiError(409, ErrorCode.totp_already_enabled)
+    secret = pyotp.random_base32()
+    account.totp_pending_encrypted = crypto.encrypt(secret)
+    await session.commit()
+    uri = admins.otpauth_uri(secret, account.email)
+    return TotpEnrollment(secret=secret, uri=uri, qr_image=admins.qr_image(uri))
+
+
+@router.post(
+    "/account/totp/confirm",
+    status_code=204,
+    operation_id="confirmTotp",
+    responses=errors(
+        (401, "Not signed in or a wrong code"), (409, "No secret is being set up"), (429, "Too many requests")
+    ),
+)
+async def confirm_totp(
+    body: TotpCode, request: Request, caller: Caller = Depends(current_device), session: AsyncSession = Depends(get_db)
+) -> Response:
+    """Turns two-factor sign-in on with a code from the new secret."""
+    account = caller.account
+    await _limit(session, request, account.email)
+    if account.totp_pending_encrypted is None:
+        raise ApiError(409, ErrorCode.totp_not_enabled)
+    secret = crypto.decrypt(account.totp_pending_encrypted)
+    step = admins.totp_step(secret, body.code, None)
+    if step is None:
+        raise ApiError(401, ErrorCode.invalid_totp)
+    _succeeded(account.email)
+    account.totp_secret_encrypted, account.totp_pending_encrypted, account.totp_last_step = (
+        account.totp_pending_encrypted,
+        None,
+        step,
+    )
+    audit.record(
+        session, actor=account.email, source="user", action="totp_enabled", entity="account", entity_id=account.id
+    )
+    await session.commit()
+    await _mail(request, session, account, "totp_enabled")
+    return Response(status_code=204)
+
+
+@router.post(
+    "/account/totp/disable",
+    status_code=204,
+    operation_id="disableTotp",
+    responses=errors(
+        (401, "Not signed in or a wrong code"), (409, "Two-factor sign-in is off"), (429, "Too many requests")
+    ),
+)
+async def disable_totp(
+    body: TotpCode, request: Request, caller: Caller = Depends(current_device), session: AsyncSession = Depends(get_db)
+) -> Response:
+    """Turns two-factor sign-in off; a current code proves the authenticator."""
+    account = caller.account
+    await _limit(session, request, account.email)
+    if account.totp_secret_encrypted is None:
+        raise ApiError(409, ErrorCode.totp_not_enabled)
+    await _second_factor(session, account, body.code, ErrorCode.invalid_totp, use=True)
+    _succeeded(account.email)
+    account.totp_secret_encrypted, account.totp_last_step = None, None
+    audit.record(
+        session, actor=account.email, source="user", action="totp_disabled", entity="account", entity_id=account.id
+    )
+    await session.commit()
+    await _mail(request, session, account, "totp_disabled")
+    return Response(status_code=204)
 
 
 async def _own_device(session: AsyncSession, caller: Caller, device_id: str) -> Device:
@@ -672,6 +804,7 @@ async def change_password(
     await _limit(session, request, caller.account.email)
     if not await accounts.verify_key(caller.account.auth_key_hash, body.auth_key):
         raise ApiError(401, ErrorCode.invalid_credentials)
+    await _second_factor(session, caller.account, body.totp_code, ErrorCode.invalid_credentials, use=True)
     _succeeded(caller.account.email)
     await _set_password(session, caller.account, body.new)
     if not body.keep_other_devices:
@@ -689,7 +822,9 @@ async def change_password(
     return Response(status_code=204)
 
 
-async def _recovery_account(session: AsyncSession, request: Request, body: RecoveryStart) -> Account:
+async def _recovery_account(
+    session: AsyncSession, request: Request, body: RecoveryStart, *, completing: bool
+) -> Account:
     email = accounts.normalize_email(body.email)
     await _limit(session, request, email)
     account = await _account_by_email(session, email)
@@ -705,6 +840,9 @@ async def _recovery_account(session: AsyncSession, request: Request, body: Recov
         )
         await session.commit()
         raise ApiError(401, ErrorCode.recovery_failed)
+    # The same code goes with both steps: checked at the start, spent when
+    # the recovery completes, so completing cannot skip it.
+    await _second_factor(session, account, body.totp_code, ErrorCode.recovery_failed, use=completing)
     _succeeded(email)
     if account.disabled_at is not None:
         raise ApiError(403, ErrorCode.account_disabled)
@@ -721,7 +859,7 @@ async def recovery_start(
     body: RecoveryStart, request: Request, session: AsyncSession = Depends(get_db)
 ) -> RecoveryWrap:
     """Proves the recovery key and returns the vault key wrapped by it."""
-    account = await _recovery_account(session, request, body)
+    account = await _recovery_account(session, request, body, completing=False)
     return RecoveryWrap(vault_id=account.vault_id, wrap_rk=Sealed.model_validate_json(account.wrap_rk))
 
 
@@ -736,7 +874,7 @@ async def recovery_complete(
 ) -> SignedIn:
     """Sets a new master password with the recovery key, signs out every
     device, and signs in this one."""
-    account = await _recovery_account(session, request, body)
+    account = await _recovery_account(session, request, body, completing=True)
     await _set_password(session, account, body.new)
     await _revoke_others(session, account, keep=None)
     device = await session.get(Device, body.device.id)

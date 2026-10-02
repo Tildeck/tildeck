@@ -241,6 +241,10 @@ class ApiClient {
           return StoredRecord.fromJson(value);
         case 'SyncRecord':
           return SyncRecord.fromJson(value);
+        case 'TotpCode':
+          return TotpCode.fromJson(value);
+        case 'TotpEnrollment':
+          return TotpEnrollment.fromJson(value);
         case 'VaultKeys':
           return VaultKeys.fromJson(value);
         default:

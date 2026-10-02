@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../vault/password_rules.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
+import 'two_factor.dart';
 
 /// The frame of the password screens: a title, an intro, and a form.
 class _PasswordScreen extends StatelessWidget {
@@ -143,10 +144,14 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       _error = null;
     });
     try {
-      await widget.services.accounts.changePassword(
-        current: _current.text,
-        newPassword: _password.text,
-        signOutOtherDevices: _signOutOthers,
+      await withSecondFactor(
+        context,
+        (code) => widget.services.accounts.changePassword(
+          current: _current.text,
+          newPassword: _password.text,
+          signOutOtherDevices: _signOutOthers,
+          totpCode: code,
+        ),
       );
       messenger.showSnackBar(SnackBar(content: Text(t.passwordChanged)));
       navigator.maybePop();
@@ -256,12 +261,18 @@ class _RecoveryPageState extends State<RecoveryPage> {
       final s = widget.services;
       final check = await s.checker.check(_address.text);
       if (check is ServerFailed) throw check;
-      await s.accounts.recover(
-        address: ServerChecker.parseAddress(_address.text).toString(),
-        email: _email.text.trim(),
-        recoveryKey: _key.text,
-        newPassword: _password.text,
-        deviceName: _deviceName.text.trim(),
+      final address = ServerChecker.parseAddress(_address.text).toString();
+      if (!mounted) return;
+      await withSecondFactor(
+        context,
+        (code) => s.accounts.recover(
+          address: address,
+          email: _email.text.trim(),
+          recoveryKey: _key.text,
+          newPassword: _password.text,
+          deviceName: _deviceName.text.trim(),
+          totpCode: code,
+        ),
       );
       s.engine.sync();
       if (s.vault.status == VaultStatus.unlocked) navigator.maybePop();

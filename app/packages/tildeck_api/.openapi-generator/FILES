@@ -41,5 +41,7 @@ lib/model/signin_request.dart
 lib/model/signin_result.dart
 lib/model/stored_record.dart
 lib/model/sync_record.dart
+lib/model/totp_code.dart
+lib/model/totp_enrollment.dart
 lib/model/vault_keys.dart
 pubspec.yaml

@@ -61,6 +61,8 @@ part 'model/signin_request.dart';
 part 'model/signin_result.dart';
 part 'model/stored_record.dart';
 part 'model/sync_record.dart';
+part 'model/totp_code.dart';
+part 'model/totp_enrollment.dart';
 part 'model/vault_keys.dart';
 
 

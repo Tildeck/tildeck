@@ -80,6 +80,15 @@ class PushResult {
 /// The sync server's account and sync API (docs/security-model.md), over the
 /// client generated from server/openapi.json. Every request carries the
 /// protocol version; signed-in requests carry the device token.
+/// A secret for an authenticator app, as text and as an otpauth address
+/// (shown as a QR code).
+class TotpSetup {
+  const TotpSetup({required this.secret, required this.uri});
+
+  final String secret;
+  final String uri;
+}
+
 class SyncServer {
   SyncServer(String baseAddress, {http.Client? client})
     : _client = api.ApiClient(basePath: baseAddress)..client = client ?? http.Client();
@@ -178,6 +187,7 @@ class SyncServer {
     required List<int> authKey,
     required String deviceId,
     required String deviceName,
+    String? totpCode,
   }) async {
     final res = await _call(
       () => _account.signin(
@@ -185,6 +195,7 @@ class SyncServer {
           email: email,
           authKey: b64(authKey),
           device: api.DeviceInfo(id: deviceId, name: deviceName),
+          totpCode: totpCode,
         ),
         tildeckProtocol: kProtocolVersion,
       ),
@@ -217,6 +228,29 @@ class SyncServer {
   Future<void> revoke(String token, String deviceId) =>
       _call(() => _account.revokeDevice(deviceId, tildeckProtocol: kProtocolVersion, authorization: _bearer(token)));
 
+  /// A new secret for two-factor sign-in; on only once a code from it is
+  /// confirmed.
+  Future<TotpSetup> startTotp(String token) async {
+    final res = await _call(() => _account.startTotp(tildeckProtocol: kProtocolVersion, authorization: _bearer(token)));
+    return TotpSetup(secret: res.secret, uri: res.uri);
+  }
+
+  Future<void> confirmTotp(String token, String code) => _call(
+    () => _account.confirmTotp(
+      api.TotpCode(code: code),
+      tildeckProtocol: kProtocolVersion,
+      authorization: _bearer(token),
+    ),
+  );
+
+  Future<void> disableTotp(String token, String code) => _call(
+    () => _account.disableTotp(
+      api.TotpCode(code: code),
+      tildeckProtocol: kProtocolVersion,
+      authorization: _bearer(token),
+    ),
+  );
+
   Future<void> resendVerification(String token) =>
       _call(() => _account.resendVerification(tildeckProtocol: kProtocolVersion, authorization: _bearer(token)));
 
@@ -232,12 +266,14 @@ class SyncServer {
     required List<int> authKey,
     required Sealed wrapPw,
     required bool keepOtherDevices,
+    String? totpCode,
   }) => _call(
     () => _account.changePassword(
       api.PasswordChange(
         authKey: b64(currentAuthKey),
         new_: _newPassword(kdf, authKey, wrapPw),
         keepOtherDevices: keepOtherDevices,
+        totpCode: totpCode,
       ),
       tildeckProtocol: kProtocolVersion,
       authorization: _bearer(token),
@@ -246,10 +282,10 @@ class SyncServer {
 
   /// Proves the recovery key; returns the vault id and the vault key
   /// wrapped under the recovery key.
-  Future<(String, Sealed)> startRecovery(String email, List<int> recoveryAuthKey) async {
+  Future<(String, Sealed)> startRecovery(String email, List<int> recoveryAuthKey, {String? totpCode}) async {
     final res = await _call(
       () => _account.startRecovery(
-        api.RecoveryStart(email: email, recoveryAuthKey: b64(recoveryAuthKey)),
+        api.RecoveryStart(email: email, recoveryAuthKey: b64(recoveryAuthKey), totpCode: totpCode),
         tildeckProtocol: kProtocolVersion,
       ),
     );
@@ -266,6 +302,7 @@ class SyncServer {
     required Sealed wrapPw,
     required String deviceId,
     required String deviceName,
+    String? totpCode,
   }) async {
     final res = await _call(
       () => _account.completeRecovery(
@@ -274,6 +311,7 @@ class SyncServer {
           recoveryAuthKey: b64(recoveryAuthKey),
           new_: _newPassword(kdf, authKey, wrapPw),
           device: api.DeviceInfo(id: deviceId, name: deviceName),
+          totpCode: totpCode,
         ),
         tildeckProtocol: kProtocolVersion,
       ),

@@ -29,6 +29,9 @@ enum ErrorCode {
   invalidToken._(r'invalid_token'),
   tokenExpired._(r'token_expired'),
   recoveryFailed._(r'recovery_failed'),
+  totpRequired._(r'totp_required'),
+  totpNotEnabled._(r'totp_not_enabled'),
+  totpAlreadyEnabled._(r'totp_already_enabled'),
   rateLimited._(r'rate_limited'),
   invalidRequest._(r'invalid_request'),
   emailUnavailable._(r'email_unavailable'),
@@ -115,6 +118,9 @@ class ErrorCodeTypeTransformer {
         case r'invalid_token': return ErrorCode.invalidToken;
         case r'token_expired': return ErrorCode.tokenExpired;
         case r'recovery_failed': return ErrorCode.recoveryFailed;
+        case r'totp_required': return ErrorCode.totpRequired;
+        case r'totp_not_enabled': return ErrorCode.totpNotEnabled;
+        case r'totp_already_enabled': return ErrorCode.totpAlreadyEnabled;
         case r'rate_limited': return ErrorCode.rateLimited;
         case r'invalid_request': return ErrorCode.invalidRequest;
         case r'email_unavailable': return ErrorCode.emailUnavailable;

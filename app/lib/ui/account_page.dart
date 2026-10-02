@@ -15,6 +15,7 @@ import '../vault/password_rules.dart';
 import '../vault/vault.dart';
 import '../vault/vault_crypto.dart' show UnsafeKdf;
 import 'desktop_sidebar.dart' show isDesktopLayout;
+import 'two_factor.dart';
 
 /// Everything the sync screens need.
 class SyncServices {
@@ -38,6 +39,7 @@ String accountErrorText(AppLocalizations t, Object error) => switch (error) {
   WrongMasterPassword() => t.errorWrongMasterPassword,
   InvalidRecoveryKey() => t.errorInvalidRecoveryKey,
   DifferentVault() => t.errorDifferentVault,
+  TotpRequired() => t.errorTotpRequired,
   UnsafeKdf() => t.errorUnsafeKdf,
   ServerFailed(:final problem) => switch (problem) {
     ServerProblem.invalidAddress => t.errorInvalidAddress,
@@ -51,6 +53,7 @@ String accountErrorText(AppLocalizations t, Object error) => switch (error) {
   SyncFailure(:final code) => switch (code) {
     'invalid_credentials' => t.errorInvalidCredentials,
     'recovery_failed' => t.errorRecoveryFailed,
+    'invalid_totp' => t.errorInvalidTotp,
     'email_taken' => t.errorEmailTaken,
     'registration_closed' => t.errorRegistrationClosed,
     'registration_invite_required' => t.errorRegistrationInvite,
@@ -228,11 +231,16 @@ class _AccountFormState extends State<AccountForm> {
         onRegistered?.call(key);
         s.engine.sync();
       } else {
-        final pending = await s.accounts.signIn(
-          address: address,
-          email: email,
-          password: password,
-          deviceName: deviceName,
+        if (!mounted) return;
+        final pending = await withSecondFactor(
+          context,
+          (code) => s.accounts.signIn(
+            address: address,
+            email: email,
+            password: password,
+            deviceName: deviceName,
+            totpCode: code,
+          ),
         );
         if (mounted) _password.clear();
         if (pending != null) {
@@ -615,11 +623,16 @@ class _SignedInViewState extends State<_SignedInView> {
     final typed = await showDialog<String>(context: context, builder: (_) => const _PasswordDialog());
     if (typed == null || typed.isEmpty) return;
     try {
-      final pending = await s.accounts.signIn(
-        address: account.server,
-        email: account.email,
-        password: typed,
-        deviceName: account.deviceName,
+      if (!mounted) return;
+      final pending = await withSecondFactor(
+        context,
+        (code) => s.accounts.signIn(
+          address: account.server,
+          email: account.email,
+          password: typed,
+          deviceName: account.deviceName,
+          totpCode: code,
+        ),
       );
       if (pending != null) {
         widget.onPending(pending);

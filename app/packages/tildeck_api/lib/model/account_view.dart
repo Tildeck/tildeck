@@ -17,6 +17,7 @@ class AccountView {
     required this.email,
     required this.emailVerified,
     required this.locale,
+    required this.totpEnabled,
   });
 
   List<DeviceView> devices;
@@ -27,12 +28,15 @@ class AccountView {
 
   String locale;
 
+  bool totpEnabled;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is AccountView &&
     _deepEquality.equals(other.devices, devices) &&
     other.email == email &&
     other.emailVerified == emailVerified &&
-    other.locale == locale;
+    other.locale == locale &&
+    other.totpEnabled == totpEnabled;
 
   @override
   int get hashCode =>
@@ -40,10 +44,11 @@ class AccountView {
     (devices.hashCode) +
     (email.hashCode) +
     (emailVerified.hashCode) +
-    (locale.hashCode);
+    (locale.hashCode) +
+    (totpEnabled.hashCode);
 
   @override
-  String toString() => 'AccountView[devices=$devices, email=$email, emailVerified=$emailVerified, locale=$locale]';
+  String toString() => 'AccountView[devices=$devices, email=$email, emailVerified=$emailVerified, locale=$locale, totpEnabled=$totpEnabled]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -51,6 +56,7 @@ class AccountView {
       json[r'email'] = this.email;
       json[r'email_verified'] = this.emailVerified;
       json[r'locale'] = this.locale;
+      json[r'totp_enabled'] = this.totpEnabled;
     return json;
   }
 
@@ -73,6 +79,8 @@ class AccountView {
         assert(json[r'email_verified'] != null, 'Required key "AccountView[email_verified]" has a null value in JSON.');
         assert(json.containsKey(r'locale'), 'Required key "AccountView[locale]" is missing from JSON.');
         assert(json[r'locale'] != null, 'Required key "AccountView[locale]" has a null value in JSON.');
+        assert(json.containsKey(r'totp_enabled'), 'Required key "AccountView[totp_enabled]" is missing from JSON.');
+        assert(json[r'totp_enabled'] != null, 'Required key "AccountView[totp_enabled]" has a null value in JSON.');
         return true;
       }());
 
@@ -81,6 +89,7 @@ class AccountView {
         email: mapValueOfType<String>(json, r'email')!,
         emailVerified: mapValueOfType<bool>(json, r'email_verified')!,
         locale: mapValueOfType<String>(json, r'locale')!,
+        totpEnabled: mapValueOfType<bool>(json, r'totp_enabled')!,
       );
     }
     return null;
@@ -132,6 +141,7 @@ class AccountView {
     'email',
     'email_verified',
     'locale',
+    'totp_enabled',
   };
 }
 

@@ -44,12 +44,17 @@
           "locale": {
             "title": "Locale",
             "type": "string"
+          },
+          "totp_enabled": {
+            "title": "Totp Enabled",
+            "type": "boolean"
           }
         },
         "required": [
           "email",
           "email_verified",
           "locale",
+          "totp_enabled",
           "devices"
         ],
         "title": "AccountView",
@@ -209,6 +214,9 @@
           "invalid_token",
           "token_expired",
           "recovery_failed",
+          "totp_required",
+          "totp_not_enabled",
+          "totp_already_enabled",
           "rate_limited",
           "invalid_request",
           "email_unavailable",
@@ -305,6 +313,18 @@
           },
           "new": {
             "$ref": "#/components/schemas/NewPassword"
+          },
+          "totp_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totp Code"
           }
         },
         "required": [
@@ -466,6 +486,18 @@
           "recovery_auth_key": {
             "title": "Recovery Auth Key",
             "type": "string"
+          },
+          "totp_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totp Code"
           }
         },
         "required": [
@@ -487,6 +519,18 @@
           "recovery_auth_key": {
             "title": "Recovery Auth Key",
             "type": "string"
+          },
+          "totp_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totp Code"
           }
         },
         "required": [
@@ -657,6 +701,19 @@
             "maxLength": 320,
             "title": "Email",
             "type": "string"
+          },
+          "totp_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Needed when two-factor sign-in is on",
+            "title": "Totp Code"
           }
         },
         "required": [
@@ -828,6 +885,44 @@
           "deleted"
         ],
         "title": "SyncRecord",
+        "type": "object"
+      },
+      "TotpCode": {
+        "properties": {
+          "code": {
+            "maxLength": 20,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "TotpCode",
+        "type": "object"
+      },
+      "TotpEnrollment": {
+        "description": "A new secret for an authenticator app: as text, as an otpauth\naddress, and as a QR code image.",
+        "properties": {
+          "qr_image": {
+            "title": "Qr Image",
+            "type": "string"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "uri",
+          "qr_image"
+        ],
+        "title": "TotpEnrollment",
         "type": "object"
       },
       "VaultKeys": {
@@ -1440,6 +1535,290 @@
           }
         },
         "summary": "Signin",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/totp/confirm": {
+      "post": {
+        "description": "Turns two-factor sign-in on with a code from the new secret.",
+        "operationId": "confirmTotp",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not signed in or a wrong code"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No secret is being set up"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Confirm Totp",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/totp/disable": {
+      "post": {
+        "description": "Turns two-factor sign-in off; a current code proves the authenticator.",
+        "operationId": "disableTotp",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not signed in or a wrong code"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Two-factor sign-in is off"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Disable Totp",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/totp/start": {
+      "post": {
+        "description": "A new secret for two-factor sign-in. Nothing changes until a code\nfrom it is confirmed.",
+        "operationId": "startTotp",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Tildeck-Protocol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tildeck-Protocol"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpEnrollment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Two-factor sign-in is already on"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request"
+          }
+        },
+        "summary": "Start Totp",
         "tags": [
           "account"
         ]

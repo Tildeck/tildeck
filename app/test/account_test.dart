@@ -219,6 +219,46 @@ void main() {
     expect(b.vault.account, isNull);
   });
 
+  test('with two-factor sign-in on, signing in, a password change, and recovery need the code', () async {
+    final (a, rk) = await registered();
+    await a.accounts.startTwoFactor();
+    await expectLater(a.accounts.confirmTwoFactor('000000'), throwsA(isA<SyncFailure>()));
+    await a.accounts.confirmTwoFactor('123 456');
+    expect(await a.accounts.twoFactorEnabled(), isTrue);
+
+    final b = await Device('b').load();
+    Future<PendingDevice?> signIn([String? code]) =>
+        b.accounts.signIn(address: address, email: email, password: password, deviceName: 'Phone', totpCode: code);
+    await expectLater(signIn(), throwsA(isA<TotpRequired>()));
+    await expectLater(signIn('999999'), throwsA(isA<WrongMasterPassword>()));
+    expect(await signIn('123456'), isNotNull, reason: 'pending approval, past both factors');
+
+    await expectLater(
+      a.accounts.changePassword(current: password, newPassword: newPassword),
+      throwsA(isA<TotpRequired>()),
+    );
+    expect(await a.opensWith(password), isTrue, reason: 'nothing changed');
+    await a.accounts.changePassword(current: password, newPassword: newPassword, totpCode: '123456');
+    expect(server.passwordChanges, 1);
+
+    final c = await Device('c').load();
+    Future<void> recover([String? code]) => c.accounts.recover(
+      address: address,
+      email: email,
+      recoveryKey: rk,
+      newPassword: password,
+      deviceName: 'Laptop',
+      totpCode: code,
+    );
+    await expectLater(recover(), throwsA(isA<TotpRequired>()));
+    expect(c.vault.status, VaultStatus.missing);
+    await recover('123456');
+    expect(c.vault.status, VaultStatus.unlocked);
+
+    await c.accounts.disableTwoFactor('123456');
+    expect(await c.accounts.twoFactorEnabled(), isFalse);
+  });
+
   test('a device holding another vault is refused before anything changes on the server', () async {
     final (_, rk) = await registered();
     final other = await Device('other').load();

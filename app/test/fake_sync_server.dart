@@ -34,6 +34,18 @@ class FakeSyncServer {
   /// a server asking for weak ones.
   Map<String, dynamic>? preloginKdf;
 
+  /// Two-factor sign-in: when on, requests that prove a key need [totpCode]
+  /// too (the one code the fake accepts, every time).
+  bool totpEnabled = false;
+  String totpCode = '123456';
+
+  http.Response? _secondFactor(Map<String, dynamic> body, String wrong) {
+    if (!totpEnabled) return null;
+    final code = body['totp_code'];
+    if (code == null) return _error(401, 'totp_required');
+    return code == totpCode ? null : _error(401, wrong);
+  }
+
   /// The one account, once registered: its request body.
   Map<String, dynamic>? account;
   bool emailVerified = true;
@@ -66,9 +78,13 @@ class FakeSyncServer {
         return _claim(body);
       case ('POST', '/api/account/recovery/start'):
         if (!_recoveryOk(body)) return _error(401, 'recovery_failed');
+        final refused = _secondFactor(body, 'recovery_failed');
+        if (refused != null) return refused;
         return _json({'vault_id': account!['vault_id'], 'wrap_rk': account!['wrap_rk']});
       case ('POST', '/api/account/recovery/complete'):
         if (!_recoveryOk(body)) return _error(401, 'recovery_failed');
+        final refused = _secondFactor(body, 'recovery_failed');
+        if (refused != null) return refused;
         _setPassword(body['new'] as Map<String, dynamic>);
         _revokeOthers(null);
         final device = body['device'] as Map<String, dynamic>;
@@ -84,6 +100,7 @@ class FakeSyncServer {
         'email': account?['email'] ?? 'user@example.test',
         'email_verified': emailVerified,
         'locale': 'en',
+        'totp_enabled': totpEnabled,
         'devices': [
           for (final d in devices.values)
             {
@@ -99,9 +116,24 @@ class FakeSyncServer {
     }
     if (request.method == 'POST' && path == '/api/account/password') {
       if (body['auth_key'] != account!['auth_key']) return _error(401, 'invalid_credentials');
+      final refused = _secondFactor(body, 'invalid_credentials');
+      if (refused != null) return refused;
       _setPassword(body['new'] as Map<String, dynamic>);
       if (body['keep_other_devices'] != true) _revokeOthers(caller);
       passwordChanges++;
+      return http.Response('', 204);
+    }
+    if (request.method == 'POST' && path == '/api/account/totp/start') {
+      if (totpEnabled) return _error(409, 'totp_already_enabled');
+      return _json({
+        'secret': 'JBSWY3DPEHPK3PXP',
+        'uri': 'otpauth://totp/Tildeck:user%40example.test?secret=JBSWY3DPEHPK3PXP&issuer=Tildeck',
+        'qr_image': 'data:image/svg+xml;base64,',
+      });
+    }
+    if (request.method == 'POST' && (path == '/api/account/totp/confirm' || path == '/api/account/totp/disable')) {
+      if (body['code'] != totpCode) return _error(401, 'invalid_totp');
+      totpEnabled = path.endsWith('confirm');
       return http.Response('', 204);
     }
     final action = RegExp(r'^/api/devices/([^/]+)/(approve|revoke)$').firstMatch(path);
@@ -172,6 +204,8 @@ class FakeSyncServer {
     if (account == null || body['email'] != account!['email'] || body['auth_key'] != account!['auth_key']) {
       return _error(401, 'invalid_credentials');
     }
+    final refused = _secondFactor(body, 'invalid_credentials');
+    if (refused != null) return refused;
     final info = body['device'] as Map<String, dynamic>;
     final known = devices[info['id']];
     if (known != null && known['status'] == 'revoked') return _error(409, 'device_revoked');
