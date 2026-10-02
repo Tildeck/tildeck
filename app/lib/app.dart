@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'l10n/app_localizations.dart';
+import 'platform/biometric.dart';
 import 'platform/window_security.dart';
 import 'server_check.dart';
 import 'settings/device_settings.dart';
@@ -19,6 +20,7 @@ import 'theme.dart';
 import 'ui/account_page.dart';
 import 'ui/sessions_page.dart';
 import 'ui/vault_gate.dart';
+import 'vault/biometric_unlock.dart';
 import 'vault/password_rules.dart';
 import 'vault/vault.dart';
 import 'vault/vault_crypto.dart';
@@ -38,6 +40,7 @@ class TildeckApp extends StatefulWidget {
     this.initialLocale,
     this.initialThemeMode = ThemeMode.system,
     this.settings,
+    this.biometricPlatform,
   });
 
   /// The local vault. Null opens the one in the app support directory.
@@ -64,6 +67,10 @@ class TildeckApp extends StatefulWidget {
   /// starting from [initialLocale] and [initialThemeMode] until loaded; with
   /// a given [vault] (a test) they stay in memory.
   final DeviceSettingsStore? settings;
+
+  /// The system's biometrics. Null uses the device's, except with a given
+  /// [vault] (a test), which then has none.
+  final BiometricPlatform? biometricPlatform;
 
   @override
   State<TildeckApp> createState() => _TildeckAppState();
@@ -93,6 +100,10 @@ class _TildeckAppState extends State<TildeckApp> {
     accounts: AccountService(vault: _vault, engine: _engine),
     checker: _checker,
     commonPasswords: common,
+  );
+  late final BiometricUnlock _biometrics = BiometricUnlock(
+    _vault,
+    widget.biometricPlatform ?? (widget.vault == null ? BiometricPlatform.device : null),
   );
   late final VaultKnownHosts _knownHosts = VaultKnownHosts(_vault);
   late final SshConnector _connector = widget.connector ?? SshConnector(knownHosts: _knownHosts);
@@ -159,6 +170,7 @@ class _TildeckAppState extends State<TildeckApp> {
             commonPasswords: common,
             sync: _sync(common),
             settings: _settings,
+            biometrics: _biometrics,
             unlocked: (context) {
               final current = Localizations.localeOf(context);
               final dark = Theme.of(context).brightness == Brightness.dark;
@@ -168,6 +180,7 @@ class _TildeckAppState extends State<TildeckApp> {
                 sync: _sync(common),
                 showKeyBar: widget.showKeyBar ?? Platform.isAndroid,
                 settings: _settings,
+                biometrics: _biometrics,
                 onToggleLocale: () => _settings.update(
                   _settings.value.copyWith(
                     locale: () => current.languageCode == 'he' ? const Locale('en') : const Locale('he'),

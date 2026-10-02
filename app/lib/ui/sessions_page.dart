@@ -13,6 +13,7 @@ import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
+import '../vault/biometric_unlock.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
@@ -40,12 +41,14 @@ class SessionsPage extends StatefulWidget {
     required this.onToggleLocale,
     required this.onToggleTheme,
     required this.settings,
+    this.biometrics,
   });
 
   final Vault vault;
   final SshConnector connector;
   final SyncServices sync;
   final DeviceSettingsStore settings;
+  final BiometricUnlock? biometrics;
   final bool showKeyBar;
   final VoidCallback onToggleLocale;
   final VoidCallback onToggleTheme;
@@ -115,7 +118,12 @@ class _SessionsPageState extends State<SessionsPage> {
         if (target != null) _open(target);
       },
     ),
-    DeskSection.settings => SettingsPage(vault: widget.vault, settings: widget.settings, sync: widget.sync),
+    DeskSection.settings => SettingsPage(
+      vault: widget.vault,
+      settings: widget.settings,
+      sync: widget.sync,
+      biometrics: widget.biometrics,
+    ),
   };
 
   Widget _hostsPage({required bool desktop}) => HostsPage(
@@ -544,7 +552,12 @@ class _SessionsPageState extends State<SessionsPage> {
                 case 'settings':
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => SettingsPage(vault: widget.vault, settings: widget.settings, sync: widget.sync),
+                      builder: (_) => SettingsPage(
+                        vault: widget.vault,
+                        settings: widget.settings,
+                        sync: widget.sync,
+                        biometrics: widget.biometrics,
+                      ),
                     ),
                   );
                 case 'language':

@@ -128,6 +128,11 @@ class Vault extends ChangeNotifier {
   Sealed? _sealedAccount;
   SyncAccount? _account;
 
+  /// Biometric unlock on this device: `wrap_bio`, and on Android `BK` as
+  /// the Keystore encrypted it (its GCM nonce and ciphertext). Never synced.
+  Sealed? _wrapBio;
+  Sealed? _protectedBio;
+
   SecureKey? _vaultKey;
   final _entries = <String, VaultEntry>{};
 
@@ -154,6 +159,10 @@ class Vault extends ChangeNotifier {
       _cursor = j['cursor'] as int? ?? 0;
       final account = j['account'] as Map<String, dynamic>?;
       _sealedAccount = account == null ? null : Sealed.fromJson(account);
+      final bio = j['biometric'] as Map<String, dynamic>?;
+      _wrapBio = bio == null ? null : Sealed.fromJson(bio['wrap_bio'] as Map<String, dynamic>);
+      final protected = bio?['protected_key'] as Map<String, dynamic>?;
+      _protectedBio = protected == null ? null : Sealed.fromJson(protected);
       _records
         ..clear()
         ..addEntries(
@@ -294,6 +303,9 @@ class Vault extends ChangeNotifier {
     }
     _kdf = kdf;
     _wrapPw = wrapPw;
+    // The recovery key was used: biometric unlock is turned on again with
+    // the new master password.
+    _wrapBio = _protectedBio = null;
     _openWith(vaultKey);
     _setAccount(account);
     await _save();
@@ -311,8 +323,50 @@ class Vault extends ChangeNotifier {
     _requireUnlocked();
     _kdf = kdf;
     _wrapPw = wrapPw;
+    // A new master password: biometric unlock is turned on again with it.
+    _wrapBio = _protectedBio = null;
     notifyListeners();
     await _save();
+  }
+
+  /// Whether this device can unlock the vault with biometrics.
+  bool get biometricEnabled => _wrapBio != null;
+
+  /// On Android, `BK` as the Keystore encrypted it; null elsewhere.
+  Sealed? get biometricProtectedKey => _protectedBio;
+
+  /// Stores `wrap_bio` under [bk], and on Android the Keystore's [protectedKey].
+  Future<void> enableBiometric(SecureKey bk, {Sealed? protectedKey}) async {
+    final vaultKey = _requireUnlocked();
+    _wrapBio = crypto.wrapVaultKeyForBiometric(bk, vaultKey, _vaultId!);
+    _protectedBio = protectedKey;
+    notifyListeners();
+    await _save();
+  }
+
+  /// Forgets biometric unlock on this device, locked or not.
+  Future<void> disableBiometric() async {
+    if (_wrapBio == null) return;
+    _wrapBio = _protectedBio = null;
+    notifyListeners();
+    await _save();
+  }
+
+  /// False when [bk] does not open `wrap_bio`: the master password is
+  /// needed then.
+  Future<bool> unlockWithBiometric(SecureKey bk) async {
+    assert(status == VaultStatus.locked);
+    final wrapped = _wrapBio;
+    if (wrapped == null) return false;
+    final crypto = _crypto ??= await _cryptoFuture;
+    final SecureKey vaultKey;
+    try {
+      vaultKey = crypto.unwrapVaultKeyForBiometric(bk, wrapped, _vaultId!);
+    } on DecryptionFailed {
+      return false;
+    }
+    _openWith(vaultKey);
+    return true;
   }
 
   /// Forgets the vault key and every decrypted entry.
@@ -634,6 +688,7 @@ class Vault extends ChangeNotifier {
       'wrap_pw': _wrapPw!.toJson(),
       'cursor': _cursor,
       if (_sealedAccount != null) 'account': _sealedAccount!.toJson(),
+      if (_wrapBio != null) 'biometric': {'wrap_bio': _wrapBio!.toJson(), 'protected_key': ?_protectedBio?.toJson()},
       'records': [for (final r in _records.values) r.toJson()],
     });
     // A failed write (a full disk, a permission problem) fails this save for

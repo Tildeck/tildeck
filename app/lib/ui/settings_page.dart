@@ -7,9 +7,11 @@ import '../l10n/app_localizations.dart';
 import '../settings/device_settings.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
+import '../vault/biometric_unlock.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
+import 'biometric_settings.dart';
 import 'desktop_sidebar.dart';
 import 'password_pages.dart';
 import 'two_factor.dart';
@@ -31,12 +33,16 @@ class SettingsPage extends StatefulWidget {
     required this.sync,
     this.initial = SettingsCategory.general,
     this.mobileOptions,
+    this.biometrics,
   });
 
   final Vault vault;
   final DeviceSettingsStore settings;
   final SyncServices sync;
   final SettingsCategory initial;
+
+  /// Biometric unlock on this device; null hides it.
+  final BiometricUnlock? biometrics;
 
   /// The options only a phone has: locking in the background and blocking
   /// screenshots. Null shows them on Android only.
@@ -91,7 +97,12 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsCategory.security => _SettingsForm(
       title: _title(AppLocalizations.of(context), c),
       draft: _draft,
-      content: () => _SecuritySettings(draft: _draft, mobileOptions: _mobileOptions, sync: widget.sync),
+      content: () => _SecuritySettings(
+        draft: _draft,
+        mobileOptions: _mobileOptions,
+        sync: widget.sync,
+        biometrics: widget.biometrics,
+      ),
     ),
     SettingsCategory.password => ChangePasswordPage(services: widget.sync),
     SettingsCategory.account => AccountPage(services: widget.sync),
@@ -487,11 +498,12 @@ class _TerminalSettings extends StatelessWidget {
 }
 
 class _SecuritySettings extends StatelessWidget {
-  const _SecuritySettings({required this.draft, required this.mobileOptions, required this.sync});
+  const _SecuritySettings({required this.draft, required this.mobileOptions, required this.sync, this.biometrics});
 
   final SettingsDraft draft;
   final bool mobileOptions;
   final SyncServices sync;
+  final BiometricUnlock? biometrics;
 
   @override
   Widget build(BuildContext context) {
@@ -502,6 +514,10 @@ class _SecuritySettings extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (biometrics != null) ...[
+          const SizedBox(height: 12),
+          BiometricSettings(key: const ValueKey('biometric'), biometrics: biometrics!),
+        ],
         _Label(t.autoLockLabel, t.autoLockHelp),
         Wrap(
           spacing: 8,
