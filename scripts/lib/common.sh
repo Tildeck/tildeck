@@ -67,15 +67,18 @@ version() {
 # FLUTTER_DOCKER_ARGS, an array, adds docker run options (a network, test
 # environment variables) for one call.
 FLUTTER_DOCKER_ARGS=()
+# FLUTTER_CACHE names the cache volumes (default tildeck): code that is not
+# trusted builds with caches of its own, so it cannot leave anything behind
+# for the trusted builds.
 flutter_run() {
-  local image src="${FLUTTER_SRC:-$ROOT}"
+  local image src="${FLUTTER_SRC:-$ROOT}" cache="${FLUTTER_CACHE:-tildeck}"
   image="$(toolchain_image flutter)"
   docker run --rm "${FLUTTER_DOCKER_ARGS[@]}" \
     -v "$src:/work" -w /work/app \
-    -v tildeck-pub-cache:/root/.pub-cache \
-    -v tildeck-gradle-cache:/root/.gradle \
-    -v tildeck-android-ndk:/opt/android-sdk-linux/ndk \
-    -v tildeck-android-cmake:/opt/android-sdk-linux/cmake \
+    -v "$cache-pub-cache:/root/.pub-cache" \
+    -v "$cache-gradle-cache:/root/.gradle" \
+    -v "$cache-android-ndk:/opt/android-sdk-linux/ndk" \
+    -v "$cache-android-cmake:/opt/android-sdk-linux/cmake" \
     -e PUB_CACHE=/root/.pub-cache \
     -e TILDECK_KEYSTORE_FILE -e TILDECK_KEYSTORE_PASSWORD -e TILDECK_KEY_ALIAS -e TILDECK_KEY_PASSWORD \
     "$image" bash -c "trap 'chown -R $(id -u):$(id -g) /work/app' EXIT

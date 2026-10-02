@@ -4,6 +4,8 @@
 # put the stack back on your working tree.
 #
 #   scripts/try-pr.sh <PR-number>      preview an open pull request
+#   scripts/try-pr.sh <PR-number> --trust-fork
+#                                      the same for a pull request from a fork
 #   scripts/try-pr.sh --ref <git-ref>  preview any branch or commit the same way
 #   scripts/try-pr.sh status           what the development stack runs now
 #   scripts/try-pr.sh restore          back to your working tree and database
@@ -16,6 +18,11 @@
 #                      snapshotted first (pg_dump), because the change may
 #                      migrate it; restore puts that snapshot back.
 #   app/               a debug APK is built and its path is reported.
+#
+# A preview runs the change's code with the development stack's secrets
+# (.env) and data, so a pull request from a fork is refused unless you read
+# it and pass --trust-fork. Its APK then builds with separate caches. No
+# preview build ever receives the release signing key.
 #
 # Never merges, never pushes, never edits your working tree.
 
@@ -31,7 +38,7 @@ ACTIVE_FILE="$STATE_DIR/active"
 SNAPSHOT_FILE="$STATE_DIR/db-before-preview.dump"
 
 usage() {
-  sed -n '3,21p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,28p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -149,7 +156,10 @@ cmd_preview() {
   fi
   if ((app > 0)); then
     log "Building the debug APK of $label ..."
-    FLUTTER_SRC="$WT_DIR" flutter_run "flutter pub get --enforce-lockfile >/dev/null && flutter build apk --debug"
+    (
+      unset TILDECK_KEYSTORE_FILE TILDECK_KEYSTORE_PASSWORD TILDECK_KEY_ALIAS TILDECK_KEY_PASSWORD
+      FLUTTER_SRC="$WT_DIR" flutter_run "flutter pub get --enforce-lockfile >/dev/null && flutter build apk --debug"
+    )
     cp "$WT_DIR/app/build/app/outputs/flutter-apk/app-debug.apk" "$STATE_DIR/tildeck-preview-debug.apk"
     log "APK: $STATE_DIR/tildeck-preview-debug.apk"
   fi
@@ -177,6 +187,30 @@ case "${1:-}" in
     if ! git remote get-url origin >/dev/null 2>&1; then
       err "This checkout has no origin remote to fetch pull requests from."
       exit 1
+    fi
+    case "${2:-}" in
+      "") trust_fork=0 ;;
+      --trust-fork) trust_fork=1 ;;
+      *)
+        err "Unknown argument: $2"
+        usage 2
+        ;;
+    esac
+    # Whether the change comes from a fork. When it cannot be told, it is
+    # treated as one.
+    fork="$(gh pr view "$1" --json isCrossRepository --jq .isCrossRepository 2>/dev/null || echo unknown)"
+    if [[ "$fork" != false ]]; then
+      if ((trust_fork == 0)); then
+        if [[ "$fork" == true ]]; then
+          err "PR #$1 comes from a fork. Its code would run with your development secrets and data."
+        else
+          err "Cannot tell whether PR #$1 comes from a fork (is gh installed and signed in?)."
+        fi
+        err "Read the change first; to run it anyway: scripts/try-pr.sh $1 --trust-fork"
+        exit 1
+      fi
+      warn "PR #$1 may come from a fork; running it as you asked (--trust-fork), with separate build caches."
+      export FLUTTER_CACHE=tildeck-untrusted
     fi
     # The pull request's head, forks included, into a private ref.
     git fetch --quiet origin "+refs/pull/$1/head:refs/try-pr/$1"
