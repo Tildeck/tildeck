@@ -115,7 +115,11 @@ try {
         'test' {
             # What only Windows can show, such as local terminals over ConPTY.
             Write-Step 'Running the Windows tests ...'
-            Invoke-Flutter @('test', 'integration_test', '-d', 'windows')
+            # One file per run: started together, the second launch of the
+            # app can fail while the first is still closing.
+            foreach ($file in Get-ChildItem (Join-Path $App 'integration_test') -Filter '*_test.dart' | Sort-Object Name) {
+                Invoke-Flutter @('test', "integration_test/$($file.Name)", '-d', 'windows')
+            }
         }
     }
 }

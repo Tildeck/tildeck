@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../local/local_names.dart';
+
 /// A local file chosen for upload.
 class PickedFile {
   const PickedFile(this.name, this.size, this.read);
@@ -49,7 +51,7 @@ class DeviceFiles implements LocalFiles {
 
   @override
   Future<File> downloadTarget(String remoteName) async {
-    final name = _localName(remoteName);
+    final name = localNameFor(remoteName);
     if (Platform.isAndroid) {
       final dir = await getTemporaryDirectory();
       return File('${dir.path}${Platform.pathSeparator}$name');
@@ -63,7 +65,7 @@ class DeviceFiles implements LocalFiles {
 
   @override
   Future<Directory> folderTarget(String remoteName) async {
-    final name = _localName(remoteName);
+    final name = localNameFor(remoteName);
     final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
     final sep = Platform.pathSeparator;
     var candidate = Directory('${dir.path}$sep$name');
@@ -78,10 +80,6 @@ class DeviceFiles implements LocalFiles {
     final path = await FilePicker.getDirectoryPath();
     return path == null ? null : Directory(path);
   }
-
-  /// A Linux file name may hold characters Windows refuses in a name.
-  static String _localName(String remoteName) =>
-      String.fromCharCodes(remoteName.codeUnits.map((c) => c < 32 || r'<>:"/\|?*'.codeUnits.contains(c) ? 0x5f : c));
 
   @override
   Future<String?> keep(File downloaded, String name) async {

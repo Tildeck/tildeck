@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../ssh/file_browser.dart' show RemoteEntry, SortBy;
+import 'local_names.dart';
 import 'local_shell.dart' show localHome;
 
 /// Browses this computer's files, for the local side of the files tab:
@@ -81,7 +82,9 @@ class LocalBrowser extends ChangeNotifier {
 
   /// [name] in the current folder, or "name (2).ext" and so on when it is
   /// taken: a download never replaces a file the user has.
-  String unusedPath(String name) {
+  String unusedPath(String remoteName) {
+    // A server's name, made one safe name here: never a path elsewhere.
+    final name = localNameFor(remoteName);
     final sep = Platform.pathSeparator;
     final dot = name.lastIndexOf('.');
     final stem = dot > 0 ? name.substring(0, dot) : name;
@@ -90,6 +93,7 @@ class LocalBrowser extends ChangeNotifier {
     for (var i = 2; FileSystemEntity.typeSync(candidate) != FileSystemEntityType.notFound; i++) {
       candidate = '$path$sep$stem ($i)$ext';
     }
+    if (!isInside(path!, candidate)) throw ArgumentError.value(remoteName, 'remoteName', 'not a name');
     return candidate;
   }
 

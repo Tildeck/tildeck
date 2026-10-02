@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 
+import '../local/local_names.dart';
 import 'ssh_connector.dart' show ConnectException, ConnectProblem;
 
 /// Why a file operation failed. Each maps to a localized message.
@@ -378,7 +379,24 @@ class FileBrowser extends ChangeNotifier {
         transfer
           ..files = files.length
           ..total = files.fold<int>(0, (sum, f) => sum + f.$3);
-        String local(String relative) => [target.path, ...relative.split('/')].join(Platform.pathSeparator);
+        // Each step of a server path becomes one safe local name, two names
+        // that end up the same get a number, and the result is checked to
+        // stay inside the target: a hostile server must not write elsewhere.
+        final taken = <String, String>{};
+        String local(String relative) {
+          final known = taken[relative];
+          if (known != null) return known;
+          final slash = relative.lastIndexOf('/');
+          final parent = slash < 0 ? target.path : local(relative.substring(0, slash));
+          final name = localNameFor(relative.substring(slash + 1));
+          var candidate = '$parent${Platform.pathSeparator}$name';
+          for (var i = 2; taken.containsValue(candidate); i++) {
+            candidate = '$parent${Platform.pathSeparator}$name ($i)';
+          }
+          if (!isInside(target.path, candidate)) throw const FileProblemException(FileProblem.failed);
+          return taken[relative] = candidate;
+        }
+
         await target.create(recursive: true);
         for (final relative in folders) {
           await Directory(local(relative)).create(recursive: true);
