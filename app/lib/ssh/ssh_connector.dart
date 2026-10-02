@@ -216,8 +216,12 @@ class SshConnector {
     return RegExp(r'pass(word|phrase|code)?').hasMatch(t);
   }
 
-  Future<SSHClient> connect(ConnectionTarget target, {required HostKeyPrompt promptHostKey}) =>
-      _throughJump(target, promptHostKey, (via) => _connect(target, promptHostKey, via), (c) => c.done);
+  /// [onBanner] is told the target's sign-in banner, if it sends one.
+  Future<SSHClient> connect(
+    ConnectionTarget target, {
+    required HostKeyPrompt promptHostKey,
+    void Function(String banner)? onBanner,
+  }) => _throughJump(target, promptHostKey, (via) => _connect(target, promptHostKey, via, onBanner), (c) => c.done);
 
   /// A plain connection to the target's port, through its jump hosts or
   /// proxy like an SSH one: for protocols other than SSH.
@@ -250,10 +254,15 @@ class SshConnector {
     }
   }
 
-  Future<SSHClient> _connect(ConnectionTarget target, HostKeyPrompt promptHostKey, SSHClient? via) async {
+  Future<SSHClient> _connect(
+    ConnectionTarget target,
+    HostKeyPrompt promptHostKey,
+    SSHClient? via,
+    void Function(String banner)? onBanner,
+  ) async {
     final identities = _identities(target);
     final socket = await _socketFor(target, via);
-    return _handshake(target, promptHostKey, identities, socket);
+    return _handshake(target, promptHostKey, identities, socket, onBanner);
   }
 
   Future<SSHSocket> _socketFor(ConnectionTarget target, SSHClient? via) async {
@@ -289,6 +298,7 @@ class SshConnector {
     HostKeyPrompt promptHostKey,
     List<SSHIdentity>? identities,
     SSHSocket socket,
+    void Function(String banner)? onBanner,
   ) async {
     var hostKeyRejected = false;
     var passwordUsed = false;
@@ -296,6 +306,7 @@ class SshConnector {
       socket,
       username: target.username,
       identities: identities,
+      onUserauthBanner: onBanner,
       onPasswordRequest: target.password == null ? null : () => target.password,
       // Keyboard-interactive servers ask for the password this way, and for
       // anything else they want (a one-time code), which the user answers.
@@ -388,4 +399,15 @@ class SshConnector {
       throw const ConnectException(ConnectProblem.keyInvalid);
     }
   }
+}
+
+/// A server's sign-in banner made safe to show in a terminal: its own text
+/// and line breaks only, so it cannot move the cursor, change colors, or
+/// send the terminal commands, as OpenSSH does.
+String bannerText(String banner) {
+  final text = String.fromCharCodes([
+    for (final rune in banner.replaceAll('\r\n', '\n').runes)
+      if (rune == 0x0a || rune == 0x09 || (rune >= 0x20 && rune != 0x7f && (rune < 0x80 || rune > 0x9f))) rune,
+  ]).trimRight();
+  return text.isEmpty ? '' : '${text.replaceAll('\n', '\r\n')}\r\n';
 }

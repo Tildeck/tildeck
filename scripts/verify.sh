@@ -200,12 +200,15 @@ start_test_sshd() {
   # keyword, so these go first), trust certificates signed by the test
   # authority (/tmp/ca, which the account can sign with), and turn off the
   # penalties for failed sign-ins: the tests fail some on purpose, all from
-  # one address, and would lock themselves out. Then reload sshd
-  # (SIGHUP re-execs it with the new configuration) and wait for it to
-  # listen again.
+  # one address, and would lock themselves out. A sign-in banner with a
+  # color escape in it is shown before the shell, without the escape. Then
+  # reload sshd (SIGHUP re-execs it with the new configuration) and wait
+  # for it to listen again.
   docker exec "$SSH_CONTAINER" sh -c '
+    printf "Tildeck test server\033[31m: authorized use only\n" > /tmp/banner &&
     sed -i -e "1i AllowAgentForwarding yes" -e "1i AllowTcpForwarding yes" \
-      -e "1i TrustedUserCAKeys /tmp/ca.pub" -e "1i PerSourcePenalties no" /config/sshd/sshd_config &&
+      -e "1i TrustedUserCAKeys /tmp/ca.pub" -e "1i PerSourcePenalties no" \
+      -e "1i Banner /tmp/banner" /config/sshd/sshd_config &&
     echo "AcceptEnv TILDECK_*" >> /config/sshd/sshd_config &&
     pkill -HUP -f "sshd.pam -D"' || return 1
   waited=0
