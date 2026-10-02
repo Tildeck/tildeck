@@ -12,13 +12,14 @@ import '../vault/biometric_unlock.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
+import 'backup_page.dart';
 import 'biometric_settings.dart';
 import 'desktop_sidebar.dart';
 import 'password_pages.dart';
 import 'two_factor.dart';
 
 /// The groups of the settings area.
-enum SettingsCategory { general, terminal, security, password, account, shortcuts }
+enum SettingsCategory { general, terminal, security, password, account, backup, shortcuts }
 
 /// Everything that can be set, in one place: on the desktop the groups
 /// beside their content, on a phone a list of groups that open as pages.
@@ -71,6 +72,7 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsCategory.security => t.settingsSecurity,
     SettingsCategory.password => t.navMasterPassword,
     SettingsCategory.account => t.settingsAccount,
+    SettingsCategory.backup => t.settingsBackup,
     SettingsCategory.shortcuts => t.keyboardShortcuts,
   };
 
@@ -80,6 +82,7 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsCategory.security => Icons.shield_outlined,
     SettingsCategory.password => Icons.password_rounded,
     SettingsCategory.account => Icons.cloud_sync_outlined,
+    SettingsCategory.backup => Icons.save_alt_rounded,
     SettingsCategory.shortcuts => Icons.keyboard_outlined,
   };
 
@@ -107,6 +110,19 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
     SettingsCategory.password => ChangePasswordPage(services: widget.sync),
     SettingsCategory.account => AccountPage(services: widget.sync),
+    SettingsCategory.backup => Scaffold(
+      appBar: AppBar(title: Text(_title(AppLocalizations.of(context), c))),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+            children: [BackupPanel(vault: widget.vault)],
+          ),
+        ),
+      ),
+    ),
     SettingsCategory.shortcuts => Scaffold(
       appBar: AppBar(title: Text(_title(AppLocalizations.of(context), c))),
       body: const Align(

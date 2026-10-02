@@ -496,6 +496,9 @@ class Vault extends ChangeNotifier {
 
   /// Not secret: the server holds the same values.
   String get vaultId => _vaultId!;
+
+  /// Every record as stored, encrypted: for a backup.
+  Iterable<StoredRecord> get storedRecords => _records.values;
   KdfParams get kdf => _kdf!;
   Sealed get wrapPw => _wrapPw!;
 
