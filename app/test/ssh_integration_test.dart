@@ -166,6 +166,22 @@ void main() {
       expect(session.problem, isNull, reason: 'a shell that exits is a normal close');
     });
 
+    test("the host's terminal type reaches the shell as TERM", () async {
+      final session = TerminalSession(
+        ConnectionTarget(host: host!, port: port, username: user, password: password, terminalType: 'vt220'),
+      );
+      addTearDown(session.dispose);
+      session.terminal.resize(100, 30);
+      unawaited(session.start(SshConnector(knownHosts: MemoryKnownHosts()), PromptLog().call));
+      await _until(() => session.state == SessionState.connected);
+      session.terminal.textInput(
+        r'echo "term=$TERM"'
+        '\r',
+      );
+      await _until(() => session.terminal.buffer.getText().contains('term=vt220\n'));
+      session.disconnect();
+    });
+
     test('a connection that drops is told apart from a shell that exits', () async {
       final session = TerminalSession(target(pass: password));
       addTearDown(session.dispose);

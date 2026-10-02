@@ -1,5 +1,5 @@
 import '../ssh/proxy.dart';
-import '../ssh/ssh_connector.dart' show ConnectionProtocol, defaultBaudRate;
+import '../ssh/ssh_connector.dart' show ConnectionProtocol, TerminalCharset, defaultBaudRate;
 
 /// What the vault stores. Each entry is one encrypted record; the record type
 /// is inside the ciphertext, so storage (and later the sync server) cannot
@@ -53,6 +53,8 @@ class HostEntry extends VaultEntry {
     this.protocol = ConnectionProtocol.ssh,
     this.identityId,
     this.notes = '',
+    this.terminalType,
+    this.charset = TerminalCharset.utf8,
   });
 
   static const recordType = 'host';
@@ -102,6 +104,10 @@ class HostEntry extends VaultEntry {
   /// Free text: what the server is for, who to ask, how to reach it.
   final String notes;
 
+  /// The terminal type to announce (TERM); null is the default.
+  final String? terminalType;
+  final TerminalCharset charset;
+
   bool get isTelnet => protocol == ConnectionProtocol.telnet;
   bool get isSerial => protocol == ConnectionProtocol.serial;
 
@@ -130,6 +136,8 @@ class HostEntry extends VaultEntry {
     'protocol': protocol.name,
     'identity_id': identityId,
     'notes': notes,
+    'terminal_type': terminalType,
+    'charset': charset.name,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -151,6 +159,8 @@ class HostEntry extends VaultEntry {
     protocol: ConnectionProtocol.values.byName(d['protocol'] as String? ?? 'ssh'),
     identityId: d['identity_id'] as String?,
     notes: d['notes'] as String? ?? '',
+    terminalType: d['terminal_type'] as String?,
+    charset: TerminalCharset.values.asNameMap()[d['charset']] ?? TerminalCharset.utf8,
   );
 
   String get label {

@@ -987,5 +987,7 @@
   "serialPortsFound": "Ports on this computer",
   "noSerialPorts": "No serial ports found",
   "baudRateLabel": "Baud rate",
-  "baudRateInvalid": "A number such as 9600 or 115200"
+  "baudRateInvalid": "A number such as 9600 or 115200",
+  "terminalTypeLabel": "Terminal type",
+  "charsetLabel": "Character set"
 }

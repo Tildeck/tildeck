@@ -45,6 +45,9 @@ List<HostEntry> jumpChainOf(Vault vault, HostEntry host) {
   }
 }
 
+/// Terminal types offered in the host editor, beside the default.
+const terminalTypes = ['xterm-256color', 'xterm', 'vt220', 'vt100', 'linux'];
+
 /// Hosts that [host] may connect through: any other SSH host whose own
 /// chain does not come back to it.
 List<HostEntry> jumpCandidatesFor(Vault vault, String? hostId) => [
@@ -145,6 +148,8 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
     // Only the hop that connects directly uses it; the connector decides.
     proxy: vault.entry<ProxyEntry>(host.proxyId ?? group?.proxyId)?.config,
     protocol: host.protocol,
+    terminalType: host.terminalType ?? defaultTerminalType,
+    charset: host.charset,
   );
 }
 
@@ -1088,6 +1093,8 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late bool _agentForwarding = widget.host?.agentForwarding ?? false;
   late String? _proxyId = widget.host?.proxyId;
   late String? _identityId = widget.host?.identityId;
+  late String? _terminalType = widget.host?.terminalType;
+  late TerminalCharset _charset = widget.host?.charset ?? TerminalCharset.utf8;
   late ConnectionProtocol _protocol = widget.host?.protocol ?? ConnectionProtocol.ssh;
   bool get _telnet => _protocol == ConnectionProtocol.telnet;
   bool get _serial => _protocol == ConnectionProtocol.serial;
@@ -1126,6 +1133,8 @@ class _HostEditorPageState extends State<HostEditorPage> {
         jumpHostId: _serial ? null : _jumpHostId,
         proxyId: _serial ? null : _proxyId,
         notes: _notes.text.trim(),
+        terminalType: _terminalType,
+        charset: _charset,
       ),
     );
     if (!mounted) return;
@@ -1467,6 +1476,44 @@ class _HostEditorPageState extends State<HostEditorPage> {
                           alignLabelWithHint: true,
                         ),
                       ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        if (!_serial) ...[
+                        Expanded(
+                          child: DropdownButtonFormField<String?>(
+                            key: const ValueKey('terminalType'),
+                            initialValue: _terminalType,
+                            isExpanded: true,
+                            decoration: InputDecoration(labelText: t.terminalTypeLabel),
+                            items: [
+                              DropdownMenuItem(value: null, child: Text(defaultTerminalType)),
+                              for (final type in {
+                                ...terminalTypes,
+                                ?_terminalType,
+                              }.where((x) => x != defaultTerminalType))
+                                DropdownMenuItem(value: type, child: Text(type)),
+                            ],
+                            onChanged: (v) => setState(() => _terminalType = v),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ],
+                        Expanded(
+                          child: DropdownButtonFormField<TerminalCharset>(
+                            key: const ValueKey('charset'),
+                            initialValue: _charset,
+                            isExpanded: true,
+                            decoration: InputDecoration(labelText: t.charsetLabel),
+                            items: const [
+                              DropdownMenuItem(value: TerminalCharset.utf8, child: Text('UTF-8')),
+                              DropdownMenuItem(value: TerminalCharset.latin1, child: Text('ISO-8859-1 (Latin-1)')),
+                            ],
+                            onChanged: (v) => setState(() => _charset = v ?? TerminalCharset.utf8),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 14),
                     if (_ssh)
                       DropdownButtonFormField<String?>(
