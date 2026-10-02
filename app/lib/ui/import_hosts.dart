@@ -5,17 +5,25 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../ssh/local_files.dart';
+import '../ssh/putty_sessions.dart';
 import '../ssh/ssh_config.dart';
 import '../theme.dart';
+import '../vault/host_csv.dart';
 import '../vault/host_import.dart';
 import '../vault/vault.dart';
 
 /// Where an import reads from: this computer's ~/.ssh/config, a file the
 /// user picks, and the key files the configuration names.
 class SshConfigSource {
-  const SshConfigSource({this.files = const DeviceFiles(), this.environment});
+  const SshConfigSource({this.files = const DeviceFiles(), this.environment, this.readPutty = readPuttyRegistry});
 
   final LocalFiles files;
+
+  /// PuTTY's saved sessions as `reg query` prints them; null without PuTTY.
+  final Future<String?> Function() readPutty;
+
+  /// Whether PuTTY's sessions are offered: on Windows.
+  bool get puttyOffered => Platform.isWindows || readPutty != readPuttyRegistry;
 
   /// Null reads the process environment.
   final Map<String, String>? environment;
@@ -59,7 +67,7 @@ class SshConfigSource {
   String get defaultUser => sshDefaultUser(_env);
 }
 
-/// Picks hosts from an SSH configuration and saves them. Returns what was
+/// Picks hosts from an SSH configuration, a CSV, or PuTTY, and saves them. Returns what was
 /// imported, or null when cancelled.
 Future<HostImportResult?> showImportHosts(BuildContext context, Vault vault, {SshConfigSource? source}) =>
     showDialog<HostImportResult>(
@@ -77,26 +85,37 @@ class _ImportHosts extends StatefulWidget {
   State<_ImportHosts> createState() => _ImportHostsState();
 }
 
+enum _From { sshConfig, file, putty }
+
 class _ImportHostsState extends State<_ImportHosts> {
   List<SshConfigHost>? _hosts;
   final _chosen = <String>{};
   bool _loading = true;
   bool _busy = false;
-  bool _fromDefault = true;
+  _From _from = _From.sshConfig;
+  String? _exported;
 
   @override
   void initState() {
     super.initState();
-    widget.source.readDefault().then((text) => _show(text, fromDefault: true));
+    widget.source.readDefault().then((text) => _show(text, from: _From.sshConfig));
   }
 
-  void _show(String? text, {required bool fromDefault}) {
+  void _show(String? text, {required _From from}) {
     if (!mounted) return;
-    final hosts = text == null ? null : parseSshConfig(text);
+    // A picked file is a hosts CSV (Termius's export, a spreadsheet) or an
+    // SSH configuration.
+    final hosts = text == null
+        ? null
+        : switch (from) {
+            _From.putty => parsePuttyRegistry(text),
+            _ when looksLikeHostsCsv(text) => parseHostsCsv(text),
+            _ => parseSshConfig(text),
+          };
     final user = widget.source.defaultUser;
     setState(() {
       _loading = false;
-      _fromDefault = fromDefault;
+      _from = from;
       _hosts = hosts;
       _chosen
         ..clear()
@@ -109,7 +128,21 @@ class _ImportHostsState extends State<_ImportHosts> {
 
   Future<void> _pick() async {
     final text = await widget.source.pick();
-    if (text != null) _show(text, fromDefault: false);
+    if (text != null) _show(text, from: _From.file);
+  }
+
+  Future<void> _putty() async {
+    final text = await widget.source.readPutty();
+    _show(text ?? '', from: _From.putty);
+  }
+
+  /// The saved hosts as CSV, without passwords or keys.
+  Future<void> _export() async {
+    const name = 'tildeck-hosts.csv';
+    final file = await widget.source.files.downloadTarget(name);
+    await file.writeAsString(hostsToCsv(widget.vault.hosts), flush: true);
+    final kept = await widget.source.files.keep(file, name);
+    if (mounted && kept != null) setState(() => _exported = kept);
   }
 
   Future<void> _import() async {
@@ -191,13 +224,32 @@ class _ImportHostsState extends State<_ImportHosts> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(_fromDefault ? t.importFromDefault : t.importFromFile, style: TextStyle(color: c.muted)),
+            Text(switch (_from) {
+              _From.sshConfig => t.importFromDefault,
+              _From.file => t.importFromFile,
+              _From.putty => t.importFromPutty,
+            }, style: TextStyle(color: c.muted)),
             const SizedBox(height: 8),
             body,
+            if (_exported != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                t.hostsExported(_exported!),
+                key: const ValueKey('hostsExported'),
+                style: TextStyle(color: c.muted),
+              ),
+            ],
           ],
         ),
       ),
       actions: [
+        if (widget.source.puttyOffered)
+          TextButton(key: const ValueKey('importPutty'), onPressed: _busy ? null : _putty, child: Text(t.importPutty)),
+        TextButton(
+          key: const ValueKey('exportHostsCsv'),
+          onPressed: _busy || widget.vault.hosts.isEmpty ? null : _export,
+          child: Text(t.exportHostsCsv),
+        ),
         TextButton.icon(
           key: const ValueKey('importPickFile'),
           icon: const Icon(Icons.folder_open_outlined, size: 18),

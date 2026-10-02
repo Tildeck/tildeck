@@ -632,6 +632,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - A vault preference (Settings, Terminal, "Reconnect when the connection drops"), on by default.
 - Tests: against OpenSSH, killing the server's process for the connection is a drop while `exit` is not; the panel counting down and reconnecting, waiting longer after a failed attempt, stopping after five, and not reconnecting after an exit, a refused sign-in, a cancel, or with the preference off.
 
+### Importing from CSV and PuTTY, exporting CSV (2026-10-02)
+
+- Holiday plan, wave 4. The import dialog takes a chosen file as a hosts CSV when its header names a host column (Termius's export, a spreadsheet: name or label, host or Hostname/IP, port, user, group or folder, tags, protocol), and as an SSH configuration otherwise; on Windows it also reads PuTTY's saved sessions (`reg query HKCU\Software\SimonTatham\PuTTY\Sessions /s`: names decoded, "user@host" split, Default Settings and serial lines left out, a key file listed, which PuTTY's .ppk format leaves to the Keys page).
+- The same list, choices, and saving serve every source; a CSV row brings its folder, tags, and Telnet, and the same name twice gets a number. The dialog exports the vault's hosts as CSV (name, host, port, user, folder, tags, protocol), never passwords, keys, or identities.
+- Tests: CSV quoting; other tools' headers, a row without a host, duplicate names; an export read back the same without its password; PuTTY's registry output.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
