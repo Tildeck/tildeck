@@ -650,6 +650,11 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Every folder header has "Open all": each host in the folder and in the folders inside it connects in a tab of its own, one after another (a password is asked for where it is not saved); more than five only after a confirmation.
 - Tests: notes kept, searched, and empty on an old host; a folder opening its own hosts and those of the folder inside it, not the others.
 
+### A server that goes back (2026-10-02)
+
+- From the security review, approved by Shlomi: a server answering a change with "never had it" or an older version made the device re-encrypt its change for that version, so a server could bring back old versions it had kept. Each stored record now knows whether the server has had it (`synced`: accepted from this device or pulled; files from before derive it from `dirty` and the version, and a format 1 file was never synced). For such a record, those answers are not followed: the change waits, `SyncProblem.serverBehind` says the server has older data, and the account page offers "Upload this device's copy" after a confirmation that explains when to do it. A first upload is unchanged.
+- Tests: a restored server is reported and keeps its old version until the user uploads again, then takes the change and another device gets it; a server saying it never had an accepted record is reported. The old test that took a restored server's word now checks the report instead.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
