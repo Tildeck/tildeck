@@ -67,6 +67,7 @@ class TildeckApp extends StatefulWidget {
   /// starting from [initialLocale] and [initialThemeMode] until loaded; with
   /// a given [vault] (a test) they stay in memory.
   final DeviceSettingsStore? settings;
+
   /// The system's biometrics. Null uses the device's, except with a given
   /// [vault] (a test), which then has none.
   final BiometricPlatform? biometricPlatform;
@@ -179,6 +180,7 @@ class _TildeckAppState extends State<TildeckApp> {
                 sync: _sync(common),
                 showKeyBar: widget.showKeyBar ?? Platform.isAndroid,
                 settings: _settings,
+                biometrics: _biometrics,
                 onToggleLocale: () => _settings.update(
                   _settings.value.copyWith(
                     locale: () => current.languageCode == 'he' ? const Locale('en') : const Locale('he'),

@@ -726,5 +726,8 @@
   "biometricPromptSubtitle": "Confirm it is you to open the vault.",
   "biometricPromptCancel": "Use the master password",
   "biometricFailed": "Biometric unlock did not work. Use the master password.",
-  "biometricInvalidated": "Biometric unlock was turned off because this device's biometrics changed. Turn it on again in Settings."
+  "biometricInvalidated": "Biometric unlock was turned off because this device's biometrics changed. Turn it on again in Settings.",
+  "biometricSettingHelp": "Your fingerprint or face (on Windows, Windows Hello) opens the vault on this device. The master password always works too.",
+  "biometricEnableTitle": "Turn on biometric unlock",
+  "biometricEnableBody": "Enter the master password once to turn it on for this device."
 }

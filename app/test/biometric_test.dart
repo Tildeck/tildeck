@@ -2,7 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tildeck/l10n/app_localizations.dart';
+import 'package:tildeck/theme.dart';
+import 'package:tildeck/ui/biometric_settings.dart';
+import 'package:tildeck/ui/vault_gate.dart';
+import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/platform/biometric.dart';
 import 'package:tildeck/vault/biometric_unlock.dart';
 import 'package:tildeck/vault/models.dart';
@@ -167,5 +174,94 @@ void main() {
       platform.release(vault.vaultId, Uint8List(12), Uint8List(32), text),
       throwsA(isA<BiometricException>()),
     );
+  });
+
+  Widget app(Widget home) => MaterialApp(
+    theme: buildTheme(Brightness.light),
+    locale: const Locale('en'),
+    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    home: home,
+  );
+
+  Future<void> waitFor(WidgetTester tester, bool Function() done, String what) async {
+    for (var i = 0; i < 500; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+      await tester.pump(const Duration(milliseconds: 20));
+      if (done()) return;
+    }
+    fail('timed out waiting for $what');
+  }
+
+  testWidgets('the unlock screen asks for the biometric at once, and offers it again after a cancel', (tester) async {
+    final platform = FakeBiometrics(keepsKey: true);
+    final vault = (await tester.runAsync(() async {
+      final v = await open();
+      await v.create(password);
+      await BiometricUnlock(v, platform).enable(password, text);
+      v.lock();
+      return v;
+    }))!;
+    platform.next = BiometricFailure.cancelled;
+    await tester.pumpWidget(
+      app(
+        VaultGate(
+          vault: vault,
+          commonPasswords: CommonPasswords({}),
+          biometrics: BiometricUnlock(vault, platform),
+          unlocked: (_) => const Scaffold(body: Text('open')),
+        ),
+      ),
+    );
+    await waitFor(tester, () => find.byKey(const ValueKey('unlockBiometric')).evaluate().isNotEmpty, 'the button');
+    expect(vault.status, VaultStatus.locked, reason: 'the first prompt was cancelled');
+    await tester.tap(find.byKey(const ValueKey('unlockBiometric')));
+    await waitFor(tester, () => vault.status == VaultStatus.unlocked, 'the unlock');
+  });
+
+  testWidgets('biometric unlock is turned on in the settings with the master password, and off', (tester) async {
+    final platform = FakeBiometrics(keepsKey: false);
+    final vault = (await tester.runAsync(() async {
+      final v = await open();
+      await v.create(password);
+      return v;
+    }))!;
+    await tester.pumpWidget(app(Scaffold(body: BiometricSettings(biometrics: BiometricUnlock(vault, platform)))));
+    await waitFor(tester, () => find.byKey(const ValueKey('biometricSwitch')).evaluate().isNotEmpty, 'the switch');
+
+    await tester.tap(find.byKey(const ValueKey('biometricSwitch')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('biometricPassword')), 'not-the-password-123');
+    await tester.tap(find.byKey(const ValueKey('biometricConfirm')));
+    await waitFor(tester, () => find.byKey(const ValueKey('biometricError')).evaluate().isNotEmpty, 'the refusal');
+    expect(vault.biometricEnabled, isFalse);
+
+    await tester.tap(find.byKey(const ValueKey('biometricSwitch')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('biometricPassword')), password);
+    await tester.tap(find.byKey(const ValueKey('biometricConfirm')));
+    SwitchListTile switchTile() => tester.widget<SwitchListTile>(find.byKey(const ValueKey('biometricSwitch')));
+    await waitFor(tester, () => vault.biometricEnabled && switchTile().onChanged != null, 'on');
+    expect(switchTile().value, isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('biometricSwitch')));
+    await waitFor(tester, () => !vault.biometricEnabled, 'off');
+  });
+
+  testWidgets('without biometrics on the device, the setting is not shown', (tester) async {
+    final platform = FakeBiometrics(keepsKey: true)..enrolled = false;
+    final vault = (await tester.runAsync(() async {
+      final v = await open();
+      await v.create(password);
+      return v;
+    }))!;
+    await tester.pumpWidget(app(Scaffold(body: BiometricSettings(biometrics: BiometricUnlock(vault, platform)))));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('biometricSwitch')), findsNothing);
   });
 }
