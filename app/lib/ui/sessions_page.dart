@@ -83,7 +83,7 @@ class _SessionsPageState extends State<SessionsPage> {
     onConnect: _open,
     // On the desktop, the sidebar has these.
     onOpenForwards: desktop ? null : _openForwards,
-    showNavigation: !desktop,
+    desktop: desktop,
     connectHost: _connectFor,
   );
 

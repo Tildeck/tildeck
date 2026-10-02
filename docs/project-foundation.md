@@ -458,6 +458,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Pages that closed themselves when done (the history after reconnecting, the password change after saving) now close only when they were opened over another page, so they can sit in a section.
 - Tests: every section opens in place from the sidebar, the hosts list drops the buttons the sidebar has, and a narrow window keeps the phone layout. Goldens: the desktop hosts and keys sections in both languages.
 
+### Desktop layout: hosts (2026-10-02)
+
+- In the desktop layout, the hosts fill the window: a header with the title, search, quick connect, and add host in one row, and each group's hosts as cards in as many columns as fit (about 280 pixels each). A click connects, as on a phone; the card's menu or a right-click offers connect, files, edit, and delete; the border answers the pointer.
+- Adding or editing a host, and a group's settings, open in a panel beside the grid instead of a page over it; the card being edited is marked, and the panel closes when saved or with its close button. A host deleted elsewhere closes its panel.
+- With a panel open on a smaller screen, the header's search moves to its own row, and with less room still the buttons keep only their icons.
+- Quick connect opens as a dialog.
+- Tests: a right-click offers the host's menu; editing in the panel beside the grid, saving, and closing; group settings in the same place; quick connect as a dialog. Golden: the panel open, in both languages.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

@@ -9,12 +9,17 @@ import 'proxy_editor.dart';
 /// Settings every host in a group inherits when it leaves them empty: the
 /// username, the key, environment variables, and a startup snippet.
 class GroupEditorPage extends StatefulWidget {
-  const GroupEditorPage({super.key, required this.vault, required this.name});
+  const GroupEditorPage({super.key, required this.vault, required this.name, this.onDone});
 
   final Vault vault;
 
   /// The group's name, as its hosts write it.
   final String name;
+
+  /// In a side panel: called instead of closing a page.
+  final VoidCallback? onDone;
+
+  void _close(BuildContext context) => onDone == null ? Navigator.pop(context) : onDone!();
 
   @override
   State<GroupEditorPage> createState() => _GroupEditorPageState();
@@ -52,13 +57,13 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
         proxyId: _proxyId,
       ),
     );
-    if (mounted) Navigator.pop(context);
+    if (mounted) widget._close(context);
   }
 
   Future<void> _clear() async {
     final existing = _existing;
     if (existing != null) await widget.vault.delete(existing.id);
-    if (mounted) Navigator.pop(context);
+    if (mounted) widget._close(context);
   }
 
   @override
@@ -78,6 +83,16 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
       // isolate around it).
       appBar: AppBar(
         title: Text(t.groupSettingsTitle('${String.fromCharCode(0x2068)}${widget.name}${String.fromCharCode(0x2069)}')),
+        automaticallyImplyLeading: widget.onDone == null,
+        actions: [
+          if (widget.onDone != null)
+            IconButton(
+              key: const ValueKey('closePanel'),
+              tooltip: t.close,
+              icon: const Icon(Icons.close_rounded),
+              onPressed: widget.onDone,
+            ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
