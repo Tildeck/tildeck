@@ -719,5 +719,12 @@
   "totpTurnedOn": "Two-factor sign-in is on",
   "totpTurnedOff": "Two-factor sign-in is off",
   "errorTotpRequired": "This account needs a code from the authenticator app as well.",
-  "errorInvalidTotp": "That code is not right. Use the current one from the authenticator app."
+  "errorInvalidTotp": "That code is not right. Use the current one from the authenticator app.",
+  "unlockBiometric": "Unlock with biometrics",
+  "unlockWindowsHello": "Unlock with Windows Hello",
+  "biometricPromptTitle": "Unlock Tildeck",
+  "biometricPromptSubtitle": "Confirm it is you to open the vault.",
+  "biometricPromptCancel": "Use the master password",
+  "biometricFailed": "Biometric unlock did not work. Use the master password.",
+  "biometricInvalidated": "Biometric unlock was turned off because this device's biometrics changed. Turn it on again in Settings."
 }

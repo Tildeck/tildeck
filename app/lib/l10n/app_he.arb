@@ -424,5 +424,12 @@
   "totpTurnedOn": "האימות הדו-שלבי פעיל",
   "totpTurnedOff": "האימות הדו-שלבי כבוי",
   "errorTotpRequired": "החשבון הזה דורש גם קוד מאפליקציית האימות.",
-  "errorInvalidTotp": "הקוד לא נכון. צריך את הקוד הנוכחי מאפליקציית האימות."
+  "errorInvalidTotp": "הקוד לא נכון. צריך את הקוד הנוכחי מאפליקציית האימות.",
+  "unlockBiometric": "פתיחה ביומטרית",
+  "unlockWindowsHello": "פתיחה עם Windows Hello",
+  "biometricPromptTitle": "פתיחת Tildeck",
+  "biometricPromptSubtitle": "אישור זהות לפתיחת הכספת.",
+  "biometricPromptCancel": "שימוש בסיסמה הראשית",
+  "biometricFailed": "הפתיחה הביומטרית לא הצליחה. אפשר להשתמש בסיסמה הראשית.",
+  "biometricInvalidated": "הפתיחה הביומטרית כובתה כי הנתונים הביומטריים במכשיר השתנו. אפשר להפעיל אותה מחדש בהגדרות."
 }

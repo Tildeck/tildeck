@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -6,9 +7,11 @@ import 'package:flutter/services.dart';
 import '../activity.dart';
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
+import '../platform/biometric.dart';
 import '../settings/device_settings.dart';
 import '../sync/account_service.dart';
 import '../theme.dart';
+import '../vault/biometric_unlock.dart';
 import '../vault/password_rules.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
@@ -27,6 +30,7 @@ class VaultGate extends StatefulWidget {
     this.sync,
     this.autoLock,
     this.settings,
+    this.biometrics,
   });
 
   final Vault vault;
@@ -36,6 +40,9 @@ class VaultGate extends StatefulWidget {
   /// Offers signing in to an existing sync account instead of creating a
   /// vault. Null hides it.
   final SyncServices? sync;
+
+  /// Biometric unlock on this device; null offers only the master password.
+  final BiometricUnlock? biometrics;
 
   /// Locks the vault after this long without a key press, a touch, or
   /// typing into a terminal ([userActivity]). Null takes the time from the
@@ -148,7 +155,7 @@ class _VaultGateState extends State<VaultGate> with WidgetsBindingObserver {
                 commonPasswords: widget.commonPasswords,
                 sync: widget.sync,
               ),
-              _ => UnlockPage(vault: widget.vault, sync: widget.sync),
+              _ => UnlockPage(vault: widget.vault, sync: widget.sync, biometrics: widget.biometrics),
             },
         ],
       ),
@@ -383,9 +390,13 @@ class _SignInPageState extends State<SignInPage> {
 }
 
 class UnlockPage extends StatefulWidget {
-  const UnlockPage({super.key, required this.vault, this.sync});
+  const UnlockPage({super.key, required this.vault, this.sync, this.biometrics});
 
   final Vault vault;
+
+  /// Unlocking with a fingerprint, a face, or Windows Hello, when this
+  /// device has it turned on. Null offers only the master password.
+  final BiometricUnlock? biometrics;
 
   /// Offers recovery with the recovery key. Null hides it.
   final SyncServices? sync;
@@ -398,6 +409,53 @@ class _UnlockPageState extends State<UnlockPage> {
   final _password = TextEditingController();
   bool _busy = false;
   bool _wrong = false;
+  bool _biometric = false;
+  String? _biometricProblem;
+
+  @override
+  void initState() {
+    super.initState();
+    _offerBiometric();
+  }
+
+  /// Shows the biometric button, and asks once at once: the reason the
+  /// user turned it on.
+  Future<void> _offerBiometric() async {
+    final biometrics = widget.biometrics;
+    if (biometrics == null || !await biometrics.offered() || !mounted) return;
+    setState(() => _biometric = true);
+    await _unlockWithBiometrics();
+  }
+
+  Future<void> _unlockWithBiometrics() async {
+    final biometrics = widget.biometrics;
+    if (biometrics == null || _busy) return;
+    final t = AppLocalizations.of(context);
+    setState(() {
+      _busy = true;
+      _biometricProblem = null;
+    });
+    try {
+      final text = BiometricPromptText(
+        title: t.biometricPromptTitle,
+        subtitle: t.biometricPromptSubtitle,
+        cancel: t.biometricPromptCancel,
+      );
+      final ok = await biometrics.unlock(text);
+      if (!ok && mounted && widget.vault.status == VaultStatus.locked && !widget.vault.biometricEnabled) {
+        setState(() => _biometricProblem = t.biometricFailed);
+      }
+    } on BiometricException catch (e) {
+      if (mounted) {
+        setState(() {
+          _biometric = widget.vault.biometricEnabled;
+          _biometricProblem = e.failure == BiometricFailure.invalidated ? t.biometricInvalidated : t.biometricFailed;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -445,6 +503,23 @@ class _UnlockPageState extends State<UnlockPage> {
           onPressed: _busy ? null : _unlock,
           child: Text(_busy ? t.working : t.unlockButton),
         ),
+        if (_biometric) ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            key: const ValueKey('unlockBiometric'),
+            icon: Icon(Platform.isWindows ? Icons.face_rounded : Icons.fingerprint_rounded),
+            label: Text(Platform.isWindows ? t.unlockWindowsHello : t.unlockBiometric),
+            onPressed: _busy ? null : _unlockWithBiometrics,
+          ),
+        ],
+        if (_biometricProblem != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _biometricProblem!,
+            key: const ValueKey('biometricProblem'),
+            style: TextStyle(color: context.colors.danger),
+          ),
+        ],
         if (widget.sync != null) ...[
           const SizedBox(height: 10),
           TextButton(

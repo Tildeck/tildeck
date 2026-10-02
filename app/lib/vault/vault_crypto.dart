@@ -259,6 +259,62 @@ class VaultCrypto {
     }
   }
 
+  // --- Biometric unlock (docs/security-model.md, "Biometric unlock") ---
+
+  static const _biometricContext = 'tdbio001';
+
+  static Uint8List _biometricAd(String vaultId) =>
+      Uint8List.fromList(utf8.encode('tildeck:wrap:biometric:v1|$vaultId'));
+
+  /// What Windows Hello signs for this vault: its signature is the source
+  /// of `BK` there.
+  static Uint8List biometricChallenge(String vaultId) =>
+      Uint8List.fromList(utf8.encode('tildeck:biometric:challenge:v1|$vaultId'));
+
+  /// A new random `BK` (Android: the Keystore protects it).
+  Uint8List newBiometricKey() => sodium.randombytes.buf(32);
+
+  /// `BK` from a Windows Hello signature: a BLAKE2b hash of it, then a
+  /// subkey of that.
+  SecureKey biometricKeyFromSignature(Uint8List signature) {
+    final hash = sodium.crypto.genericHash(message: signature, outLen: 32);
+    final master = SecureKey.fromList(sodium, hash);
+    hash.fillRange(0, hash.length, 0);
+    try {
+      return sodium.crypto.kdf.deriveFromKey(
+        masterKey: master,
+        context: _biometricContext,
+        subkeyId: BigInt.one,
+        subkeyLen: 32,
+      );
+    } finally {
+      master.dispose();
+    }
+  }
+
+  SecureKey biometricKey(Uint8List bytes) => SecureKey.fromList(sodium, bytes);
+
+  /// `wrap_bio`: the vault key sealed under `BK`.
+  Sealed wrapVaultKeyForBiometric(SecureKey bk, SecureKey vaultKey, String vaultId) =>
+      vaultKey.runUnlockedSync((bytes) {
+        final copy = Uint8List.fromList(bytes);
+        try {
+          return _seal(bk, copy, _biometricAd(vaultId));
+        } finally {
+          copy.fillRange(0, copy.length, 0);
+        }
+      });
+
+  /// Throws [DecryptionFailed] when [bk] is not the key of [wrapped].
+  SecureKey unwrapVaultKeyForBiometric(SecureKey bk, Sealed wrapped, String vaultId) {
+    final bytes = _open(bk, wrapped, _biometricAd(vaultId));
+    try {
+      return SecureKey.fromList(sodium, bytes);
+    } finally {
+      bytes.fillRange(0, bytes.length, 0);
+    }
+  }
+
   /// This device's own state (its sync account and device token), sealed
   /// under the vault key in the local vault file. It never syncs.
   Sealed encryptLocal(SecureKey vaultKey, String vaultId, Uint8List plaintext) =>

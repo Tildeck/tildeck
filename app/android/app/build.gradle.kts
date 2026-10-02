@@ -57,3 +57,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // BiometricPrompt with a Keystore CryptoObject: biometric unlock.
+    implementation("androidx.biometric:biometric:1.1.0")
+}
