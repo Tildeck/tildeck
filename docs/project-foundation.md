@@ -655,6 +655,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - From the security review, approved by Shlomi: a server answering a change with "never had it" or an older version made the device re-encrypt its change for that version, so a server could bring back old versions it had kept. Each stored record now knows whether the server has had it (`synced`: accepted from this device or pulled; files from before derive it from `dirty` and the version, and a format 1 file was never synced). For such a record, those answers are not followed: the change waits, `SyncProblem.serverBehind` says the server has older data, and the account page offers "Upload this device's copy" after a confirmation that explains when to do it. A first upload is unchanged.
 - Tests: a restored server is reported and keeps its old version until the user uploads again, then takes the change and another device gets it; a server saying it never had an accepted record is reported. The old test that took a restored server's word now checks the report instead.
 
+### Keyword highlighting (2026-10-02)
+
+- Holiday plan, wave 2 (Termius has it since 7.50). Words in the output stand out on a translucent background: errors in red, warnings in amber, successes in green, matched as whole words in any case, as written (not as patterns). The default lists are in `KeywordRules`; Settings, Terminal turns it off or edits each list (comma-separated), synced as vault preferences.
+- `KeywordHighlighter` scans the lines on the screen and a screen above it shortly after output arrives, marks a line again only when its text changed, and releases the oldest marks past 2000 lines, so long output stays cheap. Search highlights are separate and unchanged.
+- Tests: whole words, case, colors, words with symbols taken as written; the preferences choosing the words or turning it off; new output marked once, a changed line marked again, everything released with the terminal. Goldens: the terminal with the defaults, the settings.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

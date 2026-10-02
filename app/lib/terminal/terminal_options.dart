@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:xterm/xterm.dart';
 
 import '../vault/models.dart';
+import 'keyword_highlighter.dart';
 
 enum BellMode { none, visual, sound }
 
@@ -36,6 +37,7 @@ class TerminalOptions {
     this.scrollback = 10000,
     this.copyOnSelect = false,
     this.autoReconnect = true,
+    this.keywords = const KeywordRules(),
   });
 
   factory TerminalOptions.of(PreferencesEntry prefs) {
@@ -52,6 +54,13 @@ class TerminalOptions {
       scrollback: scrollbackChoices.contains(prefs.scrollback) ? prefs.scrollback! : 10000,
       copyOnSelect: prefs.copyOnSelect ?? false,
       autoReconnect: prefs.autoReconnect ?? true,
+      keywords: prefs.highlight == false
+          ? null
+          : KeywordRules(
+              errors: prefs.highlightErrors ?? KeywordRules.defaultErrors,
+              warnings: prefs.highlightWarnings ?? KeywordRules.defaultWarnings,
+              success: prefs.highlightSuccess ?? KeywordRules.defaultSuccess,
+            ),
     );
   }
 
@@ -64,6 +73,9 @@ class TerminalOptions {
 
   /// A dropped connection reconnects on its own, a few times.
   final bool autoReconnect;
+
+  /// The words that stand out; null marks none.
+  final KeywordRules? keywords;
 
   /// The bundled font behind a system one that is missing.
   List<String> get fontFallback => fontFamily == 'JetBrainsMono' ? const [] : const ['JetBrainsMono'];

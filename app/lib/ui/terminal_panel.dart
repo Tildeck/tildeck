@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../ssh/autocomplete.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
+import '../terminal/keyword_highlighter.dart';
 import '../terminal/terminal_options.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
@@ -82,12 +83,15 @@ class _TerminalPanelState extends State<TerminalPanel> {
     session.terminal.onBell = _bell;
     session.controller.addListener(_selectionChanged);
     session.addListener(_maybeReconnect);
+    final keywords = widget.options.keywords;
+    if (keywords != null) _keywords = KeywordHighlighter(session.terminal, session.controller, keywords)..scan();
     // A session that dropped before this panel was built.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _maybeReconnect();
     });
   }
 
+  KeywordHighlighter? _keywords;
   Timer? _reconnectTimer;
   int _reconnectIn = 0;
 
@@ -159,6 +163,7 @@ class _TerminalPanelState extends State<TerminalPanel> {
   @override
   void dispose() {
     _reconnectTimer?.cancel();
+    _keywords?.dispose();
     session.removeListener(_maybeReconnect);
     _flashTimer?.cancel();
     _copyTimer?.cancel();

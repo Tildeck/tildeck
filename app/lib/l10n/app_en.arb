@@ -967,5 +967,10 @@
   "problemServerBehind": "The server has older data than this device had saved to it. It may have been restored from a backup. Your changes here are kept and wait.",
   "uploadAgain": "Upload this device's copy",
   "uploadAgainTitle": "Upload this device's copy?",
-  "uploadAgainBody": "Do this only if you know the server was restored from a backup. This device's entries go to the server again as the newest. If you do not know why the server went back, ask its administrator first."
+  "uploadAgainBody": "Do this only if you know the server was restored from a backup. This device's entries go to the server again as the newest. If you do not know why the server went back, ask its administrator first.",
+  "highlightLabel": "Highlight keywords",
+  "highlightHelp": "Errors, warnings, and successes stand out in the output. Words are separated by commas.",
+  "highlightErrors": "Errors",
+  "highlightWarnings": "Warnings",
+  "highlightSuccess": "Successes"
 }

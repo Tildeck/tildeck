@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart';
 
 import '../l10n/app_localizations.dart';
 import '../settings/device_settings.dart';
+import '../terminal/keyword_highlighter.dart';
 import '../terminal/terminal_options.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
@@ -236,7 +238,11 @@ class SettingsDraft extends ChangeNotifier {
       a.bell == b.bell &&
       a.scrollback == b.scrollback &&
       a.copyOnSelect == b.copyOnSelect &&
-      a.autoReconnect == b.autoReconnect;
+      a.autoReconnect == b.autoReconnect &&
+      a.highlight == b.highlight &&
+      listEquals(a.highlightErrors, b.highlightErrors) &&
+      listEquals(a.highlightWarnings, b.highlightWarnings) &&
+      listEquals(a.highlightSuccess, b.highlightSuccess);
 
   /// A change stored elsewhere (another device, through sync) shows here,
   /// unless something is being edited.
@@ -586,6 +592,57 @@ class _TerminalSettings extends StatelessWidget {
           title: Text(t.copyOnSelectLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(t.copyOnSelectHelp, style: TextStyle(color: c.muted, fontSize: 13)),
         ),
+        SwitchListTile(
+          key: const ValueKey('highlightSwitch'),
+          contentPadding: EdgeInsets.zero,
+          value: prefs.highlight ?? true,
+          onChanged: (v) => draft.setPrefs(prefs.copyWith(highlight: v)),
+          title: Text(t.highlightLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(t.highlightHelp, style: TextStyle(color: c.muted, fontSize: 13)),
+        ),
+        if (prefs.highlight ?? true)
+          for (final (key, label, color, words, set) in [
+            (
+              'highlightErrors',
+              t.highlightErrors,
+              KeywordRules.errorColor,
+              prefs.highlightErrors ?? KeywordRules.defaultErrors,
+              (List<String> v) => prefs.copyWith(highlightErrors: v),
+            ),
+            (
+              'highlightWarnings',
+              t.highlightWarnings,
+              KeywordRules.warningColor,
+              prefs.highlightWarnings ?? KeywordRules.defaultWarnings,
+              (List<String> v) => prefs.copyWith(highlightWarnings: v),
+            ),
+            (
+              'highlightSuccess',
+              t.highlightSuccess,
+              KeywordRules.successColor,
+              prefs.highlightSuccess ?? KeywordRules.defaultSuccess,
+              (List<String> v) => prefs.copyWith(highlightSuccess: v),
+            ),
+          ])
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextFormField(
+                key: ValueKey(key),
+                initialValue: words.join(', '),
+                textDirection: TextDirection.ltr,
+                decoration: InputDecoration(
+                  labelText: label,
+                  isDense: true,
+                  prefixIcon: Icon(Icons.circle, size: 14, color: color),
+                ),
+                onChanged: (v) => draft.setPrefs(
+                  set([
+                    for (final w in v.split(','))
+                      if (w.trim().isNotEmpty) w.trim(),
+                  ]),
+                ),
+              ),
+            ),
         SwitchListTile(
           key: const ValueKey('autoReconnect'),
           contentPadding: EdgeInsets.zero,
