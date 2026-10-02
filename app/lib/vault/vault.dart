@@ -195,7 +195,9 @@ class Vault extends ChangeNotifier {
 
   /// Creates this device's vault from an existing synced vault, whose key
   /// the caller unwrapped with the master password, and unlocks it. The
-  /// records arrive with the first pull.
+  /// records arrive with the first pull. Only when this device has no vault:
+  /// adopting replaces the vault file, so over an existing vault it would
+  /// destroy that vault's records.
   Future<void> adopt({
     required String vaultId,
     required KdfParams kdf,
@@ -203,7 +205,7 @@ class Vault extends ChangeNotifier {
     required SecureKey vaultKey,
     required SyncAccount account,
   }) async {
-    assert(status == VaultStatus.missing);
+    if (status != VaultStatus.missing) throw StateError('adopt over an existing vault');
     _crypto ??= await _cryptoFuture;
     _vaultId = vaultId;
     _kdf = kdf;
