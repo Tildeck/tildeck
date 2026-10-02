@@ -466,6 +466,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Quick connect opens as a dialog.
 - Tests: a right-click offers the host's menu; editing in the panel beside the grid, saving, and closing; group settings in the same place; quick connect as a dialog. Golden: the panel open, in both languages.
 
+### Desktop layout: the other sections (2026-10-02)
+
+- Every section in the desktop layout has the same header as the hosts: a large title on the page, actions at its end, no shaded bar. It is set once, as a theme around the section, so a page keeps its phone bar on a phone.
+- Keys adds a key from a button in the header instead of a floating one, and asks generate or import in a small dialog instead of a sheet from the bottom; the sidebar has the known hosts, so the header does not repeat them.
+- Sync on the desktop drops its dark phone bar for the section header.
+- Golden: the keys section in both languages.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

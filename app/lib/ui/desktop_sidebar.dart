@@ -11,6 +11,29 @@ const desktopMinWidth = 900.0;
 
 bool isDesktopLayout(BuildContext context) => MediaQuery.sizeOf(context).width >= desktopMinWidth;
 
+/// Every section's bar in the desktop layout looks like one header: a
+/// large title on the page, actions at the end, no shade.
+Widget deskSectionTheme(BuildContext context, Widget child) {
+  final theme = Theme.of(context);
+  final c = context.colors;
+  return Theme(
+    data: theme.copyWith(
+      appBarTheme: theme.appBarTheme.copyWith(
+        backgroundColor: c.page,
+        foregroundColor: c.ink,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        toolbarHeight: 80,
+        titleSpacing: 28,
+        titleTextStyle: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: c.ink),
+        actionsPadding: const EdgeInsetsDirectional.only(end: 20),
+      ),
+    ),
+    child: child,
+  );
+}
+
 /// The sections of the desktop layout's sidebar.
 enum DeskSection { hosts, keys, knownHosts, forwards, snippets, history, appearance, account, password }
 

@@ -13,6 +13,7 @@ import '../sync/sync_server.dart';
 import '../theme.dart';
 import '../vault/password_rules.dart';
 import '../vault/vault.dart';
+import 'desktop_sidebar.dart' show isDesktopLayout;
 
 /// Everything the sync screens need.
 class SyncServices {
@@ -90,11 +91,14 @@ class _AccountPageState extends State<AccountPage> {
     final s = widget.services;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: c.desk,
-        foregroundColor: c.deskInk,
-        title: Text(t.syncTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
-      ),
+      // On the desktop, a section header like the others.
+      appBar: isDesktopLayout(context)
+          ? AppBar(title: Text(t.syncTitle))
+          : AppBar(
+              backgroundColor: c.desk,
+              foregroundColor: c.deskInk,
+              title: Text(t.syncTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
+            ),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: Listenable.merge([s.vault, s.engine]),
