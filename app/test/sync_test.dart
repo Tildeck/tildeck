@@ -337,7 +337,7 @@ void main() {
     expect(b.vault.hosts.single.name, 'v2');
   });
 
-  test('a server restored from a backup still takes the next change', () async {
+  test('a server that went back is reported; the change waits until the user uploads again', () async {
     final a = await firstDevice();
     final id = a.vault.newId();
     for (final name in ['v1', 'v2', 'v3']) {
@@ -351,11 +351,32 @@ void main() {
     a.clock.tick();
     await a.vault.put(host(id, 'after restore'));
     await a.sync();
+    expect(a.engine.problem, SyncProblem.serverBehind);
+    expect(a.vault.dirtyRecords, hasLength(1), reason: 'the change waits');
+    expect(server.records[id]!['version'], 1, reason: 'nothing re-encrypted for the old version');
+
+    // The user knows it was restored from a backup.
+    await a.vault.uploadAgain();
+    await a.sync();
+    expect(a.engine.problem, isNull);
     expect(a.vault.dirtyRecords, isEmpty);
     expect(server.records[id]!['version'], 2);
     final b = await secondDevice(a);
     await b.sync();
     expect(b.vault.hosts.single.name, 'after restore');
+  });
+
+  test('a server that says it never had a record it accepted is reported too', () async {
+    final a = await firstDevice();
+    final id = a.vault.newId();
+    await a.vault.put(host(id, 'Database'));
+    await a.sync();
+    server.records.remove(id);
+    a.clock.tick();
+    await a.vault.put(host(id, 'Database 2'));
+    await a.sync();
+    expect(a.engine.problem, SyncProblem.serverBehind);
+    expect(server.records.containsKey(id), isFalse);
   });
 
   test('pushes stay within the server limits on count and size', () {

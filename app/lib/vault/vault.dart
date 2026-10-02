@@ -12,7 +12,14 @@ enum VaultStatus { loading, missing, locked, unlocked }
 
 /// One record as stored: everything but the ciphertext is visible metadata.
 class StoredRecord {
-  const StoredRecord({required this.id, required this.version, this.deleted = false, this.sealed, this.dirty = false});
+  const StoredRecord({
+    required this.id,
+    required this.version,
+    this.deleted = false,
+    this.sealed,
+    this.dirty = false,
+    this.synced = false,
+  });
 
   final String id;
 
@@ -29,8 +36,20 @@ class StoredRecord {
   /// Changed on this device and not yet accepted by the sync server.
   final bool dirty;
 
-  StoredRecord copyWith({bool? dirty}) =>
-      StoredRecord(id: id, version: version, deleted: deleted, sealed: sealed, dirty: dirty ?? this.dirty);
+  /// The server has had this record: it accepted a version of it, or this
+  /// device pulled it. A server that later says it never had it, or has an
+  /// older version than it accepted, went back (docs/security-model.md,
+  /// "Sync").
+  final bool synced;
+
+  StoredRecord copyWith({bool? dirty, bool? synced}) => StoredRecord(
+    id: id,
+    version: version,
+    deleted: deleted,
+    sealed: sealed,
+    dirty: dirty ?? this.dirty,
+    synced: synced ?? this.synced,
+  );
 
   /// The same stored content: the same version and the same ciphertext.
   bool sameAs(StoredRecord other) =>
@@ -45,6 +64,7 @@ class StoredRecord {
     'deleted': deleted,
     ...?sealed?.toJson(),
     'dirty': dirty,
+    'synced': synced,
   };
 
   static StoredRecord fromJson(Map<String, dynamic> j, {bool dirtyByDefault = false}) => StoredRecord(
@@ -53,6 +73,10 @@ class StoredRecord {
     deleted: j['deleted'] as bool? ?? false,
     sealed: j['ct'] == null ? null : Sealed.fromJson(j),
     dirty: j['dirty'] as bool? ?? dirtyByDefault,
+    // Files from before kept no flag: a record not dirty was accepted or
+    // pulled, and one above version 1 was accepted at the version below.
+    // A format 1 file (dirtyByDefault) was never synced.
+    synced: j['synced'] as bool? ?? (!dirtyByDefault && (!(j['dirty'] as bool? ?? false) || (j['version'] as int) > 1)),
   );
 }
 
@@ -470,7 +494,13 @@ class Vault extends ChangeNotifier {
     );
     final sealed = crypto.encryptRecord(key, _vaultId!, entry.id, version, plain);
     plain.fillRange(0, plain.length, 0);
-    _records[entry.id] = StoredRecord(id: entry.id, version: version, sealed: sealed, dirty: true);
+    _records[entry.id] = StoredRecord(
+      id: entry.id,
+      version: version,
+      sealed: sealed,
+      dirty: true,
+      synced: _records[entry.id]?.synced ?? false,
+    );
     _entries[entry.id] = entry;
     notifyListeners();
     await _save();
@@ -581,11 +611,22 @@ class Vault extends ChangeNotifier {
     _requireUnlocked();
     for (final sent in accepted) {
       final local = _records[sent.id];
-      if (local != null && local.dirty && local.sameAs(sent)) _records[sent.id] = local.copyWith(dirty: false);
+      if (local == null) continue;
+      _records[sent.id] = local.dirty && local.sameAs(sent)
+          ? local.copyWith(dirty: false, synced: true)
+          : local.copyWith(synced: true);
     }
     for (final (id, current) in conflicts) {
       final local = _records[id];
       if (local == null || !local.dirty) continue;
+      final behind = current == null || current.version + 1 < local.version;
+      if (behind && local.synced) {
+        // The server lost what it accepted (a restore from a backup, or a
+        // server serving old records on purpose). Taking its word would let
+        // it bring back old versions: the change waits, and the user is told.
+        serverBehind.add(id);
+        continue;
+      }
       if (current == null) {
         // The server has never had this record: it starts at version 1
         // there, whatever its local history, and is re-encrypted for it.
@@ -598,6 +639,24 @@ class Vault extends ChangeNotifier {
         _merge(current);
       }
     }
+    notifyListeners();
+    await _save();
+  }
+
+  /// Records the server says it lost, after it had accepted them: sync
+  /// reports it, and nothing goes back until the user says so.
+  final serverBehind = <String>{};
+
+  /// The user confirmed that the server was restored from a backup: this
+  /// device's records are offered to it again as new, from the versions it
+  /// has now.
+  Future<void> uploadAgain() async {
+    _requireUnlocked();
+    for (final id in serverBehind) {
+      final local = _records[id];
+      if (local != null) _records[id] = local.copyWith(synced: false);
+    }
+    serverBehind.clear();
     notifyListeners();
     await _save();
   }
@@ -634,7 +693,7 @@ class Vault extends ChangeNotifier {
       return;
     }
 
-    _records[remote.id] = remote.copyWith(dirty: false);
+    _records[remote.id] = remote.copyWith(dirty: false, synced: true);
     damaged.remove(remote.id);
     if (remoteDoc == null) {
       _entries.remove(remote.id);
@@ -673,7 +732,7 @@ class Vault extends ChangeNotifier {
     final plain = crypto.decryptRecord(key, _vaultId!, local.id, local.version, local.sealed!);
     final sealed = crypto.encryptRecord(key, _vaultId!, local.id, version, plain);
     plain.fillRange(0, plain.length, 0);
-    return StoredRecord(id: local.id, version: version, sealed: sealed, dirty: true);
+    return StoredRecord(id: local.id, version: version, sealed: sealed, dirty: true, synced: local.synced);
   }
 
   /// The deletion of [id] at [version], with its marker: sealed under the
@@ -682,7 +741,14 @@ class Vault extends ChangeNotifier {
   StoredRecord _tombstone(String id, int version) {
     final plain = Uint8List.fromList(utf8.encode(jsonEncode(_deletionMarker)));
     final sealed = crypto.encryptRecord(_requireUnlocked(), _vaultId!, id, version, plain);
-    return StoredRecord(id: id, version: version, deleted: true, sealed: sealed, dirty: true);
+    return StoredRecord(
+      id: id,
+      version: version,
+      deleted: true,
+      sealed: sealed,
+      dirty: true,
+      synced: _records[id]?.synced ?? false,
+    );
   }
 
   static const _deletionMarker = {'deleted': true};

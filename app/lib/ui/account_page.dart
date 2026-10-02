@@ -685,6 +685,7 @@ class _SignedInViewState extends State<_SignedInView> {
       SyncProblem.unreachable => (t.problemUnreachable, c.danger),
       SyncProblem.unsupportedProtocol => (t.errorUnsupportedProtocol, c.danger),
       SyncProblem.failed => (t.errorSyncFailed, c.danger),
+      SyncProblem.serverBehind => (t.problemServerBehind, c.danger),
     };
 
     return Column(
@@ -738,6 +739,31 @@ class _SignedInViewState extends State<_SignedInView> {
                     onPressed: engine.running ? null : () => engine.sync().then((_) => _loadDevices()),
                     child: Text(t.syncNow),
                   ),
+                  if (engine.problem == SyncProblem.serverBehind)
+                    OutlinedButton(
+                      key: const ValueKey('uploadAgain'),
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text(t.uploadAgainTitle),
+                            content: SizedBox(width: 420, child: Text(t.uploadAgainBody)),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
+                              FilledButton(
+                                key: const ValueKey('uploadAgainConfirm'),
+                                onPressed: () => Navigator.pop(context, true),
+                                child: Text(t.uploadAgain),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (ok != true) return;
+                        await s.vault.uploadAgain();
+                        await engine.sync();
+                      },
+                      child: Text(t.uploadAgain),
+                    ),
                   if (engine.problem == SyncProblem.signedOut)
                     OutlinedButton(
                       key: const ValueKey('signInAgain'),

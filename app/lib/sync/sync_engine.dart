@@ -21,6 +21,10 @@ enum SyncProblem {
 
   /// Anything else the server refused.
   failed,
+
+  /// The server lost records it had accepted: restored from a backup, or
+  /// not to be trusted. This device's changes wait for the user.
+  serverBehind,
 }
 
 /// Keeps the vault in step with the sync server (docs/security-model.md,
@@ -163,15 +167,19 @@ class SyncEngine extends ChangeNotifier {
         await vault.applyPulled(page.records, page.revision);
         more = page.more;
       }
+      vault.serverBehind.clear();
       for (var round = 0; round < _pushRounds; round++) {
-        final dirty = vault.dirtyRecords;
+        final dirty = [
+          for (final r in vault.dirtyRecords)
+            if (!vault.serverBehind.contains(r.id)) r,
+        ];
         if (dirty.isEmpty) break;
         for (final chunk in pushChunks(dirty)) {
           final result = await server.push(account.token, chunk);
           await vault.applyPushed(accepted: result.accepted, conflicts: result.conflicts);
         }
       }
-      problem = null;
+      problem = vault.serverBehind.isEmpty ? null : SyncProblem.serverBehind;
       lastSynced = DateTime.now();
     } on SyncFailure catch (e) {
       problem = switch ((e.status, e.code)) {
