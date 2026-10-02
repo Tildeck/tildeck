@@ -646,5 +646,6 @@
   "searchServers": "Search servers",
   "navVault": "VAULT",
   "navSettings": "SETTINGS",
-  "navMasterPassword": "Master password"
+  "navMasterPassword": "Master password",
+  "close": "Close"
 }

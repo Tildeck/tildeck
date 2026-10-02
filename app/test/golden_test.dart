@@ -573,6 +573,18 @@ void main() {
       expect(find.byKey(const ValueKey('hostsTab')), findsNothing, reason: 'the sidebar takes its place');
       await expectLater(find.byType(TildeckApp), matchesGoldenFile('goldens/desktop_hosts_${locale}_${mode.name}.png'));
 
+      // A host opens for editing in a panel beside the grid.
+      await tester.tap(find.byKey(const ValueKey('hostMenu-h1')));
+      await settle(tester);
+      await tester.tap(find.byKey(const ValueKey('hostEdit')));
+      await settle(tester);
+      await expectLater(
+        find.byType(TildeckApp),
+        matchesGoldenFile('goldens/desktop_host_panel_${locale}_${mode.name}.png'),
+      );
+      await tester.tap(find.byKey(const ValueKey('closePanel')));
+      await settle(tester);
+
       // Another section opens in place, with no page over the sidebar.
       await tester.tap(find.byKey(const ValueKey('nav-keys')));
       await settle(tester);

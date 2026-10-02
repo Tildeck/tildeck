@@ -358,5 +358,6 @@
   "searchServers": "חיפוש שרתים",
   "navVault": "כספת",
   "navSettings": "הגדרות",
-  "navMasterPassword": "סיסמה ראשית"
+  "navMasterPassword": "סיסמה ראשית",
+  "close": "סגירה"
 }

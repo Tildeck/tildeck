@@ -156,7 +156,7 @@ class HostsPage extends StatefulWidget {
     this.onOpenForwards,
     this.localShells,
     this.connectHost,
-    this.showNavigation = true,
+    this.desktop = false,
   });
 
   final Vault vault;
@@ -171,9 +171,9 @@ class HostsPage extends StatefulWidget {
   /// Connects to a saved host outside a session: installing a key on it.
   final HostConnect? connectHost;
 
-  /// The buttons to history, snippets, and keys; the desktop layout's
-  /// sidebar has them instead.
-  final bool showNavigation;
+  /// In the desktop layout: the hosts as a grid, edited in a side panel,
+  /// and no buttons for what the sidebar has.
+  final bool desktop;
 
   @override
   State<HostsPage> createState() => _HostsPageState();
@@ -249,6 +249,39 @@ class _HostsPageState extends State<HostsPage> {
   }
 
   void _quickConnect(BuildContext context) {
+    if (widget.desktop) {
+      showDialog<void>(
+        context: context,
+        // The form scrolls itself: the dialog gives it a size.
+        builder: (dialog) => Dialog(
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(
+            width: 520,
+            height: (MediaQuery.sizeOf(dialog).height * 0.8).clamp(320, 640),
+            child: Scaffold(
+              appBar: AppBar(
+                title: Text(AppLocalizations.of(context).quickConnect),
+                automaticallyImplyLeading: false,
+                actions: [
+                  IconButton(
+                    tooltip: AppLocalizations.of(context).close,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(dialog),
+                  ),
+                ],
+              ),
+              body: ConnectForm(
+                onConnect: (target) {
+                  Navigator.pop(dialog);
+                  onConnect(target);
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => Scaffold(
@@ -264,11 +297,334 @@ class _HostsPageState extends State<HostsPage> {
     );
   }
 
+  /// What the side panel shows in the desktop layout: a host being edited,
+  /// a new one, or a group's settings; null when it is closed.
+  ({HostEntry? host, String? group})? _panel;
+
+  void _closePanel() => setState(() => _panel = null);
+
+  void _editHost(BuildContext context, HostEntry? host) {
+    if (!widget.desktop) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => HostEditorPage(vault: vault, host: host),
+        ),
+      );
+      return;
+    }
+    setState(() => _panel = (host: host, group: null));
+  }
+
+  void _editGroup(BuildContext context, String group) {
+    if (!widget.desktop) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => GroupEditorPage(vault: vault, name: group),
+        ),
+      );
+      return;
+    }
+    setState(() => _panel = (host: null, group: group));
+  }
+
+  /// What a host's menu and its right-click offer.
+  Future<void> _hostAction(BuildContext context, String action, HostEntry host) async {
+    switch (action) {
+      case 'connect':
+        await _connectHost(context, host);
+      case 'edit':
+        _editHost(context, host);
+      case 'files':
+        await _openFiles(context, host);
+      case 'delete':
+        if (_panel?.host?.id == host.id) _closePanel();
+        await _delete(context, host);
+    }
+  }
+
+  List<PopupMenuEntry<String>> _hostMenu(AppLocalizations t, HostEntry host) => [
+    PopupMenuItem(value: 'connect', child: Text(t.connectButton)),
+    if (widget.connectHost != null && !host.isTelnet)
+      PopupMenuItem(key: const ValueKey('hostFiles'), value: 'files', child: Text(t.filesTitle)),
+    PopupMenuItem(key: const ValueKey('hostEdit'), value: 'edit', child: Text(t.editAction)),
+    PopupMenuItem(value: 'delete', child: Text(t.deleteAction)),
+  ];
+
+  /// Hosts on a wide window: a header across the top, the hosts as cards in
+  /// as many columns as fit, and editing in a panel beside them.
+  Widget _desktopBuild(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    final text = Theme.of(context).textTheme;
+    return ListenableBuilder(
+      listenable: vault,
+      builder: (context, _) {
+        final all = vault.hosts;
+        final hosts = [
+          for (final h in all)
+            if (hostMatches(h, _query)) h,
+        ];
+        final groups = <String, List<HostEntry>>{};
+        for (final h in hosts) {
+          groups.putIfAbsent(h.group.trim(), () => []).add(h);
+        }
+        final names = groups.keys.where((g) => g.isNotEmpty).toList()..sort();
+        if (groups.containsKey('')) names.add('');
+        final panel = _panel;
+        // A host deleted elsewhere (another device) closes its panel.
+        final panelHost = panel?.host == null ? null : vault.entry<HostEntry>(panel!.host!.id);
+        final panelOpen = panel != null && (panel.host == null || panelHost != null);
+
+        // Narrow (a side panel open on a small screen): the search goes to
+        // its own row, and with less room still the buttons keep only icons.
+        final header = LayoutBuilder(
+          builder: (context, box) {
+            final width = box.maxWidth - 56;
+            final twoRows = width < 760;
+            final iconsOnly = width < 520;
+            final search = all.isEmpty
+                ? null
+                : TextField(
+                    key: const ValueKey('hostSearch'),
+                    controller: _search,
+                    onChanged: (v) => setState(() => _query = v),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      hintText: t.searchHosts,
+                      isDense: true,
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: t.clearSearch,
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              onPressed: () => setState(() {
+                                _search.clear();
+                                _query = '';
+                              }),
+                            ),
+                    ),
+                  );
+            final actions = [
+              if (_shells.isNotEmpty)
+                PopupMenuButton<LocalShell>(
+                  key: const ValueKey('openLocalTerminal'),
+                  tooltip: t.localTerminal,
+                  icon: const Icon(Icons.terminal_rounded),
+                  onSelected: (shell) => widget.onConnect(ConnectionTarget.local(shell, localShellName(t, shell))),
+                  itemBuilder: (_) => [
+                    for (final shell in _shells)
+                      PopupMenuItem(
+                        key: ValueKey('localShell-${shell.kind.name}'),
+                        value: shell,
+                        child: Text(localShellName(t, shell)),
+                      ),
+                  ],
+                ),
+              const SizedBox(width: 8),
+              if (iconsOnly)
+                IconButton.outlined(
+                  key: const ValueKey('quickConnect'),
+                  tooltip: t.quickConnect,
+                  icon: const Icon(Icons.bolt, size: 18),
+                  onPressed: () => _quickConnect(context),
+                )
+              else
+                OutlinedButton.icon(
+                  key: const ValueKey('quickConnect'),
+                  icon: const Icon(Icons.bolt, size: 18),
+                  label: Text(t.quickConnect),
+                  onPressed: () => _quickConnect(context),
+                ),
+              const SizedBox(width: 10),
+              if (iconsOnly)
+                IconButton.filled(
+                  key: const ValueKey('addHost'),
+                  tooltip: t.addHost,
+                  icon: const Icon(Icons.add, size: 18),
+                  onPressed: () => _editHost(context, null),
+                )
+              else
+                FilledButton.icon(
+                  key: const ValueKey('addHost'),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: Text(t.addHost),
+                  onPressed: () => _editHost(context, null),
+                ),
+            ];
+            final title = Text(
+              t.hostsTitle,
+              overflow: TextOverflow.ellipsis,
+              style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+            );
+            return Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(28, 24, 28, 8),
+              child: twoRows
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: title),
+                            ...actions,
+                          ],
+                        ),
+                        if (search != null) ...[const SizedBox(height: 12), search],
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        title,
+                        const SizedBox(width: 24),
+                        if (search != null) SizedBox(width: 340, child: search),
+                        const Spacer(),
+                        ...actions,
+                      ],
+                    ),
+            );
+          },
+        );
+
+        final list = ListView(
+          padding: const EdgeInsetsDirectional.fromSTEB(28, 8, 28, 32),
+          children: [
+            if (vault.damaged.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(t.damagedRecords, style: TextStyle(color: c.danger)),
+              ),
+            if (_query.isEmpty && _recent().isNotEmpty) ...[
+              Text(
+                t.recentTitle,
+                style: text.labelLarge?.copyWith(color: c.muted, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final host in _recent())
+                    ActionChip(
+                      key: ValueKey('recent-${host.id}'),
+                      avatar: Icon(Icons.history_rounded, size: 18, color: c.brand),
+                      label: Text(host.name),
+                      onPressed: () => _connectHost(context, host),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (all.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: Text(t.noHostsYet, style: text.bodyLarge?.copyWith(color: c.muted, height: 1.5)),
+              ),
+            if (all.isNotEmpty && hosts.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: Text(t.noHostsMatch, style: text.bodyLarge?.copyWith(color: c.muted, height: 1.5)),
+              ),
+            for (final group in names) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 14, bottom: 8),
+                child: Row(
+                  children: [
+                    Text(
+                      group.isEmpty ? t.ungrouped : group,
+                      style: text.titleSmall?.copyWith(color: c.muted, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('${groups[group]!.length}', style: text.labelMedium?.copyWith(color: c.muted)),
+                    if (group.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      IconButton(
+                        key: ValueKey('groupSettings-$group'),
+                        tooltip: t.groupSettings,
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          Icons.tune_rounded,
+                          size: 18,
+                          color: vault.groupNamed(group) == null ? c.muted : c.brand,
+                        ),
+                        onPressed: () => _editGroup(context, group),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              LayoutBuilder(
+                builder: (context, box) {
+                  const gap = 12.0;
+                  final columns = ((box.maxWidth + gap) / (280 + gap)).floor().clamp(1, 6);
+                  final width = (box.maxWidth - gap * (columns - 1)) / columns;
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: gap,
+                    children: [
+                      for (final host in groups[group]!)
+                        SizedBox(
+                          width: width,
+                          child: _HostCard(
+                            host: host,
+                            via: switch (jumpChainOf(vault, host)) {
+                              [final first, ...] => t.viaHost(first.name),
+                              _ => null,
+                            },
+                            selected: panelHost?.id == host.id,
+                            onConnect: () => _connectHost(context, host),
+                            menu: () => _hostMenu(t, host),
+                            onAction: (action) => _hostAction(context, action, host),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ],
+        );
+
+        return Row(
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  header,
+                  Expanded(child: list),
+                ],
+              ),
+            ),
+            if (panelOpen)
+              Container(
+                width: 460,
+                decoration: BoxDecoration(
+                  border: BorderDirectional(start: BorderSide(color: c.line)),
+                ),
+                child: panel.group != null
+                    ? GroupEditorPage(
+                        key: ValueKey('group-${panel.group}'),
+                        vault: vault,
+                        name: panel.group!,
+                        onDone: _closePanel,
+                      )
+                    : HostEditorPage(
+                        key: ValueKey('editor-${panelHost?.id ?? 'new'}'),
+                        vault: vault,
+                        host: panelHost,
+                        onDone: _closePanel,
+                      ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final c = context.colors;
     final text = Theme.of(context).textTheme;
+    if (widget.desktop) return _desktopBuild(context);
 
     return ListenableBuilder(
       listenable: vault,
@@ -319,7 +675,7 @@ class _HostsPageState extends State<HostsPage> {
                         icon: const Icon(Icons.swap_horiz_rounded),
                         onPressed: widget.onOpenForwards,
                       ),
-                    if (widget.showNavigation) ...[
+                    if (!widget.desktop) ...[
                       IconButton(
                         key: const ValueKey('openHistory'),
                         tooltip: t.historyTitle,
@@ -540,10 +896,14 @@ class _HostsPageState extends State<HostsPage> {
 }
 
 class HostEditorPage extends StatefulWidget {
-  const HostEditorPage({super.key, required this.vault, this.host});
+  const HostEditorPage({super.key, required this.vault, this.host, this.onDone});
 
   final Vault vault;
   final HostEntry? host;
+
+  /// In a side panel: called instead of closing a page, and the bar has a
+  /// close button instead of the way back.
+  final VoidCallback? onDone;
 
   @override
   State<HostEditorPage> createState() => _HostEditorPageState();
@@ -602,7 +962,9 @@ class _HostEditorPageState extends State<HostEditorPage> {
         proxyId: _proxyId,
       ),
     );
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return;
+    final done = widget.onDone;
+    done == null ? Navigator.pop(context) : done();
   }
 
   @override
@@ -612,7 +974,19 @@ class _HostEditorPageState extends State<HostEditorPage> {
     String? required(String? v) => (v == null || v.trim().isEmpty) ? t.fieldRequired : null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.host == null ? t.addHost : t.editHost)),
+      appBar: AppBar(
+        title: Text(widget.host == null ? t.addHost : t.editHost),
+        automaticallyImplyLeading: widget.onDone == null,
+        actions: [
+          if (widget.onDone != null)
+            IconButton(
+              key: const ValueKey('closePanel'),
+              tooltip: t.close,
+              icon: const Icon(Icons.close_rounded),
+              onPressed: widget.onDone,
+            ),
+        ],
+      ),
       body: ListenableBuilder(
         listenable: widget.vault,
         builder: (context, _) {
@@ -867,6 +1241,152 @@ class _HostEditorPageState extends State<HostEditorPage> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// A host in the desktop grid: a click connects, the menu or a right-click
+/// offers the rest, and the border answers the pointer.
+class _HostCard extends StatefulWidget {
+  const _HostCard({
+    required this.host,
+    required this.via,
+    required this.selected,
+    required this.onConnect,
+    required this.menu,
+    required this.onAction,
+  });
+
+  final HostEntry host;
+
+  /// The jump host it goes through, as a line; null when direct.
+  final String? via;
+
+  /// Open in the side panel.
+  final bool selected;
+  final VoidCallback onConnect;
+  final List<PopupMenuEntry<String>> Function() menu;
+  final ValueChanged<String> onAction;
+
+  @override
+  State<_HostCard> createState() => _HostCardState();
+}
+
+class _HostCardState extends State<_HostCard> {
+  var _hover = false;
+
+  Future<void> _contextMenu(Offset at) async {
+    final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(at & const Size(1, 1), Offset.zero & overlay.size),
+      items: widget.menu(),
+    );
+    if (action != null) widget.onAction(action);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final host = widget.host;
+    final ltrStart = Directionality.of(context) == TextDirection.rtl ? TextAlign.right : TextAlign.left;
+    final border = widget.selected
+        ? c.brand
+        : _hover
+        ? c.brand.withValues(alpha: 0.5)
+        : c.line;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Material(
+        color: c.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: border, width: widget.selected ? 1.5 : 1),
+        ),
+        child: InkWell(
+          key: ValueKey('host-${host.id}'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: widget.onConnect,
+          onSecondaryTapUp: (d) => _contextMenu(d.globalPosition),
+          onLongPress: () {
+            final box = context.findRenderObject()! as RenderBox;
+            _contextMenu(box.localToGlobal(box.size.center(Offset.zero)));
+          },
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(14, 12, 4, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: c.brand.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    host.isTelnet
+                        ? Icons.lan_outlined
+                        : host.auth == HostAuth.key
+                        ? Icons.key_rounded
+                        : Icons.dns_outlined,
+                    size: 20,
+                    color: c.brand,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        host.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+                      const SizedBox(height: 2),
+                      // A connection label is Latin content: LTR, at the start.
+                      Text(
+                        host.label,
+                        textDirection: TextDirection.ltr,
+                        textAlign: ltrStart,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: c.muted, fontSize: 12.5),
+                      ),
+                      if (widget.via != null) Text(widget.via!, style: TextStyle(color: c.muted, fontSize: 11.5)),
+                      if (host.tags.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 5,
+                          runSpacing: 4,
+                          children: [
+                            for (final tag in host.tags)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: c.brand.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(tag, style: TextStyle(fontSize: 11.5, color: c.brand)),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  key: ValueKey('hostMenu-${host.id}'),
+                  iconSize: 20,
+                  onSelected: widget.onAction,
+                  itemBuilder: (_) => widget.menu(),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
