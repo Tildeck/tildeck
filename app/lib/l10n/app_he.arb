@@ -372,5 +372,12 @@
   "closeOtherTabs": "סגירת שאר הטאבים",
   "columnName": "שם",
   "columnSize": "גודל",
-  "columnModified": "שונה"
+  "columnModified": "שונה",
+  "thisComputer": "המחשב הזה",
+  "downloadToPane": "הורדה לתיקייה במחשב הזה",
+  "downloadToDownloads": "הורדה להורדות",
+  "uploadToServer": "העלאה לשרת",
+  "hideThisComputer": "הסתרת המחשב הזה",
+  "showThisComputer": "הצגת המחשב הזה לצד השרת",
+  "dragBetweenPanes": "גוררים קבצים מצד לצד כדי להעתיק אותם."
 }

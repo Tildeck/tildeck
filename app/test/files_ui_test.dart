@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tildeck/l10n/app_localizations.dart';
+import 'package:tildeck/local/local_browser.dart';
 import 'package:tildeck/ssh/file_browser.dart';
 import 'package:tildeck/ssh/local_files.dart';
 import 'package:tildeck/theme.dart';
@@ -274,6 +275,13 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final browser = RecordingBrowser();
+    final (dir, local) = (await tester.runAsync(() async {
+      final dir = await Directory.systemTemp.createTemp('tildeck-local');
+      final local = LocalBrowser(home: dir.path);
+      await local.start();
+      return (dir, local);
+    }))!;
+    addTearDown(() => dir.delete(recursive: true));
     await tester.pumpWidget(
       MaterialApp(
         theme: buildTheme(Brightness.light),
@@ -283,11 +291,11 @@ void main() {
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
         ],
-        home: FilesPage(browser: browser, title: 'deploy@example.com', local: TempFiles(Directory.systemTemp)),
+        home: FilesPage(browser: browser, title: 'deploy@example.com', local: TempFiles(dir), localBrowser: local),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('filesTable')), findsOneWidget);
+    expect(find.byKey(const ValueKey('filesTable-remote')), findsOneWidget);
 
     // A click selects one; Shift adds the range; Ctrl takes one out.
     await tester.tap(find.byKey(const ValueKey('row-logs')));
@@ -319,7 +327,7 @@ void main() {
     expect(browser.actions, ['rename notes.txt to todo.txt', 'delete notes.txt']);
 
     // A column title sorts; a double-click opens a folder.
-    await tester.tap(find.byKey(const ValueKey('sort-size')));
+    await tester.tap(find.byKey(const ValueKey('sort-remote-size')));
     await tester.pump();
     expect(browser.sortBy, SortBy.size);
     await tester.tap(find.byKey(const ValueKey('row-logs')));
@@ -333,6 +341,63 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('rowRename')), findsOneWidget);
     expect(find.byKey(const ValueKey('rowEdit')), findsOneWidget);
+  });
+
+  testWidgets('on the desktop: this computer beside the server, and dragging copies either way', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final browser = RecordingBrowser();
+    final (dir, local) = (await tester.runAsync(() async {
+      final dir = await Directory.systemTemp.createTemp('tildeck-panes');
+      await File('${dir.path}/report.txt').writeAsString('local report');
+      final local = LocalBrowser(home: dir.path);
+      await local.start();
+      return (dir, local);
+    }))!;
+    addTearDown(() => dir.delete(recursive: true));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: FilesPage(browser: browser, title: 'deploy@example.com', local: TempFiles(dir), localBrowser: local),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('filesTable-local')), findsOneWidget);
+
+    // This computer's file dragged onto the server's table uploads it.
+    Future<void> dragOnto(Finder from, Finder to) async {
+      final gesture = await tester.startGesture(tester.getCenter(from));
+      await tester.pump(kLongPressTimeout);
+      await gesture.moveTo(tester.getCenter(to));
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(to) + const Offset(0, 10));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+    }
+
+    await dragOnto(find.byKey(const ValueKey('local-row-report.txt')), find.byKey(const ValueKey('filesTable-remote')));
+    await waitFor(tester, () => browser.uploaded.isNotEmpty);
+    expect(browser.uploaded, [('report.txt', 'local report')]);
+
+    // The server's file dragged onto this computer's table downloads it there.
+    await dragOnto(find.byKey(const ValueKey('row-notes.txt')), find.byKey(const ValueKey('filesTable-local')));
+    final downloaded = File('${dir.path}/notes.txt');
+    await waitFor(tester, () => downloaded.existsSync() && downloaded.readAsStringSync() == 'hello');
+    expect(await tester.runAsync(() => File('${dir.path}/notes.txt').readAsString()), 'hello');
+    await waitFor(tester, () => find.byKey(const ValueKey('local-row-notes.txt')).evaluate().isNotEmpty);
+
+    // The local side can be hidden, leaving the server's alone.
+    await tester.tap(find.byKey(const ValueKey('toggleTwoPanes')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('filesTable-local')), findsNothing);
   });
 }
 
