@@ -644,6 +644,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `FileBrowser.copyTo` walks folders as the folder download does (links and devices left out), never writes over an entry the target has, counts files and bytes in the transfer list (a new direction, shown with its own icon), and removes the partial copy from the target on failure or cancel.
 - Tests: against OpenSSH, with two connections as the two servers, a folder copied whole with an empty folder inside, a second copy refused, and a large file cancelled on its way leaving nothing behind.
 
+### Host notes and opening a folder (2026-10-02)
+
+- Holiday plan (host notes) and the Termius research (open a group at once). A host has free-text notes (up to 4000 characters), edited in the host editor, shown as their first line on the desktop card with the whole text on hover, and matched by the hosts search. A host from before has none.
+- Every folder header has "Open all": each host in the folder and in the folders inside it connects in a tab of its own, one after another (a password is asked for where it is not saved); more than five only after a confirmation.
+- Tests: notes kept, searched, and empty on an old host; a folder opening its own hosts and those of the folder inside it, not the others.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

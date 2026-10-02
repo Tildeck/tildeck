@@ -9,6 +9,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - Sessions reconnect on their own when the connection drops: a few times, each after a longer wait, counted down with a cancel; on by default, in Settings, Terminal.
 - Import hosts from a CSV (Termius's export, a spreadsheet) or from PuTTY's saved sessions on Windows, and export the hosts as CSV, without passwords or keys.
 - Files: copy files and folders from one server to another saved server, through this device, from an entry's menu.
+- Host notes, shown on the host and found by search; and opening every host in a folder at once.
 - Terminal settings: the font (JetBrains Mono or the system's monospace fonts), line height, cursor shape, what the bell does (flash, sound, or nothing), how many lines are kept above the screen, and copying on select.
 - Folders inside folders (a slash in the group: Production/Web), shown nested and foldable, with settings taken from the folders above; and duplicating a host.
 - Find anything with Ctrl+Shift+P: connect to a host, switch to an open tab, go to a section, or lock, by typing.

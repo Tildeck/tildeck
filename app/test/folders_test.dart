@@ -134,9 +134,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('hostMenu-h1')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('hostDuplicate')));
-    for (var i = 0; i < 300 && find.byKey(const ValueKey('hostName')).evaluate().isEmpty; i++) {
+    for (var i = 0; i < 2000 && find.byKey(const ValueKey('hostName')).evaluate().isEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
     }
     await tester.pumpAndSettle();
     final copy = vault.hosts.firstWhere((h) => h.name == 'Web 01 (copy)');

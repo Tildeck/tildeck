@@ -203,7 +203,7 @@ class HostsPage extends StatefulWidget {
 /// group, or tag.
 bool hostMatches(HostEntry host, String query) {
   final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
-  final haystack = [host.name, host.host, host.username, host.group, ...host.tags].join(' ').toLowerCase();
+  final haystack = [host.name, host.host, host.username, host.group, ...host.tags, host.notes].join(' ').toLowerCase();
   return words.every(haystack.contains);
 }
 
@@ -392,6 +392,39 @@ class _HostsPageState extends State<HostsPage> {
       case 'delete':
         if (_panel?.host?.id == host.id) _closePanel();
         await _delete(context, host);
+    }
+  }
+
+  /// Every host in [folder] and the folders inside it, each in a session;
+  /// many at once only after asking.
+  Future<void> _openFolder(BuildContext context, String folder, Map<String, List<HostEntry>> byFolder) async {
+    final t = AppLocalizations.of(context);
+    final hosts = [
+      for (final MapEntry(:key, :value) in byFolder.entries)
+        if (key == folder || key.startsWith('$folder/')) ...value,
+    ];
+    if (hosts.isEmpty) return;
+    if (hosts.length > 5) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(t.openFolderHostsTitle(hosts.length)),
+          content: Text(t.openFolderHostsBody),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
+            FilledButton(
+              key: const ValueKey('openFolderConfirm'),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(t.openFolderHosts),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    for (final host in hosts) {
+      if (!context.mounted) return;
+      await _connectHost(context, host);
     }
   }
 
@@ -622,6 +655,13 @@ class _HostsPageState extends State<HostsPage> {
                           color: vault.groupNamed(group) == null ? c.muted : c.brand,
                         ),
                         onPressed: () => _editGroup(context, group),
+                      ),
+                      IconButton(
+                        key: ValueKey('openFolder-$group'),
+                        tooltip: t.openFolderHosts,
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(Icons.playlist_play_rounded, size: 20, color: c.muted),
+                        onPressed: () => _openFolder(context, group, groups),
                       ),
                     ],
                   ],
@@ -885,6 +925,14 @@ class _HostsPageState extends State<HostsPage> {
                         ),
                         if (group.isNotEmpty)
                           IconButton(
+                            key: ValueKey('openFolder-$group'),
+                            tooltip: t.openFolderHosts,
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(Icons.playlist_play_rounded, size: 20, color: c.muted),
+                            onPressed: () => _openFolder(context, group, groups),
+                          ),
+                        if (group.isNotEmpty)
+                          IconButton(
                             key: ValueKey('groupSettings-$group'),
                             tooltip: t.groupSettings,
                             visualDensity: VisualDensity.compact,
@@ -1022,6 +1070,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late String? _keyId = widget.host?.keyId;
   late String? _startupSnippetId = widget.host?.startupSnippetId;
   late final _tags = TextEditingController(text: widget.host?.tags.join(', '));
+  late final _notes = TextEditingController(text: widget.host?.notes);
   late final _env = TextEditingController(text: formatEnv(widget.host?.env ?? const {}));
   late String? _jumpHostId = widget.host?.jumpHostId;
   late bool _agentForwarding = widget.host?.agentForwarding ?? false;
@@ -1032,7 +1081,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
 
   @override
   void dispose() {
-    for (final c in [_name, _group, _host, _port, _username, _password, _tags, _env]) {
+    for (final c in [_name, _group, _host, _port, _username, _password, _tags, _env, _notes]) {
       c.dispose();
     }
     super.dispose();
@@ -1062,6 +1111,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
         agentForwarding: _agentForwarding,
         proxyId: _proxyId,
         identityId: _telnet ? null : _identityId,
+        notes: _notes.text.trim(),
       ),
     );
     if (!mounted) return;
@@ -1348,6 +1398,19 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       decoration: InputDecoration(labelText: t.tagsLabel, hintText: t.tagsHint),
                     ),
                     const SizedBox(height: 14),
+                    TextFormField(
+                      key: const ValueKey('hostNotes'),
+                      controller: _notes,
+                      minLines: 2,
+                      maxLines: 8,
+                      maxLength: 4000,
+                      decoration: InputDecoration(
+                        labelText: t.notesLabel,
+                        hintText: t.notesHint,
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
                     if (!_telnet)
                       TextFormField(
                         key: const ValueKey('hostEnv'),
@@ -1501,6 +1564,24 @@ class _HostCardState extends State<_HostCard> {
                         style: TextStyle(color: c.muted, fontSize: 12.5),
                       ),
                       if (widget.via != null) Text(widget.via!, style: TextStyle(color: c.muted, fontSize: 11.5)),
+                      if (host.notes.isNotEmpty)
+                        Tooltip(
+                          message: host.notes,
+                          child: Row(
+                            key: ValueKey('notes-${host.id}'),
+                            children: [
+                              Icon(Icons.sticky_note_2_outlined, size: 13, color: c.muted),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  host.notes.split('\n').first,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: c.muted, fontSize: 11.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (host.tags.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Wrap(

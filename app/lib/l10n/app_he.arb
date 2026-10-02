@@ -521,5 +521,10 @@
   "copyToServerWhere": "לאיזו תיקייה ב-{server}?",
   "copyAction": "העתקה",
   "copiedToServer": "הועתק ל-{server}",
-  "copyToServerFailed": "לא ניתן לפתוח את הקבצים של {server}."
+  "copyToServerFailed": "לא ניתן לפתוח את הקבצים של {server}.",
+  "notesLabel": "הערות",
+  "notesHint": "למה הוא משמש, את מי לשאול, איך מגיעים אליו",
+  "openFolderHosts": "פתיחת כולם",
+  "openFolderHostsTitle": "לפתוח {count} חיבורים?",
+  "openFolderHostsBody": "כל שרת בתיקייה הזו ובתיקיות שבתוכה ייפתח בלשונית משלו."
 }
