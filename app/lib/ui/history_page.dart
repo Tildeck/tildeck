@@ -65,7 +65,8 @@ class HistoryPage extends StatelessWidget {
                 onTap: host == null
                     ? null
                     : () {
-                        Navigator.pop(context);
+                        // Embedded in the desktop layout, there is nothing to close.
+                        Navigator.maybePop(context);
                         onReconnect(host);
                       },
               );

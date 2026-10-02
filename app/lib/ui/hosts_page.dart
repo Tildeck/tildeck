@@ -156,6 +156,7 @@ class HostsPage extends StatefulWidget {
     this.onOpenForwards,
     this.localShells,
     this.connectHost,
+    this.showNavigation = true,
   });
 
   final Vault vault;
@@ -169,6 +170,10 @@ class HostsPage extends StatefulWidget {
 
   /// Connects to a saved host outside a session: installing a key on it.
   final HostConnect? connectHost;
+
+  /// The buttons to history, snippets, and keys; the desktop layout's
+  /// sidebar has them instead.
+  final bool showNavigation;
 
   @override
   State<HostsPage> createState() => _HostsPageState();
@@ -314,33 +319,35 @@ class _HostsPageState extends State<HostsPage> {
                         icon: const Icon(Icons.swap_horiz_rounded),
                         onPressed: widget.onOpenForwards,
                       ),
-                    IconButton(
-                      key: const ValueKey('openHistory'),
-                      tooltip: t.historyTitle,
-                      icon: const Icon(Icons.history_rounded),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => HistoryPage(vault: vault, onReconnect: (h) => _connectHost(context, h)),
+                    if (widget.showNavigation) ...[
+                      IconButton(
+                        key: const ValueKey('openHistory'),
+                        tooltip: t.historyTitle,
+                        icon: const Icon(Icons.history_rounded),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => HistoryPage(vault: vault, onReconnect: (h) => _connectHost(context, h)),
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      key: const ValueKey('openSnippets'),
-                      tooltip: t.snippetsTitle,
-                      icon: const Icon(Icons.code_rounded),
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).push(MaterialPageRoute<void>(builder: (_) => SnippetsPage(vault: vault))),
-                    ),
-                    IconButton(
-                      tooltip: t.keysTitle,
-                      icon: const Icon(Icons.key),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => KeysPage(vault: vault, connect: widget.connectHost),
+                      IconButton(
+                        key: const ValueKey('openSnippets'),
+                        tooltip: t.snippetsTitle,
+                        icon: const Icon(Icons.code_rounded),
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).push(MaterialPageRoute<void>(builder: (_) => SnippetsPage(vault: vault))),
+                      ),
+                      IconButton(
+                        tooltip: t.keysTitle,
+                        icon: const Icon(Icons.key),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => KeysPage(vault: vault, connect: widget.connectHost),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 12),

@@ -81,6 +81,13 @@ void phone(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
+/// A laptop screen: 1280x800 logical pixels, the desktop layout.
+void desktop(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1280, 800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 /// The app's localization and themes around a single screen.
 Widget screen(String locale, ThemeMode mode, Widget child) => MaterialApp(
   debugShowCheckedModeBanner: false,
@@ -555,6 +562,22 @@ void main() {
       await tester.pumpWidget(screen(locale, mode, KnownHostsPage(vault: vault)));
       await tester.pumpAndSettle();
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/known_hosts_${locale}_${mode.name}.png'));
+    });
+
+    testWidgets('desktop hosts $locale ${mode.name}', (tester) async {
+      desktop(tester);
+      final vault = (await tester.runAsync(() => sampleVault(unlocked: true)))!;
+      await tester.pumpWidget(app(vault, locale, mode));
+      await settle(tester);
+      expect(find.byKey(const ValueKey('nav-hosts')), findsOneWidget, reason: 'the sidebar');
+      expect(find.byKey(const ValueKey('hostsTab')), findsNothing, reason: 'the sidebar takes its place');
+      await expectLater(find.byType(TildeckApp), matchesGoldenFile('goldens/desktop_hosts_${locale}_${mode.name}.png'));
+
+      // Another section opens in place, with no page over the sidebar.
+      await tester.tap(find.byKey(const ValueKey('nav-keys')));
+      await settle(tester);
+      expect(find.byKey(const ValueKey('nav-hosts')), findsOneWidget);
+      await expectLater(find.byType(TildeckApp), matchesGoldenFile('goldens/desktop_keys_${locale}_${mode.name}.png'));
     });
 
     testWidgets('keys $locale ${mode.name}', (tester) async {

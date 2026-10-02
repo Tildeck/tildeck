@@ -73,7 +73,7 @@ void main() {
 
   testWidgets('register on one device, sign in on another, and the vault arrives once approved', (tester) async {
     // Tall enough that every screen of the flow is built whole.
-    tester.view.physicalSize = const Size(1000, 2000);
+    tester.view.physicalSize = const Size(860, 2000); // the phone layout: below desktopMinWidth
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     // The first device has a vault with a host, and no account yet.
@@ -142,7 +142,7 @@ void main() {
   });
 
   testWidgets('a removed device signs in again as a new one and syncs once approved', (tester) async {
-    tester.view.physicalSize = const Size(1000, 2000);
+    tester.view.physicalSize = const Size(860, 2000); // the phone layout: below desktopMinWidth
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final vault = (await tester.runAsync(() async {
@@ -201,7 +201,7 @@ void main() {
   });
 
   testWidgets('a forgotten master password is reset with the recovery key, then changed again', (tester) async {
-    tester.view.physicalSize = const Size(1000, 2400);
+    tester.view.physicalSize = const Size(860, 2400); // the phone layout: below desktopMinWidth
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final vault = (await tester.runAsync(() async {
