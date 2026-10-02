@@ -600,6 +600,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - A host's menu duplicates it: a copy with everything but its name ("Name (copy)"), opened for editing.
 - Tests: paths made plain, the folder order with the folders above, folding, counting; settings taken through two levels; the list nesting and folding, a search inside a folded folder, and a duplicate opened for editing.
 
+### Find anything (2026-10-02)
+
+- Termius's command palette (Ctrl+K there). Here Ctrl+Shift+P, as in VS Code: Ctrl+K belongs to the shell (it deletes to the end of the line in bash), and the app's keys keep Shift so the terminal gets the plain ones. Listed among the keyboard shortcuts.
+- One field finds the open tabs, the saved hosts (connecting, with the password asked when not saved), the desktop's sections, and the lock and the shortcuts list. Every word typed must appear in the name, the address, or the kind; arrows choose, Enter runs.
+- Tests: matching by words; on the desktop, Ctrl+Shift+P, typing a host's name and Enter opening its tab, arrows moving the choice, and a section opening in place.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

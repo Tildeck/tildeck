@@ -855,5 +855,12 @@
     }
   },
   "expandFolder": "Open folder",
-  "collapseFolder": "Fold folder"
+  "collapseFolder": "Fold folder",
+  "paletteTitle": "Find anything",
+  "paletteHint": "Hosts, open tabs, sections, actions",
+  "paletteNoMatch": "Nothing matches.",
+  "paletteOpenTab": "Open tab",
+  "paletteConnect": "Connect",
+  "paletteSection": "Section",
+  "paletteAction": "Action"
 }
