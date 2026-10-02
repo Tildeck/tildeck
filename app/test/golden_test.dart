@@ -35,6 +35,7 @@ import 'package:tildeck/ui/file_editor_page.dart';
 import 'package:tildeck/ui/files_page.dart';
 import 'package:tildeck/ui/group_editor_page.dart';
 import 'package:tildeck/ui/history_page.dart';
+import 'package:tildeck/ui/identities_page.dart';
 import 'package:tildeck/ui/hosts_page.dart';
 import 'package:tildeck/ui/keys_page.dart';
 import 'package:tildeck/ui/known_hosts_page.dart';
@@ -724,6 +725,20 @@ void main() {
         find.byType(MaterialApp),
         matchesGoldenFile('goldens/settings_security_${locale}_${mode.name}.png'),
       );
+    });
+
+    testWidgets('identities $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() async {
+        final v = await sampleVault(unlocked: true);
+        await v.put(IdentityEntry(id: 'i1', name: 'Deploy', username: 'deploy', keyId: v.keys.first.id));
+        await v.put(const IdentityEntry(id: 'i2', name: 'Admin', username: 'admin', password: 'secret'));
+        await v.put(const IdentityEntry(id: 'i3', name: 'Backup', username: 'backup'));
+        return v;
+      }))!;
+      await tester.pumpWidget(screen(locale, mode, IdentitiesPage(vault: vault)));
+      await tester.pumpAndSettle();
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/identities_${locale}_${mode.name}.png'));
     });
 
     testWidgets('terminal search $locale ${mode.name}', (tester) async {

@@ -385,6 +385,8 @@ class Vault extends ChangeNotifier {
   Iterable<T> _of<T extends VaultEntry>() => _entries.values.whereType<T>();
   List<HostEntry> get hosts =>
       _of<HostEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  List<IdentityEntry> get identities => _of<IdentityEntry>().toList()..sort((a, b) => a.name.compareTo(b.name));
+
   List<KeyEntry> get keys =>
       _of<KeyEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   List<KnownHostEntry> get knownHosts => _of<KnownHostEntry>().toList();

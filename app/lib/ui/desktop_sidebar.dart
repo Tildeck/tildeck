@@ -35,7 +35,7 @@ Widget deskSectionTheme(BuildContext context, Widget child) {
 }
 
 /// The sections of the desktop layout's sidebar.
-enum DeskSection { hosts, keys, knownHosts, forwards, snippets, history, settings }
+enum DeskSection { hosts, keys, identities, knownHosts, forwards, snippets, history, settings }
 
 /// The desktop layout's navigation: the vault's sections, then the app's
 /// own settings and the lock.
@@ -145,6 +145,7 @@ class DesktopSidebar extends StatelessWidget {
                   heading(t.navVault),
                   item(DeskSection.hosts, Icons.dns_outlined, t.hostsTitle),
                   item(DeskSection.keys, Icons.key_outlined, t.keysTitle),
+                  item(DeskSection.identities, Icons.badge_outlined, t.identitiesTitle),
                   item(DeskSection.knownHosts, Icons.verified_user_outlined, t.knownHostsTitle),
                   item(DeskSection.forwards, Icons.swap_horiz_rounded, t.forwardsTitle),
                   item(DeskSection.snippets, Icons.code_rounded, t.snippetsTitle),

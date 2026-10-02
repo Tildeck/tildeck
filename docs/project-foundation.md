@@ -562,6 +562,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The unlock screen asks at once when biometric unlock is on and offers a button after a cancel; a failure says so and leaves the master password. Settings, Security has the switch where the system offers biometrics; turning it on takes the master password, then the system's check.
 - Tests: for Android-like and Windows-like systems, turning it on with the master password (a wrong one refused), unlocking with it after a restart, a cancel changing nothing, a lost system key turning it off while the master password still works; a key that does not open `wrap_bio` refused; a password change removing it; turning it off deleting the system key; the unlock screen asking at once and again after a cancel; the settings switch on with the password and off; no switch without biometrics. Native code is built (the APK in verify, the Windows release build locally), not exercised: completing a fingerprint or Windows Hello prompt needs a person.
 
+### Identities (2026-10-02)
+
+- As in Termius: an identity is a username with a key, a saved password, or neither (the password is asked at each connection), kept in the vault as its own record (`identity`) and synced. A host or a group chooses one (`identity_id`); the host's own choice wins over its group's, as for jump hosts and proxies.
+- With an identity, it decides who signs in and how: the host's own username and credentials are not used, and the host editor hides them and says which identity signs in. A deleted identity leaves the host's own fields. Telnet hosts sign in inside the terminal and have none.
+- Identities have their own page (a sidebar section on the desktop, a button beside keys on a phone) and can be created from the host editor. One in use by a host or a group is not deleted.
+- Tests: the host's identity, else the group's, gives the username and the key or password; changing the identity changes the host; a deleted one leaves the host's fields; adding one in its page; one in use not deleted; the host editor hiding its credentials and saving the choice. Golden: the identities page in both languages.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

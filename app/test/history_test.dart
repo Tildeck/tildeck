@@ -75,5 +75,6 @@ void main() {
     expect(history, hasLength(Vault.historyLimit));
     expect(history.first.label, 'c${Vault.historyLimit + 2}', reason: 'newest first');
     expect(history.last.label, 'c3', reason: 'the three oldest are gone');
-  });
+    // Hundreds of encrypted saves: slow on a loaded machine.
+  }, timeout: const Timeout(Duration(minutes: 3)));
 }

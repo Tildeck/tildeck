@@ -12,6 +12,7 @@ import 'connect_form.dart';
 import 'files_page.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
+import 'identities_page.dart';
 import 'keys_page.dart';
 import 'proxy_editor.dart';
 import 'snippets_page.dart';
@@ -53,6 +54,11 @@ String localShellName(AppLocalizations t, LocalShell shell) => switch (shell.kin
   LocalShellKind.posix => t.localTerminal,
 };
 
+/// The identity [host] signs in as: its own, or else its group's; null when
+/// neither chose one (or it was deleted).
+IdentityEntry? identityFor(Vault vault, HostEntry host) =>
+    vault.entry<IdentityEntry>(host.identityId ?? vault.groupNamed(host.group)?.identityId);
+
 Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault, HostEntry host) async {
   // The farthest jump host is connected to first.
   ConnectionTarget? jump;
@@ -78,6 +84,9 @@ Future<ConnectionTarget?> connectionTargetFor(BuildContext context, Vault vault,
 
 Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntry host, ConnectionTarget? jump) async {
   final group = vault.groupNamed(host.group);
+  // An identity (the host's, or else the group's) decides who signs in, and
+  // how; without one, the host's fields, with the group's for empty ones.
+  final identity = host.isTelnet ? null : identityFor(vault, host);
   final effective = HostEntry(
     id: host.id,
     name: host.name,
@@ -85,10 +94,10 @@ Future<ConnectionTarget?> _targetFor(BuildContext context, Vault vault, HostEntr
     host: host.host,
     port: host.port,
     protocol: host.protocol,
-    username: host.username.trim().isEmpty ? (group?.username ?? '') : host.username,
-    auth: host.auth,
-    password: host.password,
-    keyId: host.keyId ?? group?.keyId,
+    username: identity?.username ?? (host.username.trim().isEmpty ? (group?.username ?? '') : host.username),
+    auth: identity?.auth ?? host.auth,
+    password: identity == null ? host.password : identity.password,
+    keyId: identity == null ? host.keyId ?? group?.keyId : identity.keyId,
   );
   String? password;
   KeyEntry? key;
@@ -709,6 +718,14 @@ class _HostsPageState extends State<HostsPage> {
                         ).push(MaterialPageRoute<void>(builder: (_) => SnippetsPage(vault: vault))),
                       ),
                       IconButton(
+                        key: const ValueKey('openIdentities'),
+                        tooltip: t.identitiesTitle,
+                        icon: const Icon(Icons.badge_outlined),
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).push(MaterialPageRoute<void>(builder: (_) => IdentitiesPage(vault: vault))),
+                      ),
+                      IconButton(
                         tooltip: t.keysTitle,
                         icon: const Icon(Icons.key),
                         onPressed: () => Navigator.of(context).push(
@@ -941,6 +958,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late String? _jumpHostId = widget.host?.jumpHostId;
   late bool _agentForwarding = widget.host?.agentForwarding ?? false;
   late String? _proxyId = widget.host?.proxyId;
+  late String? _identityId = widget.host?.identityId;
   late ConnectionProtocol _protocol = widget.host?.protocol ?? ConnectionProtocol.ssh;
   bool get _telnet => _protocol == ConnectionProtocol.telnet;
 
@@ -975,6 +993,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
         jumpHostId: _jumpHostId,
         agentForwarding: _agentForwarding,
         proxyId: _proxyId,
+        identityId: _telnet ? null : _identityId,
       ),
     );
     if (!mounted) return;
@@ -1018,6 +1037,12 @@ class _HostEditorPageState extends State<HostEditorPage> {
           final groupJump = widget.vault.entry<HostEntry>(group?.jumpHostId);
           if (_proxyId != null && widget.vault.entry<ProxyEntry>(_proxyId) == null) _proxyId = null;
           final groupProxy = widget.vault.entry<ProxyEntry>(group?.proxyId);
+          final identities = widget.vault.identities;
+          if (_identityId != null && identities.every((x) => x.id != _identityId)) _identityId = null;
+          final groupIdentity = widget.vault.entry<IdentityEntry>(group?.identityId);
+          // With an identity (this host's or the group's), it signs in: the
+          // fields below are not used, so they are not shown.
+          final identity = _telnet ? null : widget.vault.entry<IdentityEntry>(_identityId) ?? groupIdentity;
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
@@ -1093,88 +1118,125 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    TextFormField(
-                      key: const ValueKey('username'),
-                      controller: _username,
-                      textDirection: TextDirection.ltr,
-                      autocorrect: false,
-                      validator: _telnet || group?.username?.isNotEmpty == true ? null : required,
-                      decoration: InputDecoration(
-                        labelText: _telnet ? t.usernameOptional : t.usernameLabel,
-                        helperText: group?.username?.isNotEmpty == true ? t.fromGroup(group!.username!) : null,
-                      ),
-                    ),
-                    SizedBox(height: _telnet ? 8 : 18),
-                    if (!_telnet)
-                      SegmentedButton<HostAuth>(
-                        segments: [
-                          ButtonSegment(
-                            value: HostAuth.password,
-                            label: Text(t.authPassword),
-                            icon: const Icon(Icons.password),
-                          ),
-                          ButtonSegment(
-                            value: HostAuth.key,
-                            label: Text(t.authPrivateKey),
-                            icon: const Icon(Icons.key),
-                          ),
-                        ],
-                        selected: {_auth},
-                        onSelectionChanged: (s) => setState(() => _auth = s.first),
-                      ),
-                    const SizedBox(height: 14),
-                    if (_telnet || _auth == HostAuth.password) ...[
-                      SwitchListTile(
-                        key: const ValueKey('savePassword'),
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(t.savePassword),
-                        subtitle: Text(
-                          _telnet ? t.telnetPasswordHelp : t.askPasswordEachTime,
-                          style: TextStyle(color: c.muted),
+                    if (!_telnet) ...[
+                      DropdownButtonFormField<String?>(
+                        key: const ValueKey('hostIdentity'),
+                        initialValue: _identityId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: t.identityLabel,
+                          helperText: identity == null
+                              ? t.identityHelp
+                              : identityCredentials(t, widget.vault, identity),
+                          helperMaxLines: 3,
                         ),
-                        value: _savePassword,
-                        onChanged: (v) => setState(() => _savePassword = v),
-                      ),
-                      if (_savePassword)
-                        TextFormField(
-                          key: const ValueKey('password'),
-                          controller: _password,
-                          obscureText: true,
-                          textDirection: TextDirection.ltr,
-                          validator: required,
-                          decoration: InputDecoration(labelText: t.passwordLabel),
-                        ),
-                    ] else ...[
-                      DropdownButtonFormField<String>(
-                        key: const ValueKey('keyChoice'),
-                        initialValue: _keyId,
-                        decoration: InputDecoration(labelText: t.keyLabel, hintText: t.chooseKey),
-                        validator: (v) => v == null && group?.keyId == null ? t.fieldRequired : null,
-                        items: [for (final k in keys) DropdownMenuItem(value: k.id, child: Text(k.name))],
-                        onChanged: (v) => setState(() => _keyId = v),
-                      ),
-                      Wrap(
-                        spacing: 4,
-                        children: [
-                          TextButton.icon(
-                            key: const ValueKey('hostGenerateKey'),
-                            icon: const Icon(Icons.auto_awesome_outlined),
-                            label: Text(t.generateKey),
-                            onPressed: () async {
-                              final id = await showKeyGenerator(context, widget.vault);
-                              if (id != null) setState(() => _keyId = id);
-                            },
+                        items: [
+                          DropdownMenuItem(
+                            value: null,
+                            child: Text(groupIdentity == null ? t.noIdentity : t.fromGroup(groupIdentity.name)),
                           ),
-                          TextButton.icon(
-                            icon: const Icon(Icons.file_download_outlined),
-                            label: Text(t.importKey),
-                            onPressed: () async {
-                              final id = await showKeyEditor(context, widget.vault);
-                              if (id != null) setState(() => _keyId = id);
-                            },
-                          ),
+                          for (final x in identities) DropdownMenuItem(value: x.id, child: Text(x.name)),
                         ],
+                        onChanged: (v) => setState(() => _identityId = v),
                       ),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: TextButton.icon(
+                          key: const ValueKey('hostNewIdentity'),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: Text(t.addIdentity),
+                          onPressed: () async {
+                            final id = await showIdentityEditor(context, widget.vault);
+                            if (id != null) setState(() => _identityId = id);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (identity == null) ...[
+                      TextFormField(
+                        key: const ValueKey('username'),
+                        controller: _username,
+                        textDirection: TextDirection.ltr,
+                        autocorrect: false,
+                        validator: _telnet || group?.username?.isNotEmpty == true ? null : required,
+                        decoration: InputDecoration(
+                          labelText: _telnet ? t.usernameOptional : t.usernameLabel,
+                          helperText: group?.username?.isNotEmpty == true ? t.fromGroup(group!.username!) : null,
+                        ),
+                      ),
+                      SizedBox(height: _telnet ? 8 : 18),
+                      if (!_telnet)
+                        SegmentedButton<HostAuth>(
+                          segments: [
+                            ButtonSegment(
+                              value: HostAuth.password,
+                              label: Text(t.authPassword),
+                              icon: const Icon(Icons.password),
+                            ),
+                            ButtonSegment(
+                              value: HostAuth.key,
+                              label: Text(t.authPrivateKey),
+                              icon: const Icon(Icons.key),
+                            ),
+                          ],
+                          selected: {_auth},
+                          onSelectionChanged: (s) => setState(() => _auth = s.first),
+                        ),
+                      const SizedBox(height: 14),
+                      if (_telnet || _auth == HostAuth.password) ...[
+                        SwitchListTile(
+                          key: const ValueKey('savePassword'),
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(t.savePassword),
+                          subtitle: Text(
+                            _telnet ? t.telnetPasswordHelp : t.askPasswordEachTime,
+                            style: TextStyle(color: c.muted),
+                          ),
+                          value: _savePassword,
+                          onChanged: (v) => setState(() => _savePassword = v),
+                        ),
+                        if (_savePassword)
+                          TextFormField(
+                            key: const ValueKey('password'),
+                            controller: _password,
+                            obscureText: true,
+                            textDirection: TextDirection.ltr,
+                            validator: required,
+                            decoration: InputDecoration(labelText: t.passwordLabel),
+                          ),
+                      ] else ...[
+                        DropdownButtonFormField<String>(
+                          key: const ValueKey('keyChoice'),
+                          initialValue: _keyId,
+                          decoration: InputDecoration(labelText: t.keyLabel, hintText: t.chooseKey),
+                          validator: (v) => v == null && group?.keyId == null ? t.fieldRequired : null,
+                          items: [for (final k in keys) DropdownMenuItem(value: k.id, child: Text(k.name))],
+                          onChanged: (v) => setState(() => _keyId = v),
+                        ),
+                        Wrap(
+                          spacing: 4,
+                          children: [
+                            TextButton.icon(
+                              key: const ValueKey('hostGenerateKey'),
+                              icon: const Icon(Icons.auto_awesome_outlined),
+                              label: Text(t.generateKey),
+                              onPressed: () async {
+                                final id = await showKeyGenerator(context, widget.vault);
+                                if (id != null) setState(() => _keyId = id);
+                              },
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(Icons.file_download_outlined),
+                              label: Text(t.importKey),
+                              onPressed: () async {
+                                final id = await showKeyEditor(context, widget.vault);
+                                if (id != null) setState(() => _keyId = id);
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String?>(
