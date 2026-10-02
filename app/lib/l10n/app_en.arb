@@ -951,5 +951,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "notesLabel": "Notes",
+  "notesHint": "What it is for, who to ask, how to reach it",
+  "openFolderHosts": "Open all",
+  "openFolderHostsTitle": "Open {count} sessions?",
+  "@openFolderHostsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "openFolderHostsBody": "Every host in this folder and the folders inside it opens in a tab of its own."
 }

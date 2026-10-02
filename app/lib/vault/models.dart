@@ -52,6 +52,7 @@ class HostEntry extends VaultEntry {
     this.proxyId,
     this.protocol = ConnectionProtocol.ssh,
     this.identityId,
+    this.notes = '',
   });
 
   static const recordType = 'host';
@@ -98,6 +99,9 @@ class HostEntry extends VaultEntry {
   /// credentials are not used.
   final String? identityId;
 
+  /// Free text: what the server is for, who to ask, how to reach it.
+  final String notes;
+
   bool get isTelnet => protocol == ConnectionProtocol.telnet;
 
   @override
@@ -121,6 +125,7 @@ class HostEntry extends VaultEntry {
     'proxy_id': proxyId,
     'protocol': protocol.name,
     'identity_id': identityId,
+    'notes': notes,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -141,6 +146,7 @@ class HostEntry extends VaultEntry {
     proxyId: d['proxy_id'] as String?,
     protocol: ConnectionProtocol.values.byName(d['protocol'] as String? ?? 'ssh'),
     identityId: d['identity_id'] as String?,
+    notes: d['notes'] as String? ?? '',
   );
 
   String get label {
