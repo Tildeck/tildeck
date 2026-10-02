@@ -1,5 +1,6 @@
 import '../ssh/keys.dart';
 import '../ssh/ssh_config.dart';
+import '../ssh/ssh_connector.dart' show ConnectionProtocol;
 import 'models.dart';
 import 'vault.dart';
 
@@ -22,7 +23,10 @@ String sshDefaultUser(Map<String, String> environment) => environment['USER'] ??
 
 /// Whether the vault already has [host]: the same address, port, and user.
 bool alreadySaved(Vault vault, SshConfigHost host, String defaultUser) => vault.hosts.any(
-  (h) => h.host == host.address && h.port == (host.port ?? 22) && h.username == (host.user ?? defaultUser),
+  (h) =>
+      h.host == host.address &&
+      h.port == (host.port ?? (host.telnet ? 23 : 22)) &&
+      h.username == (host.user ?? (host.telnet ? '' : defaultUser)),
 );
 
 /// Saves [chosen] as hosts. Their key files are read through [readFile]
@@ -86,11 +90,15 @@ Future<HostImportResult> importSshHosts(
         id: ids[host.alias]!,
         name: host.alias,
         host: host.address,
-        port: host.port ?? 22,
-        username: host.user ?? defaultUser,
+        port: host.port ?? (host.telnet ? 23 : 22),
+        // Telnet signs in inside the terminal: no user unless one was given.
+        username: host.user ?? (host.telnet ? '' : defaultUser),
         auth: keyId == null ? HostAuth.password : HostAuth.key,
         keyId: keyId,
         jumpHostId: jumpFor(host),
+        group: host.group,
+        tags: host.tags,
+        protocol: host.telnet ? ConnectionProtocol.telnet : ConnectionProtocol.ssh,
       ),
     );
   }

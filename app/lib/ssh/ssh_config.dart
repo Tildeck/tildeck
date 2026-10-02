@@ -14,6 +14,9 @@ class SshConfigHost {
     this.port,
     this.identityFiles = const [],
     this.proxyJump,
+    this.group = '',
+    this.tags = const [],
+    this.telnet = false,
   });
 
   /// The name after `Host`.
@@ -27,6 +30,11 @@ class SshConfigHost {
 
   /// The first hop of ProxyJump: an alias or [user@]host[:port].
   final String? proxyJump;
+
+  // From other sources than an SSH configuration (CSV, PuTTY).
+  final String group;
+  final List<String> tags;
+  final bool telnet;
 
   String get address => hostName ?? alias;
 }

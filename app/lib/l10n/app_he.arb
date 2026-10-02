@@ -510,5 +510,9 @@
   "autoReconnectLabel": "התחברות מחדש כשהחיבור נופל",
   "autoReconnectHelp": "כמה פעמים, עם המתנה קצת ארוכה יותר בכל פעם.",
   "reconnectingIn": "מתחבר מחדש בעוד {seconds} שנ׳ ({attempt} מתוך {total}).",
-  "reconnectNow": "התחברות עכשיו"
+  "reconnectNow": "התחברות עכשיו",
+  "importFromPutty": "מה-sessions השמורים של PuTTY.",
+  "importPutty": "מ-PuTTY",
+  "exportHostsCsv": "ייצוא כ-CSV",
+  "hostsExported": "השרתים יוצאו, בלי סיסמאות ומפתחות: {path}"
 }

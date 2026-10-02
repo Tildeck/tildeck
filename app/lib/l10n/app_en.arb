@@ -912,5 +912,16 @@
       }
     }
   },
-  "reconnectNow": "Reconnect now"
+  "reconnectNow": "Reconnect now",
+  "importFromPutty": "From PuTTY's saved sessions.",
+  "importPutty": "From PuTTY",
+  "exportHostsCsv": "Export as CSV",
+  "hostsExported": "Hosts exported, without passwords or keys: {path}",
+  "@hostsExported": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  }
 }
