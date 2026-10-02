@@ -356,8 +356,8 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 ### Split view (2026-10-01)
 
-- On a screen at least 840 pixels wide with two or more sessions, the Split button shows the selected session and another one side by side. A click on the other side makes it the active one (its tab is selected and the bar shows its actions); the button returns to a single view, and closing a session keeps the split pointing at the right one.
-- Test: two sessions split, the active side changing on a click, and back to one.
+- On a screen at least 840 pixels wide with two or more sessions, the Split button shows every terminal at once, in tab order, in a grid as square as it gets (two side by side, four in two rows, five in rows of three and two, up to 16; with more, the selected one and the newest others). A click on a pane makes it the active one (its tab is selected, its border is drawn in the brand color, and the bar shows its actions); the button returns to a single view of the active one. A files tab is shown alone. (Before 2026-10-02 the split showed two sessions only.)
+- Test: five sessions in a grid of three and two, the active pane changing on a click without the panes moving, and back to one.
 
 ### Port forwarding (2026-10-01)
 
