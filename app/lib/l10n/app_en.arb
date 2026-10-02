@@ -923,5 +923,33 @@
         "type": "String"
       }
     }
+  },
+  "copyToServer": "Copy to another server",
+  "copyToServerTitle": "Copy to which server?",
+  "copyToServerNone": "No other saved SSH host to copy to.",
+  "copyToServerWhere": "Into which folder on {server}?",
+  "@copyToServerWhere": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      }
+    }
+  },
+  "copyAction": "Copy",
+  "copiedToServer": "Copied to {server}",
+  "@copiedToServer": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      }
+    }
+  },
+  "copyToServerFailed": "Could not open the files of {server}.",
+  "@copyToServerFailed": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      }
+    }
   }
 }

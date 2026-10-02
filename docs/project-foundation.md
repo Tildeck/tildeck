@@ -638,6 +638,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The same list, choices, and saving serve every source; a CSV row brings its folder, tags, and Telnet, and the same name twice gets a number. The dialog exports the vault's hosts as CSV (name, host, port, user, folder, tags, protocol), never passwords, keys, or identities.
 - Tests: CSV quoting; other tools' headers, a row without a host, duplicate names; an export read back the same without its password; PuTTY's registry output.
 
+### Copying between servers (2026-10-02)
+
+- Holiday plan, wave 3 (SFTP between two servers). Termius shows two servers side by side; here the files page offers "Copy to another server" on an entry and on a selection (the right-click menu on the desktop, the entry's menu on a phone): the user picks a saved SSH host, which opens on a connection of its own, and a folder there (its home by default), and the entries are streamed through this device.
+- `FileBrowser.copyTo` walks folders as the folder download does (links and devices left out), never writes over an entry the target has, counts files and bytes in the transfer list (a new direction, shown with its own icon), and removes the partial copy from the target on failure or cancel.
+- Tests: against OpenSSH, with two connections as the two servers, a folder copied whole with an empty folder inside, a second copy refused, and a large file cancelled on its way leaving nothing behind.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

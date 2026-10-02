@@ -28,6 +28,7 @@ import 'known_hosts_page.dart';
 import 'login_prompt_dialog.dart';
 import 'host_key_dialog.dart';
 import 'port_forwards_page.dart';
+import 'server_picker.dart';
 import 'snippets_page.dart';
 import 'settings_page.dart';
 import 'hosts_page.dart';
@@ -379,7 +380,12 @@ class _SessionsPageState extends State<SessionsPage> {
   Widget _panel(int i) {
     final tab = _tabs[i];
     if (tab is _FilesTab) {
-      return FilesPage(key: ObjectKey(tab), browser: tab.browser, title: tab.title);
+      return FilesPage(
+        key: ObjectKey(tab),
+        browser: tab.browser,
+        title: tab.title,
+        otherServer: (context) => pickOtherServer(context, widget.vault, _connectFor, except: tab.title),
+      );
     }
     final session = (tab as _TermTab).session;
     return ListenableBuilder(
@@ -436,7 +442,11 @@ class _SessionsPageState extends State<SessionsPage> {
     }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => FilesPage(browser: browser, title: title),
+        builder: (_) => FilesPage(
+          browser: browser,
+          title: title,
+          otherServer: (context) => pickOtherServer(context, widget.vault, _connectFor, except: title),
+        ),
       ),
     );
   }

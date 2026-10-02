@@ -69,7 +69,7 @@ String permissionString(int mode) {
   return out.toString();
 }
 
-enum TransferDirection { upload, download }
+enum TransferDirection { upload, download, copy }
 
 enum TransferState { running, done, failed, cancelled }
 
@@ -585,6 +585,75 @@ class FileBrowser extends ChangeNotifier {
     } finally {
       await file.close().catchError((Object _) {});
     }
+  }
+
+  /// Copies [entries] from this server into [target]'s current folder, on
+  /// another server, through this device: files, and folders with
+  /// everything in them, never over an entry that is there. The copy is
+  /// listed among this browser's transfers; a partial one is removed from
+  /// the target on failure or when cancelled.
+  Future<Transfer> copyTo(FileBrowser target, List<RemoteEntry> entries) async {
+    final folder = target.path!;
+    final name = entries.length == 1 ? entries.single.name : '${entries.length}';
+    final transfer = Transfer(name, TransferDirection.copy, null);
+    transfers.insert(0, transfer);
+    _changed();
+    final created = <(String, bool)>[];
+    await _run(
+      transfer,
+      () async {
+        final into = target._sftp!;
+        // What goes where: the folders to make and the files to copy.
+        final folders = <String>[];
+        final files = <(String, String, int)>[];
+        for (final entry in entries) {
+          final top = joinRemote(folder, _safeName(entry.name));
+          if (await target._exists(top)) throw const FileProblemException(FileProblem.exists);
+          if (entry.isDirectory && !entry.isLink) {
+            folders.add(top);
+            final below = <String>[];
+            final inside = <(String, String, int)>[];
+            await _walk(entry.path, '', below, inside, transfer);
+            folders.addAll([for (final b in below) joinRemote(top, b)]);
+            files.addAll([for (final (remote, relative, size) in inside) (remote, joinRemote(top, relative), size)]);
+          } else if (!entry.isDirectory) {
+            files.add((entry.path, top, entry.size ?? 0));
+          }
+        }
+        transfer
+          ..files = files.length
+          ..total = files.fold<int>(0, (sum, f) => sum + f.$3);
+        for (final entry in entries) {
+          created.add((joinRemote(folder, _safeName(entry.name)), entry.isDirectory && !entry.isLink));
+        }
+        for (final f in folders) {
+          transfer._checkCancelled();
+          await into.mkdir(f);
+        }
+        for (final (from, to, _) in files) {
+          transfer._checkCancelled();
+          final source = await _sftp!.open(from);
+          try {
+            await target._uploadFile(transfer, source.read(), to, transfer.done);
+          } finally {
+            await source.close().catchError((Object _) {});
+          }
+          transfer.filesDone++;
+        }
+        if (target.path == folder) await target._list(folder);
+      },
+      cleanup: () async {
+        for (final (path, isDirectory) in created) {
+          try {
+            await target._remove(path, isDirectory: isDirectory);
+          } catch (_) {
+            // Not made yet, or already gone.
+          }
+        }
+        if (target.path == folder) await target._list(folder);
+      },
+    );
+    return transfer;
   }
 
   /// Deletes several entries; stops at the first that fails.

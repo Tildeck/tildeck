@@ -253,6 +253,48 @@ void main() {
       expect(browser.transfers.first.problem, FileProblem.exists, reason: 'never over an existing folder');
     });
 
+    test('entries copy to another server, folders whole, never over what is there', () async {
+      final source = await browse();
+      // A second connection stands for the other server.
+      final otherClient = await SshConnector(knownHosts: MemoryKnownHosts()).connect(
+        ConnectionTarget(host: host!, port: port, username: user, password: password),
+        promptHostKey: ({required target, required presented, required status, previous}) async => true,
+      );
+      addTearDown(otherClient.close);
+      await client.run('mkdir ~/$folder/dest');
+      final other = FileBrowser(otherClient.sftp);
+      addTearDown(other.dispose);
+      await other.start();
+      await other.goTo('$folder/dest');
+
+      final site = source.entries.firstWhere((e) => e.name == 'site');
+      final copy = await source.copyTo(other, [site]);
+      expect(copy.state, TransferState.done);
+      expect((copy.direction, copy.files, copy.total), (TransferDirection.copy, 2, 17));
+      final listing = utf8.decode(await client.run('cd ~/$folder/dest && find . | sort'));
+      expect(listing.trim().split('\n'), [
+        '.',
+        './site',
+        './site/css',
+        './site/css/app.css',
+        './site/empty',
+        './site/index.html',
+      ]);
+      expect(other.entries.map((e) => e.name), contains('site'), reason: 'the target lists the copy');
+
+      final again = await source.copyTo(other, [site]);
+      expect(again.problem, FileProblem.exists, reason: 'never over an existing entry');
+
+      // A big file, cancelled on its way: nothing is left on the target.
+      final huge = source.entries.firstWhere((e) => e.name == 'huge.bin');
+      final running = source.copyTo(other, [huge]);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await source.transfers.first.cancel();
+      expect((await running).state, TransferState.cancelled);
+      final left = utf8.decode(await client.run('ls ~/$folder/dest'));
+      expect(left.trim().split('\n'), ['site']);
+    });
+
     test('a folder with hostile names downloads inside its target only', () async {
       // Names Linux allows and Windows reads as paths, drives, or devices.
       await client.run(

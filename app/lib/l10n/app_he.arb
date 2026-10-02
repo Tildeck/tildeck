@@ -514,5 +514,12 @@
   "importFromPutty": "מה-sessions השמורים של PuTTY.",
   "importPutty": "מ-PuTTY",
   "exportHostsCsv": "ייצוא כ-CSV",
-  "hostsExported": "השרתים יוצאו, בלי סיסמאות ומפתחות: {path}"
+  "hostsExported": "השרתים יוצאו, בלי סיסמאות ומפתחות: {path}",
+  "copyToServer": "העתקה לשרת אחר",
+  "copyToServerTitle": "להעתיק לאיזה שרת?",
+  "copyToServerNone": "אין שרת SSH שמור אחר להעתיק אליו.",
+  "copyToServerWhere": "לאיזו תיקייה ב-{server}?",
+  "copyAction": "העתקה",
+  "copiedToServer": "הועתק ל-{server}",
+  "copyToServerFailed": "לא ניתן לפתוח את הקבצים של {server}."
 }
