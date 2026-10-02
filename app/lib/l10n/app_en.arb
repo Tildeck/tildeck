@@ -995,5 +995,41 @@
   "saveAsSnippet": "Save as snippet",
   "sessionLogsLabel": "Save session logs",
   "sessionLogsHelp": "Each session's output is saved as text in Documents\\Tildeck\\logs on this computer. Logs are not encrypted: they keep whatever was on the screen.",
-  "openSessionLogs": "Open the logs folder"
+  "openSessionLogs": "Open the logs folder",
+  "workspacesTitle": "Workspaces",
+  "workspaceChip": "{name} · {count}",
+  "@workspaceChip": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteWorkspace": "Remove workspace",
+  "workspaceDeleted": "Workspace {name} removed",
+  "@workspaceDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "saveWorkspace": "Save tabs as a workspace",
+  "workspaceNameLabel": "Workspace name",
+  "workspaceNameHint": "Morning checks",
+  "workspaceSaved": "{count, plural, =1{Saved {name} with 1 host} other{Saved {name} with {count} hosts}}",
+  "@workspaceSaved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "paletteWorkspace": "Workspace"
 }

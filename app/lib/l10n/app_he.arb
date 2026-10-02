@@ -551,5 +551,14 @@
   "saveAsSnippet": "שמירה כ-snippet",
   "sessionLogsLabel": "שמירת יומני sessions",
   "sessionLogsHelp": "הפלט של כל session נשמר כטקסט ב-Documents\\Tildeck\\logs במחשב הזה. היומנים אינם מוצפנים: יש בהם כל מה שהופיע על המסך.",
-  "openSessionLogs": "פתיחת תיקיית היומנים"
+  "openSessionLogs": "פתיחת תיקיית היומנים",
+  "workspacesTitle": "סביבות עבודה",
+  "workspaceChip": "{name} · {count}",
+  "deleteWorkspace": "הסרת סביבת העבודה",
+  "workspaceDeleted": "סביבת העבודה {name} הוסרה",
+  "saveWorkspace": "שמירת הלשוניות כסביבת עבודה",
+  "workspaceNameLabel": "שם סביבת העבודה",
+  "workspaceNameHint": "בדיקות בוקר",
+  "workspaceSaved": "{count, plural, =1{{name} נשמרה עם שרת אחד} other{{name} נשמרה עם {count} שרתים}}",
+  "paletteWorkspace": "סביבת עבודה"
 }
