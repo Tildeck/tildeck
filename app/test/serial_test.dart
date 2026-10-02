@@ -113,6 +113,8 @@ void main() {
   });
 
   testWidgets('the host editor makes a serial host: a port and a baud rate, no sign-in or jump host', (tester) async {
+    serialSupported = true;
+    addTearDown(() => serialSupported = Platform.isWindows);
     tester.view.physicalSize = const Size(1000, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);

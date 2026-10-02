@@ -11,6 +11,8 @@ environment:
 
 dependencies:
   dartssh2: ^4.1.0
+  # Native calls for serial ports on Windows.
+  ffi: ^2.1.0
   file_picker: ^13.1.0
   flutter:
     sdk: flutter
@@ -24,8 +26,6 @@ dependencies:
   path_provider: ^2.1.5
   # Key generation (RSA) and fingerprints; dartssh2 already depends on it.
   pointycastle: ^4.0.0
-  # Serial ports on the desktop (libserialport, built from source).
-  flutter_libserialport: ^0.5.0
   # QR codes for setting up two-factor sign-in in an authenticator app.
   qr_flutter: ^4.1.0
   sodium: ^4.0.4

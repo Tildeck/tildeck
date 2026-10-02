@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:dartssh2/dartssh2.dart' show SSHClient;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -54,9 +51,6 @@ List<HostEntry> jumpCandidatesFor(Vault vault, String? hostId) => [
   for (final h in vault.hosts)
     if (h.isSsh && h.id != hostId && jumpChainOf(vault, h).every((j) => j.id != hostId)) h,
 ];
-
-/// Serial ports can be opened on desktop computers only.
-bool get serialSupported => !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
 /// Each protocol's usual port; a serial host's is its baud rate.
 int defaultPortOf(ConnectionProtocol protocol) => switch (protocol) {
@@ -1240,7 +1234,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                             decoration: _serial
                                 ? InputDecoration(
                                     labelText: t.serialPortLabel,
-                                    hintText: Platform.isWindows ? 'COM3' : '/dev/ttyUSB0',
+                                    hintText: 'COM3',
                                     suffixIcon: PopupMenuButton<String>(
                                       key: const ValueKey('serialPorts'),
                                       icon: const Icon(Icons.usb_rounded),
