@@ -507,6 +507,8 @@ async def claim(body: ClaimRequest, request: Request, session: AsyncSession = De
     if device.status != "active":
         raise ApiError(409, ErrorCode.device_revoked)
     account = await session.get(Account, device.account_id)
+    if account is None or account.disabled_at is not None:
+        raise ApiError(403, ErrorCode.account_disabled)
     device.claim_token_hash = None
     token = _issue_token(device)
     await session.commit()

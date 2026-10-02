@@ -519,6 +519,16 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `Vault.adopt` replaces the vault file with a synced vault and was guarded only by an `assert`, which release builds drop. A device with its own vault that locked (by the idle lock, say) while it waited for approval reached `adopt` when the approval was collected, and lost its records. `adopt` now throws over any existing vault, sign-in refuses a locked vault, and a pending device does not collect its approval while the vault is locked: collecting consumes it on the server. It waits, and collects once the vault is open, where a different vault is refused as at sign-in.
 - Tests (both fail on the old code): adopting over a locked vault throws and leaves the file as it was; a device whose vault locks while it waits keeps its own vault and is refused with `DifferentVault` once unlocked.
 
+### Server hardening: the review's low findings (2026-10-02)
+
+- An email confirmation link opened a page that confirmed at once, so a mail scanner opening it confirmed the address. It now shows a button, as device approval already did; opening it changes nothing.
+- The access log line carries the request path, and the path of an email link is its token. A filter on `uvicorn.access` replaces the token with `***`.
+- Two admin sign-ins with the same TOTP code could both read the old last step and both pass. The administrator's row is now locked (`SELECT ... FOR UPDATE`) until the attempt commits.
+- A disabled account's device, approved before, could still collect its token with the claim. Claiming now refuses it (`account_disabled`).
+- Request bodies are capped before anything reads them: 1 MiB, and 16 MiB under `/api/sync/` (a declared length over the cap is refused unread; a chunked body is counted as it arrives). The answer is 413 with `invalid_request`, no new error code. The client splits a push at 500 records or 8 MiB of ciphertext, whichever comes first.
+- `device_idle_days` is at most 3650: more is a typo and overflows dates.
+- Tests (each fails on the old code): opening a confirmation link twice leaves the address unconfirmed; a disabled account's approved device is refused; declared and chunked bodies over the cap get 413 while a sync push of the same size does not; the access log filter hides a link token; one code sent twice at once signs in once; 3651 idle days refused and 3650 kept; pushes split by count and by size.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

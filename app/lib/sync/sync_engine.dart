@@ -45,6 +45,31 @@ class SyncEngine extends ChangeNotifier {
   /// The most changes one push carries: the server's limit.
   static const pushLimit = 500;
 
+  /// The most ciphertext bytes one push carries, well under the server's
+  /// 16 MiB cap on a request (base64 adds a third).
+  static const pushBytes = 8 * 1024 * 1024;
+
+  /// [records] in pushes within [pushLimit] and [pushBytes]. A record over
+  /// [pushBytes] on its own goes alone.
+  @visibleForTesting
+  static List<List<StoredRecord>> pushChunks(List<StoredRecord> records) {
+    final chunks = <List<StoredRecord>>[];
+    var chunk = <StoredRecord>[];
+    var bytes = 0;
+    for (final r in records) {
+      final size = (r.sealed?.ciphertext.length ?? 0) + (r.sealed?.nonce.length ?? 0);
+      if (chunk.isNotEmpty && (chunk.length == pushLimit || bytes + size > pushBytes)) {
+        chunks.add(chunk);
+        chunk = [];
+        bytes = 0;
+      }
+      chunk.add(r);
+      bytes += size;
+    }
+    if (chunk.isNotEmpty) chunks.add(chunk);
+    return chunks;
+  }
+
   /// Rounds of pushing per sync: a conflict won locally is pushed again in
   /// the next round, so one round is rarely followed by more than one.
   static const _pushRounds = 3;
@@ -141,8 +166,7 @@ class SyncEngine extends ChangeNotifier {
       for (var round = 0; round < _pushRounds; round++) {
         final dirty = vault.dirtyRecords;
         if (dirty.isEmpty) break;
-        for (var i = 0; i < dirty.length; i += pushLimit) {
-          final chunk = dirty.sublist(i, i + pushLimit > dirty.length ? dirty.length : i + pushLimit);
+        for (final chunk in pushChunks(dirty)) {
           final result = await server.push(account.token, chunk);
           await vault.applyPushed(accepted: result.accepted, conflicts: result.conflicts);
         }

@@ -1,8 +1,8 @@
 """The pages behind links in emails: address verification and approval of a
 new device. Plain server-rendered pages in the account's language.
 
-Verification happens when the link opens. Approval needs a button press: mail
-scanners open links on their own, and that must never approve a device.
+Both need a button press: mail scanners open links on their own, and that
+must never confirm an address or approve a device.
 These routes are not part of the API contract.
 """
 
@@ -71,6 +71,17 @@ def _invalid(request: Request) -> HTMLResponse:
 
 
 @router.get("/verify/{token}")
+async def verify_page(token: str, request: Request, session: AsyncSession = Depends(get_db)) -> HTMLResponse:
+    found = await _usable(session, token, "verify")
+    if found is None:
+        return _invalid(request)
+    _, account = found
+    button = html.escape(text(account.locale, "verify_button"))
+    form = f'<form method="post"><button type="submit">{button}</button></form>'
+    return _page(account.locale, "verify_title", "verify_page_body", form=form)
+
+
+@router.post("/verify/{token}")
 async def verify_email(token: str, request: Request, session: AsyncSession = Depends(get_db)) -> HTMLResponse:
     found = await _usable(session, token, "verify")
     if found is None:

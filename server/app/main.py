@@ -1,6 +1,7 @@
 """Application entry point: uvicorn app.main:app."""
 
 import logging
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -10,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app import admins, migrations_runner, panel, settings_store
+from app.body_limit import BodyLimitMiddleware, RequestTooLarge
 from app.config import get_app_version, get_settings
 from app.db import async_session
 from app.mailer import SmtpMailer
@@ -20,6 +22,22 @@ from app.routers import account, admin, health, links, sync
 # below WARNING is dropped.
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s")
 logger = logging.getLogger("tildeck")
+
+_LINK_TOKEN = re.compile(r"(/links/[a-z]+/)[^/?\s]+")
+
+
+class _HideLinkTokens(logging.Filter):
+    """The access log line carries the path, and the path of an email link
+    is its secret: the token is replaced before the line is written."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            record.args = (*args[:2], _LINK_TOKEN.sub(r"\1***", args[2]), *args[3:])
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_HideLinkTokens())
 
 
 def assert_startup_config() -> None:
@@ -65,6 +83,10 @@ def create_app() -> FastAPI:
     async def api_error(request: Request, exc: ApiError) -> JSONResponse:
         return JSONResponse({"error": exc.code.value}, status_code=exc.status_code)
 
+    @app.exception_handler(RequestTooLarge)
+    async def too_large(request: Request, exc: RequestTooLarge) -> JSONResponse:
+        return JSONResponse({"error": ErrorCode.invalid_request.value}, status_code=413)
+
     # A malformed request gets the same stable error body as every refusal.
     # The field details stay out of the answer: clients never show them.
     @app.exception_handler(RequestValidationError)
@@ -95,6 +117,7 @@ def create_app() -> FastAPI:
     # The client's address, as the trusted proxy saw it: the nearest entry of
     # X-Forwarded-For that is not a trusted proxy, never one the client wrote.
     app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=get_settings().TRUSTED_PROXIES)
+    app.add_middleware(BodyLimitMiddleware)
     return app
 
 

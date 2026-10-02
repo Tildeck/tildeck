@@ -187,7 +187,9 @@ async def sign_in(
     user_key = f"admin:{body.username.lower()}"
     if not limiter.take(user_key, USERNAME_LIMIT):
         raise ApiError(429, ErrorCode.rate_limited)
-    admin = await session.scalar(select(Admin).where(Admin.username == body.username))
+    # Locked until this attempt commits: two sign-ins with the same code
+    # cannot both read the old last step and both pass.
+    admin = await session.scalar(select(Admin).where(Admin.username == body.username).with_for_update())
     usable = admin if admin is not None and admin.disabled_at is None else None
     # Verified even without a usable administrator, so the time taken does
     # not tell which usernames exist.

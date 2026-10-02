@@ -115,8 +115,10 @@ async def register(client, keys: Keys) -> str:
 
 async def verify(client, mail, keys: Keys) -> None:
     message = next(m for m in mail.sent if m.to == keys.email.lower() and "Confirm" in m.subject)
-    res = await client.get(link_from(message, "verify"))
-    assert res.status_code == 200
+    link = link_from(message, "verify")
+    page = await client.get(link)
+    assert page.status_code == 200 and b'method="post"' in page.content
+    assert (await client.post(link)).status_code == 200
 
 
 def bearer(token: str) -> dict:
@@ -179,6 +181,16 @@ async def test_registration_signs_in_the_device_and_sends_a_verification_link(cl
 
     again = await client.post("/api/account/register", json={**keys.register_body(), "device": device()}, headers=H)
     assert (again.status_code, again.json()) == (409, {"error": "email_taken"})
+
+
+async def test_opening_a_verification_link_does_not_confirm_the_address(client, mail):
+    # Mail scanners open links on their own: only the button confirms.
+    keys = Keys("new@example.test")
+    token = await register(client, keys)
+    message = next(m for m in mail.sent if "Confirm" in m.subject)
+    for _ in range(2):
+        assert (await client.get(link_from(message, "verify"))).status_code == 200
+    assert (await client.get("/api/account", headers=bearer(token))).json()["email_verified"] is False
 
 
 async def test_a_verification_link_expires(client, mail, monkeypatch):
@@ -431,6 +443,56 @@ async def test_a_waiting_device_may_keep_asking_but_wrong_claim_tokens_are_limit
     wrong = {"device_id": phone["id"], "claim_token": "not-the-token"}
     codes = [(await client.post("/api/devices/claim", json=wrong, headers=H)).status_code for _ in range(31)]
     assert codes[0] == 401 and codes[-1] == 429
+
+
+async def test_a_disabled_account_cannot_collect_an_approved_device(client, mail):
+    keys = Keys("user@example.test")
+    await register(client, keys)
+    phone = device("Phone")
+    res = await client.post(
+        "/api/account/signin", json={"email": keys.email, "auth_key": keys.auth_key, "device": phone}, headers=H
+    )
+    claim = {"device_id": phone["id"], "claim_token": res.json()["claim_token"]}
+    async with engine.begin() as conn:
+        await conn.execute(text("UPDATE devices SET status = 'active' WHERE id = :id"), {"id": phone["id"]})
+        await conn.execute(text("UPDATE accounts SET disabled_at = now()"))
+    res = await client.post("/api/devices/claim", json=claim, headers=H)
+    assert (res.status_code, res.json()) == (403, {"error": "account_disabled"})
+
+
+async def test_bodies_over_the_cap_are_refused_before_they_are_read(client):
+    big = b"x" * (1024 * 1024 + 1)
+    declared = await client.post("/api/account/prelogin", content=big, headers=H)
+    assert (declared.status_code, declared.json()) == (413, {"error": "invalid_request"})
+
+    async def chunks():
+        for _ in range(3):
+            yield b"x" * (512 * 1024)
+
+    streamed = await client.post("/api/account/prelogin", content=chunks(), headers=H)
+    assert (streamed.status_code, streamed.json()) == (413, {"error": "invalid_request"})
+
+    # A sync push may be larger: it carries records.
+    push = await client.post("/api/sync/push", content=big, headers=H)
+    assert push.status_code != 413
+
+
+def test_email_link_tokens_stay_out_of_the_access_log():
+    import logging
+
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        "",
+        0,
+        '%s - "%s %s HTTP/%s" %d',
+        ("203.0.113.5:4000", "POST", "/links/approve/s3cret-token?x=1", "1.1", 200),
+        None,
+    )
+    for f in logging.getLogger("uvicorn.access").filters:
+        f.filter(record)
+    line = record.getMessage()
+    assert "s3cret-token" not in line and "/links/approve/***?x=1" in line
 
 
 async def test_email_follows_the_account_language_and_never_carries_keys(client, mail):
