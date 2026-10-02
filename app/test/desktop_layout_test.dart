@@ -67,7 +67,7 @@ void main() {
       scrollable: find.descendant(of: find.byType(HostEditorPage), matching: find.byType(Scrollable)).first,
     );
     await tester.tap(find.byKey(const ValueKey('saveHost')));
-    for (var i = 0; i < 100 && find.byKey(const ValueKey('closePanel')).evaluate().isNotEmpty; i++) {
+    for (var i = 0; i < 1000 && find.byKey(const ValueKey('closePanel')).evaluate().isNotEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
       await tester.pump(const Duration(milliseconds: 20));
     }

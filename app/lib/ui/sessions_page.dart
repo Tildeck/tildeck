@@ -344,7 +344,10 @@ class _SessionsPageState extends State<SessionsPage> {
                   if (_sessions.isNotEmpty) _sessionBar(context, showHome: false),
                   Expanded(
                     // Each section keeps its own state while another shows.
-                    child: _content(context, KeyedSubtree(key: ValueKey(_section), child: _sectionPage())),
+                    child: _content(
+                      context,
+                      KeyedSubtree(key: ValueKey(_section), child: deskSectionTheme(context, _sectionPage())),
+                    ),
                   ),
                 ],
               ),

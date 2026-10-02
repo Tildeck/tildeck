@@ -13,6 +13,7 @@ import '../ssh/ssh_connector.dart';
 import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
+import 'desktop_sidebar.dart' show isDesktopLayout;
 import 'known_hosts_page.dart';
 import 'terminal_panel.dart' show connectProblemText;
 
@@ -78,28 +79,32 @@ class _KeysPageState extends State<KeysPage> {
 
   Future<void> _add() async {
     final t = AppLocalizations.of(context);
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              key: const ValueKey('generateKey'),
-              leading: const Icon(Icons.auto_awesome_outlined),
-              title: Text(t.generateKey),
-              onTap: () => Navigator.pop(context, 'generate'),
-            ),
-            ListTile(
-              key: const ValueKey('importKey'),
-              leading: const Icon(Icons.file_download_outlined),
-              title: Text(t.importKey),
-              onTap: () => Navigator.pop(context, 'import'),
-            ),
-          ],
-        ),
+    // A sheet from the bottom on a phone; a small dialog on the desktop.
+    Widget choices(BuildContext context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            key: const ValueKey('generateKey'),
+            leading: const Icon(Icons.auto_awesome_outlined),
+            title: Text(t.generateKey),
+            onTap: () => Navigator.pop(context, 'generate'),
+          ),
+          ListTile(
+            key: const ValueKey('importKey'),
+            leading: const Icon(Icons.file_download_outlined),
+            title: Text(t.importKey),
+            onTap: () => Navigator.pop(context, 'import'),
+          ),
+        ],
       ),
     );
+    final choice = isDesktopLayout(context)
+        ? await showDialog<String>(
+            context: context,
+            builder: (context) => Dialog(child: SizedBox(width: 380, child: choices(context))),
+          )
+        : await showModalBottomSheet<String>(context: context, builder: choices);
     if (!mounted || choice == null) return;
     if (choice == 'generate') {
       await showKeyGenerator(context, vault);
@@ -175,26 +180,39 @@ class _KeysPageState extends State<KeysPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final c = context.colors;
+    // On the desktop: a button in the header, not one floating over the
+    // list, and the sidebar has the known hosts.
+    final desktop = isDesktopLayout(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(t.keysTitle),
         actions: [
-          TextButton.icon(
-            key: const ValueKey('openKnownHosts'),
-            icon: const Icon(Icons.verified_user_outlined, size: 18),
-            label: Text(t.knownHostsTitle),
-            onPressed: () =>
-                Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => KnownHostsPage(vault: vault))),
-          ),
+          if (desktop)
+            FilledButton.icon(
+              key: const ValueKey('addKey'),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(t.addKey),
+              onPressed: _add,
+            )
+          else
+            TextButton.icon(
+              key: const ValueKey('openKnownHosts'),
+              icon: const Icon(Icons.verified_user_outlined, size: 18),
+              label: Text(t.knownHostsTitle),
+              onPressed: () =>
+                  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => KnownHostsPage(vault: vault))),
+            ),
           const SizedBox(width: 8),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const ValueKey('addKey'),
-        icon: const Icon(Icons.add),
-        label: Text(t.addKey),
-        onPressed: _add,
-      ),
+      floatingActionButton: desktop
+          ? null
+          : FloatingActionButton.extended(
+              key: const ValueKey('addKey'),
+              icon: const Icon(Icons.add),
+              label: Text(t.addKey),
+              onPressed: _add,
+            ),
       body: ListenableBuilder(
         listenable: vault,
         builder: (context, _) {
