@@ -325,15 +325,17 @@ void main() {
       final browser = await browse();
       Stream<List<int>> endless() =>
           Stream<List<int>>.periodic(const Duration(milliseconds: 1), (_) => List.filled(8192, 7));
-      final runs = [for (final name in ['a.bin', 'b.bin', 'c.bin', 'd.bin']) browser.upload(endless(), name, null)];
+      final runs = [
+        for (final name in ['a.bin', 'b.bin', 'c.bin', 'd.bin']) browser.upload(endless(), name, null),
+      ];
       final byName = {for (final t in browser.transfers) t.name: t};
       await Future<void>.delayed(const Duration(milliseconds: 200));
-      expect([for (final n in ['a.bin', 'b.bin', 'c.bin', 'd.bin']) byName[n]!.state], [
-        TransferState.running,
-        TransferState.running,
-        TransferState.queued,
-        TransferState.queued,
-      ]);
+      expect(
+        [
+          for (final n in ['a.bin', 'b.bin', 'c.bin', 'd.bin']) byName[n]!.state,
+        ],
+        [TransferState.running, TransferState.running, TransferState.queued, TransferState.queued],
+      );
       await byName['c.bin']!.cancel();
       expect(byName['c.bin']!.state, TransferState.cancelled);
       await byName['a.bin']!.cancel();
