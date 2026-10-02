@@ -125,6 +125,17 @@ void main() {
     await tester.tap(find.text('Close').last);
     await settle();
 
+    // A host's files open as a tab beside the terminals, not as a page.
+    final before = tabs();
+    await tester.tap(find.byKey(ValueKey('hostMenu-${vault.hosts.first.id}')));
+    await settle();
+    await tester.tap(find.byKey(const ValueKey('hostFiles')));
+    await settle();
+    expect(tabs(), before + 1);
+    expect(chosen(), before);
+    expect(find.byKey(const ValueKey('filesUpload')), findsOneWidget);
+    expect(find.byType(BackButton), findsNothing);
+
     // Ctrl+Shift+L locks.
     await keys([ctrl, shift], LogicalKeyboardKey.keyL);
     expect(vault.status, VaultStatus.locked);

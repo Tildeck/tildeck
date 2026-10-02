@@ -466,6 +466,21 @@ void main() {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/files_${locale}_${mode.name}.png'));
     });
 
+    testWidgets('desktop files $locale ${mode.name}', (tester) async {
+      desktop(tester);
+      await tester.pumpWidget(
+        screen(locale, mode, FilesPage(browser: SampleBrowser(), title: 'deploy@prod-web-01.example.com')),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.byKey(const ValueKey('row-app-v1.4.2.tar.gz')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/desktop_files_${locale}_${mode.name}.png'),
+      );
+    });
+
     testWidgets('snippets $locale ${mode.name}', (tester) async {
       phone(tester);
       final vault = (await tester.runAsync(() async {

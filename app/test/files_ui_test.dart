@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -264,6 +265,74 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('cancelTransfer-backup.tar')));
     await tester.pump();
     expect(transfer.cancelled, isTrue);
+  });
+
+  testWidgets('on the desktop: a table with Ctrl and Shift selection, sorting by a column, and file manager keys', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final browser = RecordingBrowser();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: FilesPage(browser: browser, title: 'deploy@example.com', local: TempFiles(Directory.systemTemp)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('filesTable')), findsOneWidget);
+
+    // A click selects one; Shift adds the range; Ctrl takes one out.
+    await tester.tap(find.byKey(const ValueKey('row-logs')));
+    await tester.pump();
+    expect(find.text('1 selected'), findsOneWidget);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.tap(find.byKey(const ValueKey('row-notes.txt')));
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pump();
+    expect(find.text('2 selected'), findsOneWidget);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.tap(find.byKey(const ValueKey('row-logs')));
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    expect(find.text('1 selected'), findsOneWidget);
+
+    // F2 renames the one chosen; Delete asks, then deletes.
+    await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('folderName')), 'todo.txt');
+    await tester.tap(find.byKey(const ValueKey('nameDialogOk')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('row-notes.txt')));
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirmDelete')));
+    await tester.pumpAndSettle();
+    expect(browser.actions, ['rename notes.txt to todo.txt', 'delete notes.txt']);
+
+    // A column title sorts; a double-click opens a folder.
+    await tester.tap(find.byKey(const ValueKey('sort-size')));
+    await tester.pump();
+    expect(browser.sortBy, SortBy.size);
+    await tester.tap(find.byKey(const ValueKey('row-logs')));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const ValueKey('row-logs')));
+    await tester.pumpAndSettle();
+    expect(browser.opened, ['/home/deploy/logs']);
+
+    // A right-click offers the entry's actions.
+    await tester.tap(find.byKey(const ValueKey('row-notes.txt')), buttons: kSecondaryButton);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rowRename')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rowEdit')), findsOneWidget);
   });
 }
 

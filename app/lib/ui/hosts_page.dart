@@ -158,6 +158,7 @@ class HostsPage extends StatefulWidget {
     this.connectHost,
     this.desktop = false,
     this.searchFocus,
+    this.onFiles,
   });
 
   final Vault vault;
@@ -178,6 +179,9 @@ class HostsPage extends StatefulWidget {
 
   /// The search field's focus, for the new connection shortcut.
   final FocusNode? searchFocus;
+
+  /// Shows a host's files (as a tab on the desktop); null opens a page.
+  final void Function(FileBrowser browser, String title)? onFiles;
 
   @override
   State<HostsPage> createState() => _HostsPageState();
@@ -228,6 +232,11 @@ class _HostsPageState extends State<HostsPage> {
       final c = client = await widget.connectHost!(context, host);
       return c.sftp();
     }, onClose: () => client?.close());
+    final show = widget.onFiles;
+    if (show != null) {
+      show(browser, host.label);
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => FilesPage(browser: browser, title: host.label),
