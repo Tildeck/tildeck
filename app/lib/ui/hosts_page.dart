@@ -13,6 +13,7 @@ import 'files_page.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
 import 'identities_page.dart';
+import 'import_hosts.dart';
 import 'keys_page.dart';
 import 'proxy_editor.dart';
 import 'snippets_page.dart';
@@ -325,6 +326,21 @@ class _HostsPageState extends State<HostsPage> {
 
   void _closePanel() => setState(() => _panel = null);
 
+  Future<void> _importHosts(BuildContext context) async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await showImportHosts(context, widget.vault);
+    if (result == null) return;
+    final skipped = result.unreadableKeys.length;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          skipped == 0 ? t.importedHosts(result.hosts, result.keys) : t.importedHostsKeysSkipped(result.hosts, skipped),
+        ),
+      ),
+    );
+  }
+
   void _editHost(BuildContext context, HostEntry? host) {
     if (!widget.desktop) {
       Navigator.of(context).push(
@@ -443,6 +459,12 @@ class _HostsPageState extends State<HostsPage> {
                       ),
                   ],
                 ),
+              IconButton(
+                key: const ValueKey('importHosts'),
+                tooltip: t.importHostsTitle,
+                icon: const Icon(Icons.download_rounded),
+                onPressed: () => _importHosts(context),
+              ),
               const SizedBox(width: 8),
               if (iconsOnly)
                 IconButton.outlined(

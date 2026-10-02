@@ -8,6 +8,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 - Biometric unlock: a fingerprint or face on Android, Windows Hello on Windows, turned on per device in Settings, Security with the master password, which always keeps working too.
 - Identities: a username with a key or a password, saved once and chosen by any number of hosts or groups; changing it changes all of them.
+- Import hosts from an SSH configuration (~/.ssh/config, or a chosen file): names, addresses, users, ports, key files, and jump hosts, with the hosts already saved left out.
 - Settings in one place: general, terminal, security, master password, account and sync, and keyboard shortcuts, saved together with one bar. The language and theme are now remembered, the lock time can be chosen, and on Android the vault can lock when the app goes to the background and the app can be kept out of screenshots.
 - Two-factor sign-in for sync accounts: turned on in Settings, Security with an authenticator app, then signing in, changing the master password, and recovery also ask for its code. An administrator can turn it off for a user who lost the app.
 - On the desktop, files show this computer beside the server; drag between them to upload or download.

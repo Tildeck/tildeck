@@ -767,5 +767,58 @@
         "type": "String"
       }
     }
+  },
+  "importHostsTitle": "Import hosts",
+  "importFromDefault": "From this computer's SSH configuration (~/.ssh/config).",
+  "importFromFile": "From the chosen file.",
+  "importNoConfig": "This device has no SSH configuration (~/.ssh/config). Choose a file to import from.",
+  "importNothingFound": "No named hosts in this file. Hosts with wildcards (Host *) are defaults, not hosts.",
+  "importChooseFile": "Choose a file",
+  "importAlreadySaved": "Already saved",
+  "importKeyFile": "key {file}",
+  "@importKeyFile": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "importThrough": "through {host}",
+  "@importThrough": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "importCount": "{count, plural, =1{Import 1 host} other{Import {count} hosts}}",
+  "@importCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importedHosts": "{hosts, plural, =1{Imported 1 host} other{Imported {hosts} hosts}}, {keys, plural, =0{no new keys} =1{1 new key} other{{keys} new keys}}",
+  "@importedHosts": {
+    "placeholders": {
+      "hosts": {
+        "type": "int"
+      },
+      "keys": {
+        "type": "int"
+      }
+    }
+  },
+  "importedHostsKeysSkipped": "{hosts, plural, =1{Imported 1 host} other{Imported {hosts} hosts}}. {skipped, plural, =1{1 key file} other{{skipped} key files}} could not be read or need a passphrase: add them on the Keys page.",
+  "@importedHostsKeysSkipped": {
+    "placeholders": {
+      "hosts": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
   }
 }

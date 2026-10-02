@@ -451,5 +451,17 @@
   "identityHostCount": "{count, plural, =0{אין שרתים} =1{שרת אחד} other{{count} שרתים}}",
   "identityInUse": "יש שרתים או קבוצות שמשתמשים בזהות הזו. צריך לבחור להם זהות אחרת קודם.",
   "loginPromptTitle": "השרת מבקש פרטי כניסה",
-  "loginPromptIntro": "כניסה בתור {who}. השרת שאל:"
+  "loginPromptIntro": "כניסה בתור {who}. השרת שאל:",
+  "importHostsTitle": "ייבוא שרתים",
+  "importFromDefault": "מתצורת ה-SSH של המחשב הזה (~/.ssh/config).",
+  "importFromFile": "מהקובץ שנבחר.",
+  "importNoConfig": "אין במכשיר הזה תצורת SSH (~/.ssh/config). אפשר לבחור קובץ לייבוא.",
+  "importNothingFound": "אין בקובץ הזה שרתים עם שם. שרתים עם תווים כלליים (Host *) הם ברירות מחדל ולא שרתים.",
+  "importChooseFile": "בחירת קובץ",
+  "importAlreadySaved": "כבר שמור",
+  "importKeyFile": "מפתח {file}",
+  "importThrough": "דרך {host}",
+  "importCount": "{count, plural, =1{ייבוא שרת אחד} other{ייבוא {count} שרתים}}",
+  "importedHosts": "{hosts, plural, =1{יובא שרת אחד} other{יובאו {hosts} שרתים}}, {keys, plural, =0{בלי מפתחות חדשים} =1{מפתח חדש אחד} other{{keys} מפתחות חדשים}}",
+  "importedHostsKeysSkipped": "{hosts, plural, =1{יובא שרת אחד} other{יובאו {hosts} שרתים}}. {skipped, plural, =1{קובץ מפתח אחד} other{{skipped} קובצי מפתח}} לא נקראו או דורשים passphrase: אפשר להוסיף אותם בעמוד המפתחות."
 }
