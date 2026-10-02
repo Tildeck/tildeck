@@ -157,6 +157,14 @@ async def test_admin_attempts_sent_at_once_cannot_get_past_the_limit(panel, monk
     assert sorted(a.status_code for a in answers) == [401] * 10 + [429] * 5
 
 
+async def test_a_code_sent_twice_at_once_signs_in_once(panel, monkeypatch):
+    csrf, phone = await set_up(panel, monkeypatch)
+    await panel.delete("/api/admin/session", headers=csrf)
+    body = {"username": USERNAME, "password": PASSWORD, "code": phone.next()}
+    answers = await asyncio.gather(*(panel.post("/api/admin/session", json=body) for _ in range(2)))
+    assert sorted(a.status_code for a in answers) == [200, 401]
+
+
 async def test_changes_need_the_csrf_token_and_sessions_expire(panel, monkeypatch):
     csrf, _ = await set_up(panel, monkeypatch)
     change = {"values": {"registration_mode": "invite"}}

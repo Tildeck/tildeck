@@ -117,8 +117,18 @@ def _validate_email(key: str, value: str) -> None:
         raise InvalidSettingValue(key)
 
 
+# Ten years: more is a typo, and a date that far ahead overflows.
+MAX_IDLE_DAYS = 3650
+
+
 def _validate_positive_int(key: str, value: str) -> None:
     if not value.isdigit() or int(value) < 1:
+        raise InvalidSettingValue(key)
+
+
+def _validate_idle_days(key: str, value: str) -> None:
+    _validate_positive_int(key, value)
+    if int(value) > MAX_IDLE_DAYS:
         raise InvalidSettingValue(key)
 
 
@@ -126,7 +136,7 @@ VALIDATORS = {
     "public_url": _validate_url,
     "smtp_port": _validate_port,
     "smtp_from": _validate_email,
-    "device_idle_days": _validate_positive_int,
+    "device_idle_days": _validate_idle_days,
     "signin_limit_per_account": _validate_positive_int,
     "signin_limit_per_address": _validate_positive_int,
 }

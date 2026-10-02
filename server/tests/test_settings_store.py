@@ -62,6 +62,10 @@ async def test_invalid_values_are_refused(session):
         await settings_store.set_value(session, "smtp_port", "99999", actor="admin@test")
     with pytest.raises(settings_store.InvalidSettingValue):
         await settings_store.set_value(session, "public_url", "not a url", actor="admin@test")
+    # Beyond ten years the idle limit is a typo and would overflow dates.
+    with pytest.raises(settings_store.InvalidSettingValue):
+        await settings_store.set_value(session, "device_idle_days", "3651", actor="admin@test")
+    await settings_store.set_value(session, "device_idle_days", "3650", actor="admin@test")
 
 
 async def test_unknown_setting(session):

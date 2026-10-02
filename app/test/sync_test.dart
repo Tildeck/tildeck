@@ -322,6 +322,18 @@ void main() {
     expect(b.vault.hosts.single.name, 'after restore');
   });
 
+  test('pushes stay within the server limits on count and size', () {
+    StoredRecord record(int bytes) =>
+        StoredRecord(id: 'r', version: 1, sealed: Sealed(Uint8List(24), Uint8List(bytes)), dirty: true);
+    final many = List.generate(1200, (_) => record(100));
+    expect(SyncEngine.pushChunks(many).map((c) => c.length), [500, 500, 200]);
+    final big = List.generate(20, (_) => record(1024 * 1024));
+    final sizes = SyncEngine.pushChunks(big).map((c) => c.length).toList();
+    expect(sizes, [7, 7, 6]);
+    expect(SyncEngine.pushChunks([record(SyncEngine.pushBytes + 1)]).single, hasLength(1));
+    expect(SyncEngine.pushChunks([]), isEmpty);
+  });
+
   test('a large vault pulls in pages', () async {
     final a = await firstDevice();
     for (var i = 0; i < 7; i++) {
