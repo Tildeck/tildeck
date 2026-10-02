@@ -48,6 +48,7 @@ class DesktopSidebar extends StatelessWidget {
     required this.onLock,
     required this.onToggleLocale,
     required this.onToggleTheme,
+    required this.onShortcuts,
     required this.otherLanguageName,
   });
 
@@ -59,6 +60,7 @@ class DesktopSidebar extends StatelessWidget {
   final VoidCallback onLock;
   final VoidCallback onToggleLocale;
   final VoidCallback onToggleTheme;
+  final VoidCallback onShortcuts;
   final String otherLanguageName;
 
   static const width = 232.0;
@@ -166,6 +168,7 @@ class DesktopSidebar extends StatelessWidget {
                     dark ? t.switchToLight : t.switchToDark,
                     onToggleTheme,
                   ),
+                  action(const ValueKey('showShortcuts'), Icons.keyboard_outlined, t.keyboardShortcuts, onShortcuts),
                   // The other language, named in itself: a word, not an icon.
                   Expanded(
                     child: Align(
@@ -186,4 +189,59 @@ class DesktopSidebar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The app's keyboard shortcuts, listed.
+Future<void> showShortcuts(BuildContext context) {
+  final t = AppLocalizations.of(context);
+  final c = context.colors;
+  final rows = [
+    ('Ctrl+Shift+T', t.shortcutNewConnection),
+    ('Ctrl+Shift+W', t.shortcutCloseTab),
+    ('Ctrl+Tab', t.shortcutNextTab),
+    ('Ctrl+Shift+Tab', t.shortcutPreviousTab),
+    ('Ctrl+Shift+L', t.lockNow),
+    ('Ctrl+Shift+C', t.shortcutCopy),
+    ('Ctrl+Shift+V', t.shortcutPaste),
+    ('Ctrl+Shift+F', t.shortcutFind),
+    ('Ctrl+ +  /  Ctrl+ -', t.shortcutFontSize),
+    ('Ctrl+/', t.keyboardShortcuts),
+  ];
+  return showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(t.keyboardShortcuts),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (keys, what) in rows)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(what)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: c.page,
+                        border: Border.all(color: c.line),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        keys,
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(t.close))],
+    ),
+  );
 }

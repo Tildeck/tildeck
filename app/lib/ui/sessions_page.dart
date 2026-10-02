@@ -1,5 +1,7 @@
 import 'package:dartssh2/dartssh2.dart' show SSHClient;
+import 'package:flutter/gestures.dart' show kMiddleMouseButton;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
@@ -85,6 +87,7 @@ class _SessionsPageState extends State<SessionsPage> {
     onOpenForwards: desktop ? null : _openForwards,
     desktop: desktop,
     connectHost: _connectFor,
+    searchFocus: _hostSearch,
   );
 
   /// A second session shown beside the selected one, on a wide screen.
@@ -98,13 +101,80 @@ class _SessionsPageState extends State<SessionsPage> {
   /// Port forwarding rules that run, for as long as the app does.
   final _forwards = ForwardManager();
 
+  /// The hosts search, which a new connection (Ctrl+Shift+T) starts in.
+  final _hostSearch = FocusNode(debugLabel: 'hostSearch');
+
   @override
   void dispose() {
     for (final session in _sessions) {
       session.dispose();
     }
     _forwards.dispose();
+    _hostSearch.dispose();
+    HardwareKeyboard.instance.removeHandler(_onKey);
     super.dispose();
+  }
+
+  /// To the hosts, typing into their search.
+  void _newConnection() {
+    setState(() {
+      _selected = -1;
+      _section = DeskSection.hosts;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _hostSearch.requestFocus());
+  }
+
+  /// The next or previous tab, the hosts counted as the first.
+  void _cycle(int step) {
+    final count = _sessions.length + 1;
+    setState(() => _selected = (_selected + 1 + step) % count - 1);
+  }
+
+  void _closeOthers(int keep) {
+    final kept = _sessions[keep];
+    for (final s in _sessions.where((s) => s != kept).toList()) {
+      s.dispose();
+    }
+    setState(() {
+      _sessions
+        ..clear()
+        ..add(kept);
+      _selected = 0;
+      _splitWith = null;
+    });
+  }
+
+  /// The app's keys, as Windows Terminal has them: with Shift, so the
+  /// shell's own Ctrl keys (Ctrl+W deletes a word) stay the shell's.
+  Map<ShortcutActivator, VoidCallback> get _keys => {
+    const SingleActivator(LogicalKeyboardKey.keyT, control: true, shift: true): _newConnection,
+    const SingleActivator(LogicalKeyboardKey.keyW, control: true, shift: true): () {
+      if (_selected >= 0) _close(_selected);
+    },
+    const SingleActivator(LogicalKeyboardKey.tab, control: true): () => _cycle(1),
+    const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true): () => _cycle(-1),
+    const SingleActivator(LogicalKeyboardKey.keyL, control: true, shift: true): widget.vault.lock,
+    const SingleActivator(LogicalKeyboardKey.slash, control: true): () => showShortcuts(context),
+  };
+
+  /// Takes the app's keys before whatever has the focus (a terminal, a
+  /// field), and without taking the focus itself: typing must reach the
+  /// shell. Only while this page is on top: a page over it keeps its keys.
+  bool _onKey(KeyEvent event) {
+    if (event is! KeyDownEvent || !mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return false;
+    for (final MapEntry(key: activator, value: action) in _keys.entries) {
+      if (activator.accepts(event, HardwareKeyboard.instance)) {
+        action();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
   }
 
   /// An authenticated connection to a saved host, for a forwarding rule.
@@ -247,6 +317,7 @@ class _SessionsPageState extends State<SessionsPage> {
             showHome: showHome,
             onSelect: (i) => setState(() => _selected = i),
             onClose: _close,
+            onCloseOthers: _closeOthers,
           ),
         ),
         if (_selected >= 0)
@@ -334,6 +405,7 @@ class _SessionsPageState extends State<SessionsPage> {
             onLock: widget.vault.lock,
             onToggleLocale: widget.onToggleLocale,
             onToggleTheme: widget.onToggleTheme,
+            onShortcuts: () => showShortcuts(context),
             otherLanguageName: _otherLanguageName(context),
           ),
           Expanded(
@@ -512,8 +584,11 @@ class _TabStrip extends StatelessWidget {
     required this.selected,
     required this.onSelect,
     required this.onClose,
+    required this.onCloseOthers,
     required this.showHome,
   });
+
+  final ValueChanged<int> onCloseOthers;
 
   final List<TerminalSession> sessions;
   final int selected;
@@ -533,25 +608,57 @@ class _TabStrip extends StatelessWidget {
       required Widget child,
       required VoidCallback onTap,
       VoidCallback? onRename,
+      VoidCallback? onMiddleClick,
+      void Function(Offset at)? onMenu,
       Key? key,
     }) => Padding(
       padding: const EdgeInsetsDirectional.only(end: 6),
-      child: Material(
-        key: key,
-        color: on ? c.surface : Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: on ? c.brand : c.line),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          onDoubleTap: onRename,
-          onLongPress: onRename,
-          child: Padding(padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 8, 8), child: child),
+      // A middle click closes a tab, as in a browser.
+      child: Listener(
+        onPointerDown: (e) {
+          if (e.buttons == kMiddleMouseButton) onMiddleClick?.call();
+        },
+        child: Material(
+          key: key,
+          color: on ? c.surface : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: on ? c.brand : c.line),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: onTap,
+            onDoubleTap: onRename,
+            onLongPress: onRename,
+            onSecondaryTapUp: onMenu == null ? null : (d) => onMenu(d.globalPosition),
+            child: Padding(padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 8, 8), child: child),
+          ),
         ),
       ),
     );
+
+    Future<void> menu(Offset at, int i, TerminalSession session) async {
+      final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+      final action = await showMenu<String>(
+        context: context,
+        position: RelativeRect.fromRect(at & const Size(1, 1), Offset.zero & overlay.size),
+        items: [
+          PopupMenuItem(key: const ValueKey('tabRename'), value: 'rename', child: Text(t.renameTab)),
+          PopupMenuItem(key: const ValueKey('tabClose'), value: 'close', child: Text(t.closeSession)),
+          if (sessions.length > 1)
+            PopupMenuItem(key: const ValueKey('tabCloseOthers'), value: 'others', child: Text(t.closeOtherTabs)),
+        ],
+      );
+      if (!context.mounted) return;
+      switch (action) {
+        case 'rename':
+          await _rename(context, session);
+        case 'close':
+          onClose(i);
+        case 'others':
+          onCloseOthers(i);
+      }
+    }
 
     return Container(
       height: 52,
@@ -571,6 +678,8 @@ class _TabStrip extends StatelessWidget {
                 on: i == selected,
                 onTap: () => onSelect(i),
                 onRename: () => _rename(context, session),
+                onMiddleClick: () => onClose(i),
+                onMenu: (at) => menu(at, i, session),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
