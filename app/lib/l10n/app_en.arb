@@ -647,5 +647,15 @@
   "navVault": "VAULT",
   "navSettings": "SETTINGS",
   "navMasterPassword": "Master password",
-  "close": "Close"
+  "close": "Close",
+  "keyboardShortcuts": "Keyboard shortcuts",
+  "shortcutNewConnection": "New connection",
+  "shortcutCloseTab": "Close the tab",
+  "shortcutNextTab": "Next tab",
+  "shortcutPreviousTab": "Previous tab",
+  "shortcutCopy": "Copy in the terminal",
+  "shortcutPaste": "Paste in the terminal",
+  "shortcutFind": "Find in the terminal",
+  "shortcutFontSize": "Larger or smaller text",
+  "closeOtherTabs": "Close the other tabs"
 }

@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Keyboard shortcuts for connections and tabs, with a list of them; tabs close on a middle click and have a right-click menu.
 - On the desktop, hosts as a grid of cards with a right-click menu, edited in a side panel beside them.
 - A desktop layout for wide windows: a sidebar with every section, each opening in place, and the session tabs above.
 - Known hosts: see the trusted server keys with their fingerprints, and stop trusting one.

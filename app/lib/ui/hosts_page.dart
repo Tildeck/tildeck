@@ -157,6 +157,7 @@ class HostsPage extends StatefulWidget {
     this.localShells,
     this.connectHost,
     this.desktop = false,
+    this.searchFocus,
   });
 
   final Vault vault;
@@ -174,6 +175,9 @@ class HostsPage extends StatefulWidget {
   /// In the desktop layout: the hosts as a grid, edited in a side panel,
   /// and no buttons for what the sidebar has.
   final bool desktop;
+
+  /// The search field's focus, for the new connection shortcut.
+  final FocusNode? searchFocus;
 
   @override
   State<HostsPage> createState() => _HostsPageState();
@@ -386,6 +390,7 @@ class _HostsPageState extends State<HostsPage> {
                 ? null
                 : TextField(
                     key: const ValueKey('hostSearch'),
+                    focusNode: widget.searchFocus,
                     controller: _search,
                     onChanged: (v) => setState(() => _query = v),
                     decoration: InputDecoration(
@@ -735,6 +740,7 @@ class _HostsPageState extends State<HostsPage> {
                   const SizedBox(height: 16),
                   TextField(
                     key: const ValueKey('hostSearch'),
+                    focusNode: widget.searchFocus,
                     controller: _search,
                     onChanged: (v) => setState(() => _query = v),
                     decoration: InputDecoration(

@@ -359,5 +359,15 @@
   "navVault": "כספת",
   "navSettings": "הגדרות",
   "navMasterPassword": "סיסמה ראשית",
-  "close": "סגירה"
+  "close": "סגירה",
+  "keyboardShortcuts": "קיצורי מקלדת",
+  "shortcutNewConnection": "חיבור חדש",
+  "shortcutCloseTab": "סגירת הטאב",
+  "shortcutNextTab": "הטאב הבא",
+  "shortcutPreviousTab": "הטאב הקודם",
+  "shortcutCopy": "העתקה בטרמינל",
+  "shortcutPaste": "הדבקה בטרמינל",
+  "shortcutFind": "חיפוש בטרמינל",
+  "shortcutFontSize": "הגדלה או הקטנה של הטקסט",
+  "closeOtherTabs": "סגירת שאר הטאבים"
 }

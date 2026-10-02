@@ -473,6 +473,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Sync on the desktop drops its dark phone bar for the section header.
 - Golden: the keys section in both languages.
 
+### Desktop layout: keys and mouse (2026-10-02)
+
+- Shortcuts, as Windows Terminal has them (with Shift, so the shell's own Ctrl keys stay the shell's; Ctrl+W deletes a word there): Ctrl+Shift+T for a new connection (the hosts, typing into their search), Ctrl+Shift+W to close the tab, Ctrl+Tab and Ctrl+Shift+Tab to go round the tabs (the hosts counted as the first), Ctrl+Shift+L to lock, and Ctrl+/ to list them all with the terminal's own. They work in both layouts wherever the focus is, taken by a keyboard handler before the focused widget and without taking the focus (typing must reach the shell), and only while the main screen is on top.
+- A tab closes on a middle click, as in a browser, and its right-click menu renames it, closes it, or closes the others.
+- The sidebar has a button for the list of shortcuts.
+- Test: on three real tabs, going round both ways, closing by keys, by a middle click, and the others from the menu; a new connection focusing the search; the list; and the lock.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
