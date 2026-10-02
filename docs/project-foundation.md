@@ -503,7 +503,7 @@ The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, an
 
 - **`scripts/local.sh`** manages the development stack (`server` and `postgres`) through `docker-compose-dev.yml` only. It builds the panel and the server development image explicitly before changing the running stack, and can build a debug Android APK. It removes development data only through the confirmed `nuke` operation.
 - **`scripts/verify.sh`** is the single entry point used locally, in CI, and by release. It supports a full sweep and a changed-area mode.
-- **`scripts/try-pr.sh`** tests a pull request in a disposable worktree. For server or panel changes it rebuilds and restarts only the server against the existing development database, after taking a database snapshot. For client changes it builds an APK and reports its path. It never merges, pushes, or edits the user's checkout.
+- **`scripts/try-pr.sh`** tests a pull request in a disposable worktree. For server or panel changes it rebuilds and restarts only the server against the existing development database, after taking a database snapshot. For client changes it builds an APK and reports its path. It never merges, pushes, or edits the user's checkout. A pull request from a fork (or one whose origin `gh` cannot tell) is refused unless `--trust-fork` is passed, because its code runs with the development secrets and data; with it, the APK builds with separate cache volumes (`FLUTTER_CACHE`). A preview build never receives the release signing variables.
 - **`scripts/release.sh`** prepares the release commit and immutable tag after a full verify run and requires an explicit target. Publication happens in the tagged CI run. Merge and release stay separate.
 
 ## Implementation decisions
