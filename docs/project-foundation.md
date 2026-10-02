@@ -586,6 +586,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - From the security review, approved by Shlomi: a sign-in with `AK` and an active device's id issued a token without approval, and device ids are not secret. Now, while that device holds a working token, the sign-in makes it pending (its token stops, `device_reapproval` in the activity log) and it needs approval again; a device whose token expired from idleness, or never had one, still signs in again without approval.
 - Tests (the device one fails on the old code): with a live token the device waits and its old token stops, then is approved; after 91 idle days it signs in again directly. Tests that signed in again with a live device now expect the approval answer (202).
 
+### Terminal options (2026-10-02)
+
+- Holiday plan, wave 2. Settings, Terminal adds the font (the bundled JetBrains Mono, or the system's own monospace fonts: Cascadia Mono, Consolas, Courier New on Windows, Droid Sans Mono on Android, with JetBrains Mono behind a missing one), the line height (1.0 to 1.6), the cursor (block, underline, bar), the bell (a short flash of the screen, the system's alert sound, or nothing), the lines kept above the screen for new sessions (1,000 to 50,000), and copying on select (a selection is copied once it stops changing for 300 ms).
+- They are vault preferences, synced like the color scheme; `TerminalOptions.of` reads them with their defaults and ignores a value outside the choices, from another device or version. Right-click already copied a selection or pasted.
+- Tests: options from the preferences, with odd values ignored; the fonts offered per system; a visual bell flashing and no bell showing nothing; the cursor and font reaching the terminal; a finished selection copied once. Golden: the terminal settings with the new options.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

@@ -463,5 +463,21 @@
   "importThrough": "דרך {host}",
   "importCount": "{count, plural, =1{ייבוא שרת אחד} other{ייבוא {count} שרתים}}",
   "importedHosts": "{hosts, plural, =1{יובא שרת אחד} other{יובאו {hosts} שרתים}}, {keys, plural, =0{בלי מפתחות חדשים} =1{מפתח חדש אחד} other{{keys} מפתחות חדשים}}",
-  "importedHostsKeysSkipped": "{hosts, plural, =1{יובא שרת אחד} other{יובאו {hosts} שרתים}}. {skipped, plural, =1{קובץ מפתח אחד} other{{skipped} קובצי מפתח}} לא נקראו או דורשים passphrase: אפשר להוסיף אותם בעמוד המפתחות."
+  "importedHostsKeysSkipped": "{hosts, plural, =1{יובא שרת אחד} other{יובאו {hosts} שרתים}}. {skipped, plural, =1{קובץ מפתח אחד} other{{skipped} קובצי מפתח}} לא נקראו או דורשים passphrase: אפשר להוסיף אותם בעמוד המפתחות.",
+  "terminalFontLabel": "גופן",
+  "lineHeightLabel": "גובה שורה",
+  "cursorStyleLabel": "סמן",
+  "cursorBlock": "מלבן",
+  "cursorUnderline": "קו תחתון",
+  "cursorBar": "קו אנכי",
+  "bellLabel": "צלצול",
+  "bellHelp": "כשתוכנה במסוף מצלצלת.",
+  "bellVisual": "הבהוב",
+  "bellSound": "צליל",
+  "bellNone": "כלום",
+  "scrollbackLabel": "שורות שנשמרות מעל המסך",
+  "scrollbackHelp": "לחיבורים חדשים. יותר שורות צורכות יותר זיכרון.",
+  "linesCount": "{count} שורות",
+  "copyOnSelectLabel": "העתקה בסימון",
+  "copyOnSelectHelp": "טקסט שמסמנים מועתק מיד."
 }

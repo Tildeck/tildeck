@@ -19,8 +19,9 @@ enum SessionState { connecting, connected, closed }
 /// One open tab: an SSH shell wired to a terminal emulator. The terminal
 /// exists before the connection, so the tab can show progress and errors.
 class TerminalSession extends ChangeNotifier {
-  TerminalSession(this.target) {
-    terminal = Terminal(maxLines: 10000);
+  /// [scrollback] is how many lines stay above the screen.
+  TerminalSession(this.target, {int scrollback = 10000}) {
+    terminal = Terminal(maxLines: scrollback);
     controller = TerminalController();
   }
 

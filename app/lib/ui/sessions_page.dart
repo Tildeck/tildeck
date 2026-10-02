@@ -11,6 +11,7 @@ import '../ssh/history_recorder.dart';
 import '../ssh/port_forwarding.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
+import '../terminal/terminal_options.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
 import '../vault/biometric_unlock.dart';
@@ -260,7 +261,8 @@ class _SessionsPageState extends State<SessionsPage> {
   }
 
   void _open(ConnectionTarget target, {int? replacing}) {
-    final session = TerminalSession(target)..autocomplete = widget.vault.preferences.autocomplete ?? true;
+    final session = TerminalSession(target, scrollback: TerminalOptions.of(widget.vault.preferences).scrollback)
+      ..autocomplete = widget.vault.preferences.autocomplete ?? true;
     setState(() {
       if (replacing == null) {
         _tabs.add(_TermTab(session));
@@ -331,6 +333,7 @@ class _SessionsPageState extends State<SessionsPage> {
           fontSize: prefs.fontSize ?? defaultFontSize,
           onFontSize: (size) => widget.vault.put(prefs.copyWith(fontSize: size)),
           snippets: {for (final x in widget.vault.snippets) x.name: x.command},
+          options: TerminalOptions.of(prefs),
         );
       },
     );
