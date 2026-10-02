@@ -77,12 +77,12 @@ async def test_sign_in_needs_the_code_and_a_code_works_once(client, mail, monkey
     assert (res.status_code, res.json()) == (401, {"error": "invalid_credentials"})
 
     code = phone.next()
-    assert (await signin(totp_code=code)).status_code == 200
+    assert (await signin(totp_code=code)).status_code == 202, "both factors: on to approval"
     replay = await signin(totp_code=code)
     assert (replay.status_code, replay.json()) == (401, {"error": "invalid_credentials"}), "a code works once"
     # Signing in with the code does not use up the limit.
     for _ in range(12):
-        assert (await signin(totp_code=phone.next())).status_code == 200
+        assert (await signin(totp_code=phone.next())).status_code == 202
 
 
 async def test_devices_stay_signed_in_when_it_is_turned_on(client, mail, monkeypatch):  # noqa: F811
@@ -141,7 +141,7 @@ async def test_turning_it_off_needs_a_current_code(client, mail, monkeypatch):  
     assert (await client.get("/api/account", headers=bearer(token))).json()["totp_enabled"] is False
     assert any("Two-factor sign-in is off" in m.subject for m in mail.sent)
     body = {"email": keys.email, "auth_key": keys.auth_key, "device": keys.device}
-    assert (await client.post("/api/account/signin", json=body, headers=H)).status_code == 200
+    assert (await client.post("/api/account/signin", json=body, headers=H)).status_code == 202
 
     async with engine.begin() as conn:
         actions = (await conn.execute(text("SELECT action FROM audit_entries ORDER BY id"))).scalars().all()

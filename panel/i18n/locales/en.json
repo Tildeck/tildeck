@@ -235,7 +235,8 @@
       "totp_enabled": "Two-factor sign-in turned on",
       "totp_disabled": "Two-factor sign-in turned off",
       "totp_reset": "Two-factor sign-in turned off by an administrator",
-      "totp_failed": "Wrong two-factor code"
+      "totp_failed": "Wrong two-factor code",
+      "device_reapproval": "Device needs approval again"
     }
   },
   "errors": {

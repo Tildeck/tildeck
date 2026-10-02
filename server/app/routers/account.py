@@ -300,6 +300,15 @@ def _issue_token(device: Device) -> str:
     return token
 
 
+async def _token_live(session: AsyncSession, device: Device) -> bool:
+    """Whether the device holds a token that still works: one was issued and
+    the device has not been idle past the limit."""
+    if device.token_hash is None:
+        return False
+    idle_days = int(await settings_store.get_value(session, "device_idle_days") or 90)
+    return device.last_seen_at is None or clock.now() - device.last_seen_at <= timedelta(days=idle_days)
+
+
 async def _account_by_email(session: AsyncSession, email: str) -> Account | None:
     return await session.scalar(select(Account).where(Account.email == accounts.normalize_email(email)))
 
@@ -494,7 +503,23 @@ async def signin(
         raise ApiError(409, ErrorCode.device_revoked)
     if device is not None and device.status == "revoked":
         raise ApiError(409, ErrorCode.device_revoked)
-    if device is not None and device.status == "active":
+    if device is not None and device.status == "active" and await _token_live(session, device):
+        # A device id is not a secret (it shows in the activity log and the
+        # panel), so with the key alone it gets no token while the device has
+        # a live one: it waits for approval again, and the old token stops.
+        device.status, device.token_hash = "pending", None
+        audit.record(
+            session,
+            actor=email,
+            source="user",
+            action="device_reapproval",
+            entity="device",
+            entity_id=device.id,
+            new_value=device.name,
+        )
+    elif device is not None and device.status == "active":
+        # Its token expired (or it never had one): the device signs in again
+        # with its own id, without approval.
         token = _issue_token(device)
         await session.commit()
         return SigninResult(

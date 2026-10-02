@@ -271,12 +271,28 @@ async def test_an_existing_device_approves_and_revokes(client, mail):
         )
     ).json()["device_token"]
 
-    # An approved device signs in again without a new approval.
-    again = await client.post(
-        "/api/account/signin", json={"email": keys.email, "auth_key": keys.auth_key, "device": phone}, headers=H
-    )
+    # Its id and the key are not enough while its token works: it waits for
+    # approval again, and the token stops.
+    signin = {"email": keys.email, "auth_key": keys.auth_key, "device": phone}
+    again = await client.post("/api/account/signin", json=signin, headers=H)
+    assert again.status_code == 202 and again.json()["status"] == "pending"
+    assert (await client.get("/api/account", headers=bearer(phone_token))).status_code == 401
+    assert (await client.post(f"/api/devices/{phone['id']}/approve", headers=bearer(first))).status_code == 204
+    phone_token = (
+        await client.post(
+            "/api/devices/claim", json={"device_id": phone["id"], "claim_token": again.json()["claim_token"]}, headers=H
+        )
+    ).json()["device_token"]
+
+    # Once its token expired from idleness, it signs in again without approval.
+    async with engine.begin() as conn:
+        await conn.execute(
+            text("UPDATE devices SET last_seen_at = now() - interval '91 days' WHERE id = :id"), {"id": phone["id"]}
+        )
+    again = await client.post("/api/account/signin", json=signin, headers=H)
     assert again.status_code == 200 and again.json()["status"] == "active"
     assert again.json()["signed_in"]["vault"]["wrap_pw"] == keys.wrap_pw
+    phone_token = again.json()["signed_in"]["device_token"]
 
     assert (await client.post(f"/api/devices/{phone['id']}/revoke", headers=bearer(first))).status_code == 204
     assert (await client.get("/api/account", headers=bearer(phone_token))).status_code == 401
@@ -387,7 +403,9 @@ async def test_a_successful_sign_in_is_not_counted_as_a_failure(client, mail):
     await register(client, keys)
     right = {"email": keys.email, "auth_key": keys.auth_key, "device": keys.device}
     for _ in range(12):
-        assert (await client.post("/api/account/signin", json=right, headers=H)).status_code == 200
+        # The device has a live token, so it waits for approval: a right key
+        # all the same, never a failure.
+        assert (await client.post("/api/account/signin", json=right, headers=H)).status_code == 202
 
 
 async def test_an_unknown_email_takes_as_long_as_a_wrong_key(client, mail, monkeypatch):

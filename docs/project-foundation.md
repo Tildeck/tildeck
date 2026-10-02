@@ -581,6 +581,11 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Each named host becomes a host; its key files are read and added as keys (a key already in the vault, by fingerprint, is reused; one that cannot be read or needs a passphrase is listed, and its host signs in with a password); a ProxyJump naming another imported host, or a saved one, becomes its jump host; with no User, ssh's default, this computer's user. Hosts already saved (same address, port, and user) are shown and left out.
 - Tests: the parser on a configuration with defaults, several names per line, negation, Match, `=`, quotes, and ProxyJump forms; importing with keys read once, an unreadable key, jump hosts by alias and by a saved host's name, a key not added twice; the dialog listing hosts, leaving out a saved one, and saving the chosen.
 
+### Re-approval for a device id in use (2026-10-02)
+
+- From the security review, approved by Shlomi: a sign-in with `AK` and an active device's id issued a token without approval, and device ids are not secret. Now, while that device holds a working token, the sign-in makes it pending (its token stops, `device_reapproval` in the activity log) and it needs approval again; a device whose token expired from idleness, or never had one, still signs in again without approval.
+- Tests (the device one fails on the old code): with a live token the device waits and its old token stops, then is approved; after 91 idle days it signs in again directly. Tests that signed in again with a live device now expect the approval answer (202).
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
