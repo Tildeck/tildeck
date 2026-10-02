@@ -545,5 +545,8 @@
   "baudRateLabel": "קצב (baud)",
   "baudRateInvalid": "מספר כמו 9600 או 115200",
   "terminalTypeLabel": "סוג טרמינל",
-  "charsetLabel": "קידוד תווים"
+  "charsetLabel": "קידוד תווים",
+  "commandsTitle": "פקודות",
+  "noCommandsYet": "פקודות שהורצו ב-session הזה, וההיסטוריה של השרת, יופיעו כאן.",
+  "saveAsSnippet": "שמירה כ-snippet"
 }

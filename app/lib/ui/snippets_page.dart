@@ -112,19 +112,21 @@ class SnippetsPage extends StatelessWidget {
   }
 }
 
-/// Adds or edits a snippet; returns its id.
-Future<String?> showSnippetEditor(BuildContext context, Vault vault, {SnippetEntry? snippet}) {
+/// Adds or edits a snippet, a new one with [command] filled in; returns its
+/// id.
+Future<String?> showSnippetEditor(BuildContext context, Vault vault, {SnippetEntry? snippet, String? command}) {
   return showDialog<String>(
     context: context,
-    builder: (_) => _SnippetEditor(vault: vault, snippet: snippet),
+    builder: (_) => _SnippetEditor(vault: vault, snippet: snippet, command: command),
   );
 }
 
 class _SnippetEditor extends StatefulWidget {
-  const _SnippetEditor({required this.vault, this.snippet});
+  const _SnippetEditor({required this.vault, this.snippet, this.command});
 
   final Vault vault;
   final SnippetEntry? snippet;
+  final String? command;
 
   @override
   State<_SnippetEditor> createState() => _SnippetEditorState();
@@ -133,7 +135,7 @@ class _SnippetEditor extends StatefulWidget {
 class _SnippetEditorState extends State<_SnippetEditor> {
   final _form = GlobalKey<FormState>();
   late final _name = TextEditingController(text: widget.snippet?.name);
-  late final _command = TextEditingController(text: widget.snippet?.command);
+  late final _command = TextEditingController(text: widget.snippet?.command ?? widget.command);
   late final _folder = TextEditingController(text: widget.snippet?.folder);
 
   @override

@@ -13,6 +13,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - Import hosts from MobaXterm's sessions (an exported .mxtsessions file or MobaXterm.ini), with their folders.
 - A server's sign-in banner shows at the top of the terminal, as text only.
 - Per host: the terminal type it announces (xterm-256color, xterm, vt220, vt100, linux) and its character set (UTF-8 or Latin-1), for older devices.
+- Commands: a terminal's recent commands, this session's and the server's history, to run again or save as a snippet.
 - Sessions reconnect on their own when the connection drops: a few times, each after a longer wait, counted down with a cancel; on by default, in Settings, Terminal.
 - Import hosts from a CSV (Termius's export, a spreadsheet) or from PuTTY's saved sessions on Windows, and export the hosts as CSV, without passwords or keys.
 - Files: copy files and folders from one server to another saved server, through this device, from an entry's menu.

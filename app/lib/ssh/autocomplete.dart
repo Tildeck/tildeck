@@ -83,6 +83,9 @@ class LineTracker {
   String _line = '';
   bool _known = true;
 
+  /// Told each known line when Enter is pressed.
+  void Function(String line)? onEnter;
+
   /// The line as typed, or null when it is not known.
   String? get line => _known ? _line : null;
 
@@ -95,6 +98,7 @@ class LineTracker {
     for (final rune in data.runes) {
       switch (rune) {
         case 0x0d || 0x0a: // Enter
+          if (_known) onEnter?.call(_line);
           reset();
         case 0x7f || 0x08: // Backspace
           if (_line.isNotEmpty) _line = String.fromCharCodes(_line.runes.toList()..removeLast());

@@ -421,6 +421,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Records from before have neither field and keep the defaults.
 - Tests: the record with and without the fields; the connection target taking them; a Telnet session reading and writing Latin-1 and announcing vt100 when asked; against the OpenSSH container, TERM in the shell set to the host's type.
 
+### Recent commands (2026-10-02)
+
+- Commands, beside Snippets above an open terminal, lists the session's recent commands, newest first: those run in it, then the server's own history (read for suggestions), each once. A tap puts one on the line, completing what was typed; the user still presses Enter. Each has Save as snippet, which opens the snippet editor with the command filled in.
+- A command is a line known in full when Enter is pressed (the line followed for suggestions; a line changed by Tab completion or an escape sequence is not known). What is typed while the cursor's line asks for a password is never kept. The list is in memory only, up to 200 commands per session, and ends with it.
+- Tests: commands kept once each and newest last, an empty line, a password at a prompt, and a Tab-completed line left out; the session's commands before the server's; a command saved as a snippet from the list.
+
 ### Local terminal (2026-10-01)
 
 - On the desktop, a terminal button on the hosts screen opens a local shell in a tab, like a session. On Windows it offers the shells it finds: PowerShell 7 (on PATH or where it installs), Windows PowerShell, Command Prompt, and WSL; elsewhere the user's login shell. Phones have none.
