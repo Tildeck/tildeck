@@ -5,6 +5,7 @@ import 'package:xterm/xterm.dart';
 
 import '../l10n/app_localizations.dart';
 import '../settings/device_settings.dart';
+import '../terminal/terminal_options.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
 import '../vault/biometric_unlock.dart';
@@ -212,7 +213,13 @@ class SettingsDraft extends ChangeNotifier {
       a.terminalTheme == b.terminalTheme &&
       a.fontSize == b.fontSize &&
       a.autocomplete == b.autocomplete &&
-      a.autoLockMinutes == b.autoLockMinutes;
+      a.autoLockMinutes == b.autoLockMinutes &&
+      a.fontFamily == b.fontFamily &&
+      a.lineHeight == b.lineHeight &&
+      a.cursorStyle == b.cursorStyle &&
+      a.bell == b.bell &&
+      a.scrollback == b.scrollback &&
+      a.copyOnSelect == b.copyOnSelect;
 
   /// A change stored elsewhere (another device, through sync) shows here,
   /// unless something is being edited.
@@ -440,11 +447,32 @@ class _TerminalSettings extends StatelessWidget {
     final prefs = draft.prefs;
     final current = themeById(prefs.terminalTheme);
     final size = prefs.fontSize ?? defaultFontSize;
+    final options = TerminalOptions.of(prefs);
+    final fonts = terminalFonts();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 8),
-        TerminalPreview(theme: current.theme, fontSize: size),
+        TerminalPreview(
+          theme: current.theme,
+          fontSize: size,
+          fontFamily: options.fontFamily,
+          lineHeight: options.lineHeight,
+        ),
+        _Label(t.terminalFontLabel),
+        DropdownButtonFormField<String>(
+          key: const ValueKey('terminalFont'),
+          initialValue: fonts.any((f) => f.family == options.fontFamily) ? options.fontFamily : fonts.first.family,
+          isExpanded: true,
+          items: [
+            for (final f in fonts)
+              DropdownMenuItem(
+                value: f.family,
+                child: Text(f.label, style: TextStyle(fontFamily: f.family)),
+              ),
+          ],
+          onChanged: (v) => draft.setPrefs(prefs.copyWith(fontFamily: v)),
+        ),
         _Label(t.fontSizeLabel, t.fontSizeHelp),
         Row(
           children: [
@@ -470,7 +498,77 @@ class _TerminalSettings extends StatelessWidget {
             ),
           ],
         ),
+        _Label(t.lineHeightLabel),
+        Row(
+          children: [
+            Expanded(
+              child: Slider(
+                key: const ValueKey('lineHeight'),
+                value: options.lineHeight,
+                min: minLineHeight,
+                max: maxLineHeight,
+                divisions: 6,
+                label: options.lineHeight.toStringAsFixed(1),
+                onChanged: (v) => draft.setPrefs(prefs.copyWith(lineHeight: (v * 10).round() / 10)),
+              ),
+            ),
+            SizedBox(
+              width: 32,
+              child: Text(
+                options.lineHeight.toStringAsFixed(1),
+                textAlign: TextAlign.end,
+                style: TextStyle(color: c.muted, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        _Label(t.cursorStyleLabel),
+        SegmentedButton<String>(
+          key: const ValueKey('cursorStyle'),
+          showSelectedIcon: false,
+          segments: [
+            ButtonSegment(value: 'block', label: Text(t.cursorBlock)),
+            ButtonSegment(value: 'underline', label: Text(t.cursorUnderline)),
+            ButtonSegment(value: 'bar', label: Text(t.cursorBar)),
+          ],
+          selected: {prefs.cursorStyle ?? 'block'},
+          onSelectionChanged: (v) => draft.setPrefs(prefs.copyWith(cursorStyle: v.single)),
+        ),
+        _Label(t.bellLabel, t.bellHelp),
+        SegmentedButton<BellMode>(
+          key: const ValueKey('bellMode'),
+          showSelectedIcon: false,
+          segments: [
+            ButtonSegment(value: BellMode.visual, label: Text(t.bellVisual)),
+            ButtonSegment(value: BellMode.sound, label: Text(t.bellSound)),
+            ButtonSegment(value: BellMode.none, label: Text(t.bellNone)),
+          ],
+          selected: {options.bell},
+          onSelectionChanged: (v) => draft.setPrefs(prefs.copyWith(bell: v.single.name)),
+        ),
+        _Label(t.scrollbackLabel, t.scrollbackHelp),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final lines in scrollbackChoices)
+              ChoiceChip(
+                key: ValueKey('scrollback-$lines'),
+                label: Text(t.linesCount(lines)),
+                selected: options.scrollback == lines,
+                onSelected: (_) => draft.setPrefs(prefs.copyWith(scrollback: lines)),
+              ),
+          ],
+        ),
         const SizedBox(height: 8),
+        SwitchListTile(
+          key: const ValueKey('copyOnSelect'),
+          contentPadding: EdgeInsets.zero,
+          value: options.copyOnSelect,
+          onChanged: (v) => draft.setPrefs(prefs.copyWith(copyOnSelect: v)),
+          title: Text(t.copyOnSelectLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(t.copyOnSelectHelp, style: TextStyle(color: c.muted, fontSize: 13)),
+        ),
         SwitchListTile(
           key: const ValueKey('autocompleteSwitch'),
           contentPadding: EdgeInsets.zero,
@@ -573,10 +671,18 @@ class _SecuritySettings extends StatelessWidget {
 
 /// A few lines of a shell in the chosen scheme and size.
 class TerminalPreview extends StatelessWidget {
-  const TerminalPreview({super.key, required this.theme, required this.fontSize});
+  const TerminalPreview({
+    super.key,
+    required this.theme,
+    required this.fontSize,
+    this.fontFamily = 'JetBrainsMono',
+    this.lineHeight = 1.3,
+  });
 
   final TerminalTheme theme;
   final double fontSize;
+  final String fontFamily;
+  final double lineHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -592,7 +698,13 @@ class TerminalPreview extends StatelessWidget {
         decoration: BoxDecoration(color: theme.background, borderRadius: BorderRadius.circular(14)),
         child: Text.rich(
           TextSpan(
-            style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: fontSize, height: 1.3, color: theme.foreground),
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontFamilyFallback: const ['JetBrainsMono'],
+              fontSize: fontSize,
+              height: lineHeight,
+              color: theme.foreground,
+            ),
             children: [
               span('deploy@web-01', theme.green, bold: true),
               span(':', theme.foreground),

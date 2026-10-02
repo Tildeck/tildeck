@@ -703,6 +703,8 @@ void main() {
       await tester.pumpWidget(screen(locale, mode, page));
       await tester.pumpAndSettle();
       // An unsaved change shows the save bar.
+      await tester.ensureVisible(find.byKey(const ValueKey('theme-dracula')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('theme-dracula')));
       await tester.pumpAndSettle();
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/settings_${locale}_${mode.name}.png'));

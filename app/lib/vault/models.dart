@@ -435,8 +435,18 @@ String formatEnv(Map<String, String> env) => [for (final e in env.entries) '${e.
 /// The user's preferences, one record with a fixed id on every device, so
 /// they sync and a change on one device reaches the others.
 class PreferencesEntry extends VaultEntry {
-  const PreferencesEntry({this.terminalTheme, this.fontSize, this.autocomplete, this.autoLockMinutes})
-    : super(id: fixedId);
+  const PreferencesEntry({
+    this.terminalTheme,
+    this.fontSize,
+    this.autocomplete,
+    this.autoLockMinutes,
+    this.fontFamily,
+    this.lineHeight,
+    this.cursorStyle,
+    this.bell,
+    this.scrollback,
+    this.copyOnSelect,
+  }) : super(id: fixedId);
 
   static const recordType = 'preferences';
   static const fixedId = '00000000-0000-4000-8000-000000000001';
@@ -457,13 +467,44 @@ class PreferencesEntry extends VaultEntry {
 
   Duration get autoLock => Duration(minutes: autoLockMinutes ?? defaultAutoLockMinutes);
 
-  PreferencesEntry copyWith({String? terminalTheme, double? fontSize, bool? autocomplete, int? autoLockMinutes}) =>
-      PreferencesEntry(
-        terminalTheme: terminalTheme ?? this.terminalTheme,
-        fontSize: fontSize ?? this.fontSize,
-        autocomplete: autocomplete ?? this.autocomplete,
-        autoLockMinutes: autoLockMinutes ?? this.autoLockMinutes,
-      );
+  // The terminal's look and behavior (lib/terminal/terminal_options.dart
+  // reads them, with their defaults). Null is the default.
+  final String? fontFamily;
+  final double? lineHeight;
+
+  /// block, underline, or bar.
+  final String? cursorStyle;
+
+  /// none, visual, or sound.
+  final String? bell;
+
+  /// Lines kept above the screen, for new sessions.
+  final int? scrollback;
+  final bool? copyOnSelect;
+
+  PreferencesEntry copyWith({
+    String? terminalTheme,
+    double? fontSize,
+    bool? autocomplete,
+    int? autoLockMinutes,
+    String? fontFamily,
+    double? lineHeight,
+    String? cursorStyle,
+    String? bell,
+    int? scrollback,
+    bool? copyOnSelect,
+  }) => PreferencesEntry(
+    terminalTheme: terminalTheme ?? this.terminalTheme,
+    fontSize: fontSize ?? this.fontSize,
+    autocomplete: autocomplete ?? this.autocomplete,
+    autoLockMinutes: autoLockMinutes ?? this.autoLockMinutes,
+    fontFamily: fontFamily ?? this.fontFamily,
+    lineHeight: lineHeight ?? this.lineHeight,
+    cursorStyle: cursorStyle ?? this.cursorStyle,
+    bell: bell ?? this.bell,
+    scrollback: scrollback ?? this.scrollback,
+    copyOnSelect: copyOnSelect ?? this.copyOnSelect,
+  );
 
   @override
   String get type => recordType;
@@ -474,6 +515,12 @@ class PreferencesEntry extends VaultEntry {
     'font_size': fontSize,
     'autocomplete': autocomplete,
     'auto_lock_minutes': autoLockMinutes,
+    'font_family': fontFamily,
+    'line_height': lineHeight,
+    'cursor_style': cursorStyle,
+    'bell': bell,
+    'scrollback': scrollback,
+    'copy_on_select': copyOnSelect,
   };
 
   static PreferencesEntry fromJson(String id, Map<String, dynamic> d) => PreferencesEntry(
@@ -483,6 +530,12 @@ class PreferencesEntry extends VaultEntry {
     // Only a listed choice: a synced value cannot make the lock wait for
     // hours, or never come.
     autoLockMinutes: autoLockChoices.contains(d['auto_lock_minutes']) ? d['auto_lock_minutes'] as int : null,
+    fontFamily: d['font_family'] as String?,
+    lineHeight: (d['line_height'] as num?)?.toDouble(),
+    cursorStyle: d['cursor_style'] as String?,
+    bell: d['bell'] as String?,
+    scrollback: d['scrollback'] as int?,
+    copyOnSelect: d['copy_on_select'] as bool?,
   );
 }
 

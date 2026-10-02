@@ -820,5 +820,29 @@
         "type": "int"
       }
     }
-  }
+  },
+  "terminalFontLabel": "Font",
+  "lineHeightLabel": "Line height",
+  "cursorStyleLabel": "Cursor",
+  "cursorBlock": "Block",
+  "cursorUnderline": "Underline",
+  "cursorBar": "Bar",
+  "bellLabel": "Bell",
+  "bellHelp": "When a program in the terminal rings the bell.",
+  "bellVisual": "Flash",
+  "bellSound": "Sound",
+  "bellNone": "Nothing",
+  "scrollbackLabel": "Lines kept above the screen",
+  "scrollbackHelp": "For new sessions. More lines use more memory.",
+  "linesCount": "{count} lines",
+  "@linesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "copyOnSelectLabel": "Copy on select",
+  "copyOnSelectHelp": "Selected text is copied as soon as you select it."
 }

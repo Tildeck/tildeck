@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
@@ -6,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../ssh/autocomplete.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
+import '../terminal/terminal_options.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
 
@@ -21,6 +24,7 @@ class TerminalPanel extends StatefulWidget {
     this.fontSize = defaultFontSize,
     this.onFontSize,
     this.snippets = const {},
+    this.options = const TerminalOptions(),
   }) : theme = theme ?? terminalThemes.first.theme;
 
   final TerminalSession session;
@@ -37,6 +41,9 @@ class TerminalPanel extends StatefulWidget {
 
   /// Snippet names and commands, offered among the suggestions.
   final Map<String, String> snippets;
+
+  /// Font, line height, cursor, bell, and copying on selection.
+  final TerminalOptions options;
 
   @override
   State<TerminalPanel> createState() => _TerminalPanelState();
@@ -59,8 +66,54 @@ class _TerminalPanelState extends State<TerminalPanel> {
 
   static const _maxHits = 500;
 
+  /// The screen flashes for a moment at a bell, when the bell is visual.
+  bool _flash = false;
+  Timer? _flashTimer;
+  Timer? _copyTimer;
+  String? _copied;
+
+  @override
+  void initState() {
+    super.initState();
+    session.terminal.onBell = _bell;
+    session.controller.addListener(_selectionChanged);
+  }
+
+  void _bell() {
+    switch (widget.options.bell) {
+      case BellMode.none:
+        return;
+      case BellMode.sound:
+        SystemSound.play(SystemSoundType.alert);
+      case BellMode.visual:
+        if (!mounted) return;
+        setState(() => _flash = true);
+        _flashTimer?.cancel();
+        _flashTimer = Timer(const Duration(milliseconds: 150), () {
+          if (mounted) setState(() => _flash = false);
+        });
+    }
+  }
+
+  /// With copying on selection, a selection is copied once it stops
+  /// changing: dragging changes it many times.
+  void _selectionChanged() {
+    if (!widget.options.copyOnSelect) return;
+    _copyTimer?.cancel();
+    _copyTimer = Timer(const Duration(milliseconds: 300), () {
+      final text = session.selectedText;
+      if (text == null || text.isEmpty || text == _copied) return;
+      _copied = text;
+      Clipboard.setData(ClipboardData(text: text));
+    });
+  }
+
   @override
   void dispose() {
+    _flashTimer?.cancel();
+    _copyTimer?.cancel();
+    session.controller.removeListener(_selectionChanged);
+    if (session.terminal.onBell == _bell) session.terminal.onBell = null;
     _clearHighlights();
     _scroll.dispose();
     _searchField.dispose();
@@ -188,18 +241,38 @@ class _TerminalPanelState extends State<TerminalPanel> {
             const SingleActivator(LogicalKeyboardKey.numpadSubtract, control: true): () => _size(widget.fontSize - 1),
             const SingleActivator(LogicalKeyboardKey.digit0, control: true): () => _size(defaultFontSize),
           },
-          child: TerminalView(
-            session.terminal,
-            controller: session.controller,
-            scrollController: _scroll,
-            focusNode: _terminalFocus,
-            theme: theme,
-            textStyle: TerminalStyle(fontFamily: 'JetBrainsMono', fontSize: widget.fontSize),
-            padding: const EdgeInsets.all(8),
-            autofocus: true,
-            // Right click copies a selection, or pastes when nothing is
-            // selected, as in the Windows console.
-            onSecondaryTapDown: (_, _) => session.selectedText?.isNotEmpty == true ? _copy() : _paste(),
+          child: Stack(
+            children: [
+              TerminalView(
+                session.terminal,
+                controller: session.controller,
+                scrollController: _scroll,
+                focusNode: _terminalFocus,
+                theme: theme,
+                textStyle: TerminalStyle(
+                  fontFamily: widget.options.fontFamily,
+                  fontFamilyFallback: [...widget.options.fontFallback, ...const TerminalStyle().fontFamilyFallback],
+                  fontSize: widget.fontSize,
+                  height: widget.options.lineHeight,
+                ),
+                cursorType: widget.options.cursor,
+                padding: const EdgeInsets.all(8),
+                autofocus: true,
+                // Right click copies a selection, or pastes when nothing is
+                // selected, as in the Windows console.
+                onSecondaryTapDown: (_, _) => session.selectedText?.isNotEmpty == true ? _copy() : _paste(),
+              ),
+              // A visual bell: the screen lights up for a moment.
+              if (_flash)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: ColoredBox(
+                      key: const ValueKey('bellFlash'),
+                      color: theme.foreground.withValues(alpha: 0.12),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
 
