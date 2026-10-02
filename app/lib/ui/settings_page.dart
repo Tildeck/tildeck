@@ -6,11 +6,8 @@ import 'package:xterm/xterm.dart';
 
 import '../l10n/app_localizations.dart';
 import '../settings/device_settings.dart';
-<<<<<<< HEAD
 import '../terminal/keyword_highlighter.dart';
-=======
 import '../terminal/session_log.dart';
->>>>>>> 6d56064 (Save session logs on the desktop)
 import '../terminal/terminal_options.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
