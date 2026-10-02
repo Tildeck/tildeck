@@ -535,5 +535,6 @@
   "highlightHelp": "שגיאות, אזהרות והצלחות בולטות בפלט. מפרידים בין מילים בפסיקים.",
   "highlightErrors": "שגיאות",
   "highlightWarnings": "אזהרות",
-  "highlightSuccess": "הצלחות"
+  "highlightSuccess": "הצלחות",
+  "runSnippet": "הרצה"
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../ssh/snippet_variables.dart';
 import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
@@ -207,7 +208,8 @@ class _SnippetEditorState extends State<_SnippetEditor> {
                 decoration: InputDecoration(
                   labelText: t.snippetCommandLabel,
                   hintText: 'sudo systemctl restart nginx',
-                  helperText: t.snippetCommandHelp,
+                  helperText: t.snippetCommandHelp('{{name}}'),
+                  helperMaxLines: 3,
                   alignLabelWithHint: true,
                 ),
               ),
@@ -387,6 +389,91 @@ class _HostChooserState extends State<_HostChooser> {
                 ]),
           child: Text(t.runOnHostsButton(_chosen.length)),
         ),
+      ],
+    );
+  }
+}
+
+/// Values of a snippet's variables typed this run, offered the next time.
+final _lastValues = <String, Map<String, String>>{};
+
+/// The command of [snippet] to run, its variables asked for first; null
+/// when the user cancels.
+Future<String?> snippetCommandToRun(BuildContext context, SnippetEntry snippet) async {
+  final names = variablesIn(snippet.command);
+  if (names.isEmpty) return snippet.command;
+  final values = await showDialog<Map<String, String>>(
+    context: context,
+    builder: (_) => _VariablesDialog(snippet: snippet, names: names, initial: _lastValues[snippet.id] ?? const {}),
+  );
+  if (values == null) return null;
+  _lastValues[snippet.id] = values;
+  return fillVariables(snippet.command, values);
+}
+
+class _VariablesDialog extends StatefulWidget {
+  const _VariablesDialog({required this.snippet, required this.names, required this.initial});
+
+  final SnippetEntry snippet;
+  final List<String> names;
+  final Map<String, String> initial;
+
+  @override
+  State<_VariablesDialog> createState() => _VariablesDialogState();
+}
+
+class _VariablesDialogState extends State<_VariablesDialog> {
+  late final _fields = {for (final n in widget.names) n: TextEditingController(text: widget.initial[n])};
+
+  @override
+  void dispose() {
+    for (final c in _fields.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _run() => Navigator.pop(context, {for (final MapEntry(:key, :value) in _fields.entries) key: value.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    return AlertDialog(
+      title: Text(widget.snippet.name),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.snippet.command,
+                textDirection: TextDirection.ltr,
+                style: _mono.copyWith(color: c.muted),
+              ),
+              for (final (i, name) in widget.names.indexed) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  key: ValueKey('variable-$name'),
+                  controller: _fields[name],
+                  autofocus: i == 0,
+                  autocorrect: false,
+                  textDirection: TextDirection.ltr,
+                  style: _mono,
+                  textInputAction: i == widget.names.length - 1 ? TextInputAction.done : TextInputAction.next,
+                  onSubmitted: (_) => i == widget.names.length - 1 ? _run() : null,
+                  decoration: InputDecoration(labelText: name),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
+        FilledButton(key: const ValueKey('runWithVariables'), onPressed: _run, child: Text(t.runSnippet)),
       ],
     );
   }

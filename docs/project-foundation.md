@@ -661,6 +661,11 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `KeywordHighlighter` scans the lines on the screen and a screen above it shortly after output arrives, marks a line again only when its text changed, and releases the oldest marks past 2000 lines, so long output stays cheap. Search highlights are separate and unchanged.
 - Tests: whole words, case, colors, words with symbols taken as written; the preferences choosing the words or turning it off; new output marked once, a changed line marked again, everything released with the terminal. Goldens: the terminal with the defaults, the settings.
 
+### Snippet variables (2026-10-02)
+
+- Holiday plan, wave 2. `{{name}}` in a snippet's command (letters, digits, `_`, `.`, `-`) is a value asked for when the snippet runs: a dialog shows the command and a field per variable, each once, offering the values typed last for that snippet (in memory, for this run of the app). Run on several hosts, it asks once and sends the same command to each. A startup snippet runs without asking, its variables as written; the editor's help says so. Cancelling runs nothing.
+- Tests: variables found once each in order, filled in, one without a value left as written; the dialog asking, offering the last value, and a cancel running nothing; a snippet without variables run as it is.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.
