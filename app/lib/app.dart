@@ -7,7 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'l10n/app_localizations.dart';
+import 'platform/window_security.dart';
 import 'server_check.dart';
+import 'settings/device_settings.dart';
 import 'ssh/known_hosts.dart';
 import 'ssh/ssh_connector.dart';
 import 'sync/account_service.dart';
@@ -35,6 +37,7 @@ class TildeckApp extends StatefulWidget {
     this.showKeyBar,
     this.initialLocale,
     this.initialThemeMode = ThemeMode.system,
+    this.settings,
   });
 
   /// The local vault. Null opens the one in the app support directory.
@@ -57,13 +60,22 @@ class TildeckApp extends StatefulWidget {
   final Locale? initialLocale;
   final ThemeMode initialThemeMode;
 
+  /// This device's settings. Null keeps them in the app support directory,
+  /// starting from [initialLocale] and [initialThemeMode] until loaded; with
+  /// a given [vault] (a test) they stay in memory.
+  final DeviceSettingsStore? settings;
+
   @override
   State<TildeckApp> createState() => _TildeckAppState();
 }
 
 class _TildeckAppState extends State<TildeckApp> {
-  late Locale? _locale = widget.initialLocale;
-  late ThemeMode _themeMode = widget.initialThemeMode;
+  late final DeviceSettingsStore _settings =
+      widget.settings ??
+      DeviceSettingsStore(
+        resolveFile: widget.vault == null ? () => _supportFile('settings.json') : null,
+        initial: DeviceSettings(locale: widget.initialLocale, themeMode: widget.initialThemeMode),
+      );
   late final ServerChecker _checker = widget.checker ?? ServerChecker();
   late final Vault _vault =
       widget.vault ?? Vault(crypto: VaultCrypto.load(), resolveFile: () => _supportFile('vault.json'));
@@ -95,10 +107,19 @@ class _TildeckAppState extends State<TildeckApp> {
     _engine; // Syncs from the first unlock on.
     if (_vault.status == VaultStatus.loading) _vault.load();
     _vault.addListener(_onVault);
+    _settings.addListener(_onSettings);
+    _settings.load();
+  }
+
+  /// Applies what the app itself does with this device's settings.
+  void _onSettings() {
+    setState(() {});
+    WindowSecurity.setSecure(_settings.value.blockScreenshots);
   }
 
   @override
   void dispose() {
+    _settings.removeListener(_onSettings);
     _vault.removeListener(_onVault);
     _engine.dispose();
     if (widget.vault == null) _vault.dispose();
@@ -119,8 +140,8 @@ class _TildeckAppState extends State<TildeckApp> {
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
-      themeMode: _themeMode,
-      locale: _locale,
+      themeMode: _settings.value.themeMode,
+      locale: _settings.value.locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -137,6 +158,7 @@ class _TildeckAppState extends State<TildeckApp> {
             vault: _vault,
             commonPasswords: common,
             sync: _sync(common),
+            settings: _settings,
             unlocked: (context) {
               final current = Localizations.localeOf(context);
               final dark = Theme.of(context).brightness == Brightness.dark;
@@ -145,10 +167,14 @@ class _TildeckAppState extends State<TildeckApp> {
                 connector: _connector,
                 sync: _sync(common),
                 showKeyBar: widget.showKeyBar ?? Platform.isAndroid,
-                onToggleLocale: () => setState(() {
-                  _locale = current.languageCode == 'he' ? const Locale('en') : const Locale('he');
-                }),
-                onToggleTheme: () => setState(() => _themeMode = dark ? ThemeMode.light : ThemeMode.dark),
+                settings: _settings,
+                onToggleLocale: () => _settings.update(
+                  _settings.value.copyWith(
+                    locale: () => current.languageCode == 'he' ? const Locale('en') : const Locale('he'),
+                  ),
+                ),
+                onToggleTheme: () =>
+                    _settings.update(_settings.value.copyWith(themeMode: dark ? ThemeMode.light : ThemeMode.dark)),
               );
             },
           );

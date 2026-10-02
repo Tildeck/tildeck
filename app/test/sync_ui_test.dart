@@ -244,7 +244,9 @@ void main() {
     // And changed once more, from the key button.
     await tap(tester, 'moreMenu');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('openPassword')));
+    await tester.tap(find.byKey(const ValueKey('openSettings')));
+    await tester.pumpAndSettle();
+    await tap(tester, 'settings-password');
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('currentPassword')), 'lantern-river-autumn-77');
     await tester.enterText(find.byKey(const ValueKey('newPassword')), 'harbor-maple-sunrise-15');

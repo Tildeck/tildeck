@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../l10n/app_localizations.dart';
 import '../logo.dart';
+import '../settings/device_settings.dart';
 import '../ssh/file_browser.dart';
 import '../ssh/history_recorder.dart';
 import '../ssh/port_forwarding.dart';
@@ -21,10 +22,9 @@ import 'history_page.dart';
 import 'keys_page.dart';
 import 'known_hosts_page.dart';
 import 'host_key_dialog.dart';
-import 'password_pages.dart';
 import 'port_forwards_page.dart';
 import 'snippets_page.dart';
-import 'terminal_settings_page.dart';
+import 'settings_page.dart';
 import 'hosts_page.dart';
 import 'terminal_panel.dart';
 
@@ -39,11 +39,13 @@ class SessionsPage extends StatefulWidget {
     required this.showKeyBar,
     required this.onToggleLocale,
     required this.onToggleTheme,
+    required this.settings,
   });
 
   final Vault vault;
   final SshConnector connector;
   final SyncServices sync;
+  final DeviceSettingsStore settings;
   final bool showKeyBar;
   final VoidCallback onToggleLocale;
   final VoidCallback onToggleTheme;
@@ -113,9 +115,7 @@ class _SessionsPageState extends State<SessionsPage> {
         if (target != null) _open(target);
       },
     ),
-    DeskSection.appearance => TerminalSettingsPage(vault: widget.vault),
-    DeskSection.account => AccountPage(services: widget.sync),
-    DeskSection.password => ChangePasswordPage(services: widget.sync),
+    DeskSection.settings => SettingsPage(vault: widget.vault, settings: widget.settings, sync: widget.sync),
   };
 
   Widget _hostsPage({required bool desktop}) => HostsPage(
@@ -541,14 +541,12 @@ class _SessionsPageState extends State<SessionsPage> {
             iconColor: c.deskMuted,
             onSelected: (action) {
               switch (action) {
-                case 'appearance':
-                  Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute<void>(builder: (_) => TerminalSettingsPage(vault: widget.vault)));
-                case 'password':
-                  Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute<void>(builder: (_) => ChangePasswordPage(services: widget.sync)));
+                case 'settings':
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => SettingsPage(vault: widget.vault, settings: widget.settings, sync: widget.sync),
+                    ),
+                  );
                 case 'language':
                   widget.onToggleLocale();
                 case 'theme':
@@ -557,14 +555,9 @@ class _SessionsPageState extends State<SessionsPage> {
             },
             itemBuilder: (_) => [
               PopupMenuItem(
-                key: const ValueKey('openTerminalSettings'),
-                value: 'appearance',
-                child: ListTile(leading: const Icon(Icons.palette_outlined), title: Text(t.terminalSettingsTitle)),
-              ),
-              PopupMenuItem(
-                key: const ValueKey('openPassword'),
-                value: 'password',
-                child: ListTile(leading: const Icon(Icons.password_rounded), title: Text(t.changePasswordTitle)),
+                key: const ValueKey('openSettings'),
+                value: 'settings',
+                child: ListTile(leading: const Icon(Icons.settings_outlined), title: Text(t.settingsTitle)),
               ),
               PopupMenuItem(
                 value: 'language',

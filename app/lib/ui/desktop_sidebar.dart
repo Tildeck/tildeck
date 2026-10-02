@@ -35,7 +35,7 @@ Widget deskSectionTheme(BuildContext context, Widget child) {
 }
 
 /// The sections of the desktop layout's sidebar.
-enum DeskSection { hosts, keys, knownHosts, forwards, snippets, history, appearance, account, password }
+enum DeskSection { hosts, keys, knownHosts, forwards, snippets, history, settings }
 
 /// The desktop layout's navigation: the vault's sections, then the app's
 /// own settings and the lock.
@@ -150,9 +150,7 @@ class DesktopSidebar extends StatelessWidget {
                   item(DeskSection.snippets, Icons.code_rounded, t.snippetsTitle),
                   item(DeskSection.history, Icons.history_rounded, t.historyTitle),
                   heading(t.navSettings),
-                  item(DeskSection.appearance, Icons.palette_outlined, t.terminalSettingsTitle),
-                  item(DeskSection.account, Icons.cloud_sync_outlined, t.syncTitle),
-                  item(DeskSection.password, Icons.password_rounded, t.navMasterPassword),
+                  item(DeskSection.settings, Icons.settings_outlined, t.settingsTitle),
                 ],
               ),
             ),
@@ -194,54 +192,65 @@ class DesktopSidebar extends StatelessWidget {
 /// The app's keyboard shortcuts, listed.
 Future<void> showShortcuts(BuildContext context) {
   final t = AppLocalizations.of(context);
-  final c = context.colors;
-  final rows = [
-    ('Ctrl+Shift+T', t.shortcutNewConnection),
-    ('Ctrl+Shift+W', t.shortcutCloseTab),
-    ('Ctrl+Tab', t.shortcutNextTab),
-    ('Ctrl+Shift+Tab', t.shortcutPreviousTab),
-    ('Ctrl+Shift+L', t.lockNow),
-    ('Ctrl+Shift+C', t.shortcutCopy),
-    ('Ctrl+Shift+V', t.shortcutPaste),
-    ('Ctrl+Shift+F', t.shortcutFind),
-    ('Ctrl+ +  /  Ctrl+ -', t.shortcutFontSize),
-    ('Ctrl+/', t.keyboardShortcuts),
-  ];
   return showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text(t.keyboardShortcuts),
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final (keys, what) in rows)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 5),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(what)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: c.page,
-                        border: Border.all(color: c.line),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        keys,
-                        textDirection: TextDirection.ltr,
-                        style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12.5),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
+      content: const SizedBox(width: 420, child: ShortcutsList()),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(t.close))],
     ),
   );
+}
+
+/// Each shortcut beside what it does.
+class ShortcutsList extends StatelessWidget {
+  const ShortcutsList({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    final rows = [
+      ('Ctrl+Shift+T', t.shortcutNewConnection),
+      ('Ctrl+Shift+W', t.shortcutCloseTab),
+      ('Ctrl+Tab', t.shortcutNextTab),
+      ('Ctrl+Shift+Tab', t.shortcutPreviousTab),
+      ('Ctrl+Shift+L', t.lockNow),
+      ('Ctrl+Shift+C', t.shortcutCopy),
+      ('Ctrl+Shift+V', t.shortcutPaste),
+      ('Ctrl+Shift+F', t.shortcutFind),
+      ('Ctrl+ +  /  Ctrl+ -', t.shortcutFontSize),
+      ('Ctrl+/', t.keyboardShortcuts),
+    ];
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 560),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (keys, what) in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  Expanded(child: Text(what)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: c.page,
+                      border: Border.all(color: c.line),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      keys,
+                      textDirection: TextDirection.ltr,
+                      style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

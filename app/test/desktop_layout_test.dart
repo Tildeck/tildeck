@@ -23,9 +23,7 @@ void main() {
       ('forwards', 'Port forwarding'),
       ('snippets', 'Snippets'),
       ('history', 'History'),
-      ('appearance', 'Terminal appearance'),
-      ('account', 'Sync'),
-      ('password', 'Change master password'),
+      ('settings', 'Settings'),
       ('hosts', 'Hosts'),
     ]) {
       await tester.tap(find.byKey(ValueKey('nav-$section')));
@@ -35,6 +33,25 @@ void main() {
       expect(find.byType(BackButton), findsNothing, reason: section);
       expect(find.byKey(const ValueKey('nav-hosts')), findsOneWidget);
     }
+    // Every group of the settings opens in place too.
+    await tester.tap(find.byKey(const ValueKey('nav-settings')));
+    await settle(tester);
+    for (final (group, title) in [
+      ('terminal', 'Color scheme'),
+      ('security', 'Lock after inactivity'),
+      ('password', 'Change master password'),
+      ('account', 'Sync'),
+      ('shortcuts', 'Ctrl+Shift+T'),
+      ('general', 'Language'),
+    ]) {
+      await tester.tap(find.byKey(ValueKey('settings-$group')));
+      await settle(tester);
+      expect(find.text(title), findsWidgets, reason: group);
+      expect(find.byType(BackButton), findsNothing, reason: group);
+    }
+    await tester.tap(find.byKey(const ValueKey('nav-hosts')));
+    await settle(tester);
+
     // The hosts list does not repeat the sidebar's buttons.
     expect(find.byKey(const ValueKey('openSnippets')), findsNothing);
     expect(find.byKey(const ValueKey('openForwards')), findsNothing);

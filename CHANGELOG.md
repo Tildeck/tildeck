@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Settings in one place: general, terminal, security, master password, account and sync, and keyboard shortcuts, saved together with one bar. The language and theme are now remembered, the lock time can be chosen, and on Android the vault can lock when the app goes to the background and the app can be kept out of screenshots.
 - On the desktop, files show this computer beside the server; drag between them to upload or download.
 - On the desktop, files open as a tab with a file manager's table: sortable columns, Ctrl and Shift selection, double-click, right-click, and keys.
 - Keyboard shortcuts for connections and tabs, with a list of them; tabs close on a middle click and have a right-click menu.
