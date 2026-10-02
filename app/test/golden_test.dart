@@ -687,6 +687,24 @@ void main() {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/telnet_host_${locale}_${mode.name}.png'));
     });
 
+    testWidgets('serial host $locale ${mode.name}', (tester) async {
+      phone(tester);
+      final vault = (await tester.runAsync(() => sampleVault(unlocked: true)))!;
+      const console = HostEntry(
+        id: 's1',
+        name: 'Lab router console',
+        group: 'Network',
+        host: 'COM3',
+        port: 9600,
+        username: '',
+        protocol: ConnectionProtocol.serial,
+      );
+      await tester.pumpWidget(screen(locale, mode, HostEditorPage(vault: vault, host: console)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('jumpHost')), findsNothing, reason: 'a local port');
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/serial_host_${locale}_${mode.name}.png'));
+    });
+
     testWidgets('settings on the desktop $locale ${mode.name}', (tester) async {
       desktop(tester);
       final vault = (await tester.runAsync(() async {

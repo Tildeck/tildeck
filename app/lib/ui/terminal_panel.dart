@@ -542,6 +542,7 @@ String connectProblemText(AppLocalizations t, ConnectProblem problem) => switch 
   ConnectProblem.keyPassphraseWrong => t.errConnKeyPassphraseWrong,
   ConnectProblem.disconnected => t.errConnDisconnected,
   ConnectProblem.localShellFailed => t.errLocalShell,
+  ConnectProblem.serialFailed => t.errSerial,
 };
 
 class _StatusBanner extends StatelessWidget {

@@ -1,5 +1,5 @@
 import '../ssh/proxy.dart';
-import '../ssh/ssh_connector.dart' show ConnectionProtocol;
+import '../ssh/ssh_connector.dart' show ConnectionProtocol, defaultBaudRate;
 
 /// What the vault stores. Each entry is one encrypted record; the record type
 /// is inside the ciphertext, so storage (and later the sync server) cannot
@@ -103,6 +103,10 @@ class HostEntry extends VaultEntry {
   final String notes;
 
   bool get isTelnet => protocol == ConnectionProtocol.telnet;
+  bool get isSerial => protocol == ConnectionProtocol.serial;
+
+  /// Sign-in, keys, jump hosts, forwarding and files are SSH's alone.
+  bool get isSsh => protocol == ConnectionProtocol.ssh;
 
   @override
   String get type => recordType;
@@ -150,6 +154,7 @@ class HostEntry extends VaultEntry {
   );
 
   String get label {
+    if (isSerial) return port == defaultBaudRate ? host : '$host $port';
     final address = port == (isTelnet ? 23 : 22) ? host : '$host:$port';
     return username.isEmpty ? address : '$username@$address';
   }

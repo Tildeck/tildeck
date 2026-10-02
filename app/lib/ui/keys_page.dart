@@ -605,7 +605,7 @@ class _InstallKey extends StatefulWidget {
 }
 
 class _InstallKeyState extends State<_InstallKey> {
-  late final _hosts = widget.vault.hosts.where((h) => !h.isTelnet).toList();
+  late final _hosts = widget.vault.hosts.where((h) => h.isSsh).toList();
   late String? _hostId = _hosts.isEmpty ? null : _hosts.first.id;
   var _working = false;
   String? _problem;

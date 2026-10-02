@@ -536,5 +536,12 @@
   "highlightErrors": "שגיאות",
   "highlightWarnings": "אזהרות",
   "highlightSuccess": "הצלחות",
-  "runSnippet": "הרצה"
+  "runSnippet": "הרצה",
+  "errSerial": "לא ניתן היה לפתוח את היציאה הטורית. כדאי לבדוק שההתקן מחובר ושאף תוכנה אחרת לא משתמשת בה.",
+  "serial": "טורי",
+  "serialPortLabel": "יציאה טורית",
+  "serialPortsFound": "יציאות במחשב הזה",
+  "noSerialPorts": "לא נמצאו יציאות טוריות",
+  "baudRateLabel": "קצב (baud)",
+  "baudRateInvalid": "מספר כמו 9600 או 115200"
 }
