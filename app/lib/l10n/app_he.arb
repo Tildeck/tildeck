@@ -561,5 +561,7 @@
   "workspaceNameHint": "בדיקות בוקר",
   "workspaceSaved": "{count, plural, =1{{name} נשמרה עם שרת אחד} other{{name} נשמרה עם {count} שרתים}}",
   "paletteWorkspace": "סביבת עבודה",
-  "transferQueued": "ממתין"
+  "transferQueued": "ממתין",
+  "broadcastInput": "הקלדה בכל הטרמינלים בבת אחת",
+  "broadcastOn": "ההקלדה נשלחת לכל {count} הטרמינלים"
 }

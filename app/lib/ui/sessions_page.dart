@@ -110,6 +110,25 @@ class _SessionsPageState extends State<SessionsPage> {
   /// -1 is the hosts tab, or on the desktop the chosen section.
   int _selected = -1;
 
+  /// What is typed in one terminal goes to every open terminal.
+  bool _broadcast = false;
+
+  /// Points each terminal's typing at the others while broadcasting; with
+  /// fewer than two terminals there is no one to send to, and it turns off.
+  void _wireBroadcast() {
+    final terms = [for (var i = 0; i < _tabs.length; i++) _term(i)].nonNulls.toList();
+    if (terms.length < 2) _broadcast = false;
+    for (final session in terms) {
+      session.onTyped = _broadcast
+          ? (data) {
+              for (final other in terms) {
+                if (other != session) other.receive(data);
+              }
+            }
+          : null;
+    }
+  }
+
   /// The desktop layout's section, shown when no session is.
   DeskSection _section = DeskSection.hosts;
 
@@ -547,7 +566,7 @@ class _SessionsPageState extends State<SessionsPage> {
               final connected = session.state == SessionState.connected;
               final terminals = [for (var i = 0; i < _tabs.length; i++) _term(i)].nonNulls.length;
               final canSplit = terminals > 1 && MediaQuery.sizeOf(context).width >= _splitMinWidth;
-              if (!connected && !canSplit) return const SizedBox.shrink();
+              if (!connected && terminals < 2) return const SizedBox.shrink();
               return Container(
                 height: 52,
                 padding: const EdgeInsetsDirectional.only(end: 10),
@@ -567,6 +586,24 @@ class _SessionsPageState extends State<SessionsPage> {
                         onPressed: _toggleSplit,
                       ),
                       const SizedBox(width: 4),
+                    ],
+                    if (terminals > 1) ...[
+                      IconButton(
+                        key: const ValueKey('broadcast'),
+                        tooltip: t.broadcastInput,
+                        isSelected: _broadcast,
+                        icon: const Icon(Icons.cell_tower_outlined),
+                        selectedIcon: Icon(Icons.cell_tower, color: c.danger),
+                        onPressed: () => setState(() => _broadcast = !_broadcast),
+                      ),
+                      if (_broadcast) ...[
+                        Text(
+                          t.broadcastOn(terminals),
+                          style: TextStyle(color: c.danger, fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                        const SizedBox(width: 12),
+                      ] else
+                        const SizedBox(width: 4),
                     ],
                     if (connected) ...[
                       OutlinedButton.icon(
@@ -659,6 +696,8 @@ class _SessionsPageState extends State<SessionsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Every change to the tabs rebuilds, so the wiring follows them.
+    _wireBroadcast();
     if (isDesktopLayout(context)) return _desktop(context);
     final t = AppLocalizations.of(context);
     final c = context.colors;
