@@ -551,7 +551,8 @@ class Terminal with Observable implements TerminalState, EscapeHandler {
 
   @override
   void sendCursorPosition() {
-    onOutput?.call(_emitter.cursorPosition(_buffer.cursorX, _buffer.cursorY));
+    // Reported 1-based, as VT100 and xterm do (Tildeck patch 2).
+    onOutput?.call(_emitter.cursorPosition(_buffer.cursorX + 1, _buffer.cursorY + 1));
   }
 
   @override

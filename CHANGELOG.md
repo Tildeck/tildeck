@@ -59,6 +59,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Fixed
 
+- The terminal tells programs where its cursor is counting from 1, as other terminals do; it was one row and one column short.
 - A sync server that goes back to older data is reported instead of being followed quietly; this device's changes wait until you confirm the server was restored from a backup.
 - A deletion now proves it came from one of your devices: the sync server can no longer delete entries on your devices by itself.
 - Servers that ask for more than a password at sign-in (a one-time code from an authenticator, Duo) now show their questions instead of getting the password for each one; this also works with a key, and a refused password is asked for instead of sent again.
