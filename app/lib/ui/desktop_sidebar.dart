@@ -221,6 +221,7 @@ class ShortcutsList extends StatelessWidget {
       ('Ctrl+Shift+V', t.shortcutPaste),
       ('Ctrl+Shift+F', t.shortcutFind),
       ('Ctrl+ +  /  Ctrl+ -', t.shortcutFontSize),
+      ('Ctrl+Shift+P', t.paletteTitle),
       ('Ctrl+/', t.keyboardShortcuts),
     ];
     return ConstrainedBox(

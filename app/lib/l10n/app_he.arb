@@ -483,5 +483,12 @@
   "duplicateAction": "שכפול",
   "copyName": "{name} (עותק)",
   "expandFolder": "פתיחת תיקייה",
-  "collapseFolder": "קיפול תיקייה"
+  "collapseFolder": "קיפול תיקייה",
+  "paletteTitle": "חיפוש הכול",
+  "paletteHint": "שרתים, לשוניות פתוחות, אזורים, פעולות",
+  "paletteNoMatch": "אין התאמות.",
+  "paletteOpenTab": "לשונית פתוחה",
+  "paletteConnect": "התחברות",
+  "paletteSection": "אזור",
+  "paletteAction": "פעולה"
 }

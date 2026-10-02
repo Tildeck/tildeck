@@ -18,6 +18,7 @@ import '../vault/biometric_unlock.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
+import 'command_palette.dart';
 import 'desktop_sidebar.dart';
 import 'files_page.dart';
 import 'history_page.dart';
@@ -212,7 +213,65 @@ class _SessionsPageState extends State<SessionsPage> {
     const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true): () => _cycle(-1),
     const SingleActivator(LogicalKeyboardKey.keyL, control: true, shift: true): widget.vault.lock,
     const SingleActivator(LogicalKeyboardKey.slash, control: true): () => showShortcuts(context),
+    const SingleActivator(LogicalKeyboardKey.keyP, control: true, shift: true): _openPalette,
   };
+
+  /// Everything there is to go to or do, found by typing: the open tabs,
+  /// the saved hosts, the sections (on the desktop), and a few actions.
+  void _openPalette() {
+    final t = AppLocalizations.of(context);
+    final desktop = isDesktopLayout(context);
+    showCommandPalette(context, [
+      for (final (i, tab) in _tabs.indexed)
+        PaletteItem(
+          icon: tab is _FilesTab ? Icons.folder_outlined : Icons.terminal_rounded,
+          title: switch (tab) {
+            _TermTab(:final session) => session.title ?? session.target.label,
+            _FilesTab(:final title) => title,
+          },
+          kind: t.paletteOpenTab,
+          run: () => setState(() => _selected = i),
+        ),
+      for (final host in widget.vault.hosts)
+        PaletteItem(
+          icon: Icons.dns_outlined,
+          title: host.name,
+          detail: host.label,
+          kind: t.paletteConnect,
+          run: () async {
+            final target = await connectionTargetFor(context, widget.vault, host);
+            if (target != null && mounted) _open(target);
+          },
+        ),
+      if (desktop)
+        for (final (section, icon, label) in [
+          (DeskSection.hosts, Icons.dns_outlined, t.hostsTitle),
+          (DeskSection.keys, Icons.key_outlined, t.keysTitle),
+          (DeskSection.identities, Icons.badge_outlined, t.identitiesTitle),
+          (DeskSection.knownHosts, Icons.verified_user_outlined, t.knownHostsTitle),
+          (DeskSection.forwards, Icons.swap_horiz_rounded, t.forwardsTitle),
+          (DeskSection.snippets, Icons.code_rounded, t.snippetsTitle),
+          (DeskSection.history, Icons.history_rounded, t.historyTitle),
+          (DeskSection.settings, Icons.settings_outlined, t.settingsTitle),
+        ])
+          PaletteItem(
+            icon: icon,
+            title: label,
+            kind: t.paletteSection,
+            run: () => setState(() {
+              _section = section;
+              _selected = -1;
+            }),
+          ),
+      PaletteItem(icon: Icons.lock_outline, title: t.lockNow, kind: t.paletteAction, run: widget.vault.lock),
+      PaletteItem(
+        icon: Icons.keyboard_outlined,
+        title: t.keyboardShortcuts,
+        kind: t.paletteAction,
+        run: () => showShortcuts(context),
+      ),
+    ]);
+  }
 
   /// Takes the app's keys before whatever has the focus (a terminal, a
   /// field), and without taking the focus itself: typing must reach the
