@@ -480,6 +480,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The sidebar has a button for the list of shortcuts.
 - Test: on three real tabs, going round both ways, closing by keys, by a middle click, and the others from the menu; a new connection focusing the search; the list; and the lock.
 
+### Desktop layout: files (2026-10-02)
+
+- On the desktop, files open as a tab beside the terminals (from a session or from a host's menu), not as a page over the app. A tab is a terminal or files; the split view is for terminals.
+- The files are a table: a toolbar with the path as steps to click (and a field to type one), up, refresh, hidden files, new folder, and upload; columns for name, size, date, and permissions, sorted by a click on their title; rows that select at a click, add with Ctrl, take a range with Shift, open at a double-click (a folder opens, a file goes to the editor), and offer their actions at a right-click. The list has a file manager's keys: Delete, F2, Enter, Backspace, Ctrl+A, and Escape. A double-click is told apart in the row itself, so a single click selects at once.
+- The text editor opens over the files as a large window instead of a page.
+- The files page now starts listing after its first frame: starting notifies listeners (the tab, too), which must not happen while building.
+- Tests: on the desktop, selection by click, Shift, and Ctrl; F2 and Delete; sorting by a column; a double-click opening a folder; the right-click menu; and a host's files opening as a tab. Golden: the table in both languages.
+
 ## Required workflow contracts
 
 The four Bash scripts run in WSL with `#!/usr/bin/env bash`, LF line endings, and executable file modes. Each resolves the repository root from its own location.

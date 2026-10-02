@@ -369,5 +369,8 @@
   "shortcutPaste": "הדבקה בטרמינל",
   "shortcutFind": "חיפוש בטרמינל",
   "shortcutFontSize": "הגדלה או הקטנה של הטקסט",
-  "closeOtherTabs": "סגירת שאר הטאבים"
+  "closeOtherTabs": "סגירת שאר הטאבים",
+  "columnName": "שם",
+  "columnSize": "גודל",
+  "columnModified": "שונה"
 }

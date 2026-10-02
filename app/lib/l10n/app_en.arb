@@ -657,5 +657,8 @@
   "shortcutPaste": "Paste in the terminal",
   "shortcutFind": "Find in the terminal",
   "shortcutFontSize": "Larger or smaller text",
-  "closeOtherTabs": "Close the other tabs"
+  "closeOtherTabs": "Close the other tabs",
+  "columnName": "Name",
+  "columnSize": "Size",
+  "columnModified": "Modified"
 }
