@@ -992,5 +992,8 @@
   "charsetLabel": "Character set",
   "commandsTitle": "Commands",
   "noCommandsYet": "Commands run in this session, and the server's history, show here.",
-  "saveAsSnippet": "Save as snippet"
+  "saveAsSnippet": "Save as snippet",
+  "sessionLogsLabel": "Save session logs",
+  "sessionLogsHelp": "Each session's output is saved as text in Documents\\Tildeck\\logs on this computer. Logs are not encrypted: they keep whatever was on the screen.",
+  "openSessionLogs": "Open the logs folder"
 }

@@ -6,7 +6,11 @@ import 'package:xterm/xterm.dart';
 
 import '../l10n/app_localizations.dart';
 import '../settings/device_settings.dart';
+<<<<<<< HEAD
 import '../terminal/keyword_highlighter.dart';
+=======
+import '../terminal/session_log.dart';
+>>>>>>> 6d56064 (Save session logs on the desktop)
 import '../terminal/terminal_options.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
@@ -592,6 +596,30 @@ class _TerminalSettings extends StatelessWidget {
           title: Text(t.copyOnSelectLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(t.copyOnSelectHelp, style: TextStyle(color: c.muted, fontSize: 13)),
         ),
+        if (!Platform.isAndroid && !Platform.isIOS) ...[
+          SwitchListTile(
+            key: const ValueKey('sessionLogs'),
+            contentPadding: EdgeInsets.zero,
+            value: draft.device.sessionLogs,
+            onChanged: (v) => draft.setDevice(draft.device.copyWith(sessionLogs: v)),
+            title: Text(t.sessionLogsLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(t.sessionLogsHelp, style: TextStyle(color: c.muted, fontSize: 13)),
+          ),
+          if (Platform.isWindows)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                key: const ValueKey('openSessionLogs'),
+                icon: const Icon(Icons.folder_open_rounded),
+                label: Text(t.openSessionLogs),
+                onPressed: () async {
+                  final dir = await sessionLogsDirectory();
+                  await dir.create(recursive: true);
+                  await Process.run('explorer', [dir.path]);
+                },
+              ),
+            ),
+        ],
         SwitchListTile(
           key: const ValueKey('highlightSwitch'),
           contentPadding: EdgeInsets.zero,

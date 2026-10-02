@@ -26,6 +26,7 @@ class DeviceSettings {
     this.themeMode = ThemeMode.system,
     this.backgroundLock = BackgroundLock.oneMinute,
     this.blockScreenshots = false,
+    this.sessionLogs = false,
   });
 
   /// Null follows the device language.
@@ -37,16 +38,21 @@ class DeviceSettings {
   /// recent apps preview.
   final bool blockScreenshots;
 
+  /// Desktop: each session's output is saved as text (not encrypted).
+  final bool sessionLogs;
+
   DeviceSettings copyWith({
     Locale? Function()? locale,
     ThemeMode? themeMode,
     BackgroundLock? backgroundLock,
     bool? blockScreenshots,
+    bool? sessionLogs,
   }) => DeviceSettings(
     locale: locale != null ? locale() : this.locale,
     themeMode: themeMode ?? this.themeMode,
     backgroundLock: backgroundLock ?? this.backgroundLock,
     blockScreenshots: blockScreenshots ?? this.blockScreenshots,
+    sessionLogs: sessionLogs ?? this.sessionLogs,
   );
 
   Map<String, Object?> toJson() => {
@@ -54,6 +60,7 @@ class DeviceSettings {
     'theme': themeMode.name,
     'background_lock': backgroundLock.name,
     'block_screenshots': blockScreenshots,
+    'session_logs': sessionLogs,
   };
 
   /// Unknown or missing values fall back to the defaults: a file from a
@@ -66,6 +73,7 @@ class DeviceSettings {
       themeMode: named(ThemeMode.values, json['theme']) ?? ThemeMode.system,
       backgroundLock: named(BackgroundLock.values, json['background_lock']) ?? BackgroundLock.oneMinute,
       blockScreenshots: json['block_screenshots'] == true,
+      sessionLogs: json['session_logs'] == true,
     );
   }
 
@@ -75,10 +83,11 @@ class DeviceSettings {
       other.locale == locale &&
       other.themeMode == themeMode &&
       other.backgroundLock == backgroundLock &&
-      other.blockScreenshots == blockScreenshots;
+      other.blockScreenshots == blockScreenshots &&
+      other.sessionLogs == sessionLogs;
 
   @override
-  int get hashCode => Object.hash(locale, themeMode, backgroundLock, blockScreenshots);
+  int get hashCode => Object.hash(locale, themeMode, backgroundLock, blockScreenshots, sessionLogs);
 }
 
 /// This device's settings, loaded once and written on every change.
