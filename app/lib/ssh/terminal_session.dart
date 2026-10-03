@@ -24,7 +24,7 @@ class TerminalSession extends ChangeNotifier {
   /// [scrollback] is how many lines stay above the screen.
   /// [openSerial] opens a serial target's port.
   TerminalSession(this.target, {int scrollback = 10000, this.openSerial = openSerialPort}) {
-    terminal = Terminal(maxLines: scrollback);
+    terminal = _keyboard = _KeyboardTerminal(maxLines: scrollback);
     controller = TerminalController();
     line.onEnter = _entered;
   }
@@ -32,6 +32,11 @@ class TerminalSession extends ChangeNotifier {
   final ConnectionTarget target;
   final SerialOpener openSerial;
   late final Terminal terminal;
+  late final _KeyboardTerminal _keyboard;
+
+  /// Told what the user types or pastes here (not what the app sends, such
+  /// as a saved password), to send it to other sessions too.
+  void Function(String data)? onTyped;
   late final TerminalController controller;
 
   SessionState state = SessionState.connecting;
@@ -132,7 +137,9 @@ class TerminalSession extends ChangeNotifier {
         userActivity.ping();
         line.feed(data);
         if (autocomplete) notifyListeners();
-        link.write(_encode(applyCtrl(data)));
+        final input = applyCtrl(data);
+        link.write(_encode(input));
+        if (_keyboard.typing) onTyped?.call(input);
       };
       terminal.onResize = (width, height, pixelWidth, pixelHeight) =>
           link.resize(width, height, pixelWidth, pixelHeight);
@@ -291,7 +298,16 @@ class TerminalSession extends ChangeNotifier {
   /// Completes the typed line with [command], without running it.
   void complete(String command) {
     if (state != SessionState.connected) return;
-    terminal.textInput(completionInput(line.line ?? '', command));
+    _keyboard.fromApp(() => terminal.textInput(completionInput(line.line ?? '', command)));
+  }
+
+  /// Takes [data] as if typed here: what another session broadcast.
+  void receive(String data) {
+    final link = _link;
+    if (state != SessionState.connected || link == null) return;
+    userActivity.ping();
+    line.feed(data);
+    link.write(_encode(data));
   }
 
   /// Answers a password prompt with the password this session signed in
@@ -299,7 +315,7 @@ class TerminalSession extends ChangeNotifier {
   void fillPassword() {
     final password = target.password;
     if (state != SessionState.connected || password == null || !atPasswordPrompt) return;
-    terminal.textInput('$password\r');
+    _keyboard.fromApp(() => terminal.textInput('$password\r'));
     atPasswordPrompt = false;
     notifyListeners();
   }
@@ -312,7 +328,7 @@ class TerminalSession extends ChangeNotifier {
       lines.removeLast();
     }
     if (lines.isEmpty) return;
-    terminal.textInput('${lines.join('\r')}\r');
+    _keyboard.fromApp(() => terminal.textInput('${lines.join('\r')}\r'));
   }
 
   /// Text typed or pasted by the user, sent as if from the keyboard.
@@ -370,4 +386,49 @@ class _Link {
   final void Function(int width, int height, int pixelWidth, int pixelHeight) resize;
   final Future<void> done;
   final void Function() close;
+}
+
+/// A terminal that knows whether its input comes from the keyboard: typed
+/// or pasted by the user, not the terminal's own replies to the program
+/// (cursor position, mouse reports) or text the app sends.
+class _KeyboardTerminal extends Terminal {
+  _KeyboardTerminal({super.maxLines});
+
+  bool _app = false;
+  var _depth = 0;
+
+  /// Input is being given by the user right now.
+  bool get typing => _depth > 0 && !_app;
+
+  T _typed<T>(T Function() input) {
+    _depth++;
+    try {
+      return input();
+    } finally {
+      _depth--;
+    }
+  }
+
+  void fromApp(void Function() input) {
+    _app = true;
+    try {
+      input();
+    } finally {
+      _app = false;
+    }
+  }
+
+  @override
+  bool keyInput(TerminalKey key, {bool shift = false, bool alt = false, bool ctrl = false}) =>
+      _typed(() => super.keyInput(key, shift: shift, alt: alt, ctrl: ctrl));
+
+  @override
+  bool charInput(int charCode, {bool alt = false, bool ctrl = false}) =>
+      _typed(() => super.charInput(charCode, alt: alt, ctrl: ctrl));
+
+  @override
+  void textInput(String text) => _typed(() => super.textInput(text));
+
+  @override
+  void paste(String text) => _typed(() => super.paste(text));
 }

@@ -1032,5 +1032,14 @@
     }
   },
   "paletteWorkspace": "Workspace",
-  "transferQueued": "Waiting"
+  "transferQueued": "Waiting",
+  "broadcastInput": "Type in every terminal at once",
+  "broadcastOn": "Typing goes to all {count} terminals",
+  "@broadcastOn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

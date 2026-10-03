@@ -444,6 +444,11 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 - A files tab runs at most two transfers at once (uploads, downloads, copies to another server); the rest wait their turn in order, shown as Waiting in the transfers list. One cancelled while waiting never starts, and the next one waiting takes the free turn. Clear finished leaves running and waiting ones.
 - Tests: against the OpenSSH container, four uploads: two running and two waiting, a waiting one cancelled, the next one taking a turn freed by another cancel, and nothing partial left on the server.
+### Typing in every terminal (2026-10-02)
+
+- With two or more terminals open, a button above the terminal sends what is typed in any of them to all of them, until it is pressed again: the same command on several servers at once. While it is on, the bar says so in red, with how many terminals receive it. It turns off when fewer than two terminals are left.
+- Only the user's own typing and pasting is sent: keys, text, and pastes. The terminal's replies to its program (cursor position, device attributes, mouse reports), the saved password offered at a prompt, a completion picked from the suggestions, and a snippet run with Run are not; a snippet goes to many servers with Run on hosts instead. A terminal that is not connected is skipped.
+- Tests: two Telnet sessions against local servers: typing reaches the other one; a cursor position reply, the saved password, and a snippet do not; turned off, nothing does.
 
 ### Local terminal (2026-10-01)
 
