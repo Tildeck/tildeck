@@ -401,12 +401,19 @@ class SshConnector {
   }
 }
 
+/// CSI (7-bit and the C1 form), OSC ended by BEL or ST, and two-character
+/// escape sequences.
+final _bannerEscapes = RegExp(r'(?:\x1b\[|\x9b)[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[ -/]*[0-~]');
+
 /// A server's sign-in banner made safe to show in a terminal: its own text
 /// and line breaks only, so it cannot move the cursor, change colors, or
 /// send the terminal commands, as OpenSSH does.
 String bannerText(String banner) {
+  // Whole escape sequences go first, so none leaves its tail as text; then
+  // every control character left.
+  final plain = banner.replaceAll(_bannerEscapes, '').replaceAll('\r\n', '\n');
   final text = String.fromCharCodes([
-    for (final rune in banner.replaceAll('\r\n', '\n').runes)
+    for (final rune in plain.runes)
       if (rune == 0x0a || rune == 0x09 || (rune >= 0x20 && rune != 0x7f && (rune < 0x80 || rune > 0x9f))) rune,
   ]).trimRight();
   return text.isEmpty ? '' : '${text.replaceAll('\n', '\r\n')}\r\n';
