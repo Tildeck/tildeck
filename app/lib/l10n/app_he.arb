@@ -543,5 +543,7 @@
   "serialPortsFound": "יציאות במחשב הזה",
   "noSerialPorts": "לא נמצאו יציאות טוריות",
   "baudRateLabel": "קצב (baud)",
-  "baudRateInvalid": "מספר כמו 9600 או 115200"
+  "baudRateInvalid": "מספר כמו 9600 או 115200",
+  "terminalTypeLabel": "סוג טרמינל",
+  "charsetLabel": "קידוד תווים"
 }

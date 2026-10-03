@@ -14,6 +14,13 @@ enum ConnectionProtocol { ssh, telnet, local, serial }
 /// The usual speed of a serial console.
 const defaultBaudRate = 115200;
 
+/// How a session's bytes become text. Old devices and consoles often speak
+/// ISO-8859-1 (Latin-1) rather than UTF-8.
+enum TerminalCharset { utf8, latin1 }
+
+/// The terminal type a session announces when the host sets none.
+const defaultTerminalType = 'xterm-256color';
+
 /// Where to connect and how to authenticate.
 class ConnectionTarget {
   const ConnectionTarget({
@@ -33,6 +40,8 @@ class ConnectionTarget {
     this.protocol = ConnectionProtocol.ssh,
     this.localShell,
     this.localName,
+    this.terminalType = defaultTerminalType,
+    this.charset = TerminalCharset.utf8,
   });
 
   /// A local terminal: [host] and [username] are unused.
@@ -80,6 +89,10 @@ class ConnectionTarget {
   final LocalShell? localShell;
   final String? localName;
 
+  /// What the session tells the server it is (TERM).
+  final String terminalType;
+  final TerminalCharset charset;
+
   String get label {
     if (protocol == ConnectionProtocol.local) return localName ?? localShell?.executable ?? '';
     if (protocol == ConnectionProtocol.serial) return port == defaultBaudRate ? host : '$host $port';
@@ -106,6 +119,8 @@ class ConnectionTarget {
     protocol: protocol,
     localShell: localShell,
     localName: localName,
+    terminalType: terminalType,
+    charset: charset,
   );
 }
 

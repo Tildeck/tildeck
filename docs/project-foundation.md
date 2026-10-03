@@ -413,6 +413,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - A server's sign-in banner (sshd's `Banner`, often a legal notice) is shown at the top of the terminal before the shell, as OpenSSH shows it. Only the server being connected to shows one; a jump host's is not shown.
 - The banner is the server's text, so it is shown as text only: line breaks and tabs stay, and every other control character, escape sequences included, is dropped, so a banner cannot move the cursor, change colors, set the window title, or send the terminal commands.
 - Tests: the cleaning (escape and C1 sequences dropped, line breaks kept, an empty banner shows nothing), and against the OpenSSH container, whose banner `scripts/verify.sh` sets with a color escape in it: the banner on the first line, without the color.
+### Terminal type and character set per host (2026-10-02)
+
+- A host chooses the terminal type it announces (TERM over SSH, TTYPE over Telnet, in capitals there): xterm-256color by default, or xterm, vt220, vt100, or linux, for devices that draw badly with the default. A type set elsewhere (an older record, another device) stays offered.
+- A host chooses its character set: UTF-8 by default, or ISO-8859-1 (Latin-1), which older devices and consoles use. Output is read and typing is sent in it; a character Latin-1 does not have is sent as `?`.
+- A serial host has the character set but no terminal type: a serial line does not negotiate one.
+- Records from before have neither field and keep the defaults.
+- Tests: the record with and without the fields; the connection target taking them; a Telnet session reading and writing Latin-1 and announcing vt100 when asked; against the OpenSSH container, TERM in the shell set to the host's type.
 
 ### Local terminal (2026-10-01)
 

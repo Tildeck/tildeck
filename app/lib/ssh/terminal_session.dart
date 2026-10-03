@@ -74,6 +74,18 @@ class TerminalSession extends ChangeNotifier {
   _Link? _link;
   final _subscriptions = <StreamSubscription<String>>[];
 
+  /// The session's bytes as text, in the host's charset.
+  Stream<String> _decode(Stream<List<int>> bytes) => switch (target.charset) {
+    TerminalCharset.utf8 => bytes.transform(const Utf8Decoder(allowMalformed: true)),
+    TerminalCharset.latin1 => bytes.map(latin1.decode),
+  };
+
+  /// Text as the host's charset; a character Latin-1 lacks is sent as ?.
+  Uint8List _encode(String text) => switch (target.charset) {
+    TerminalCharset.utf8 => utf8.encode(text),
+    TerminalCharset.latin1 => Uint8List.fromList([for (final c in text.runes) c > 0xff ? 0x3f : c]),
+  };
+
   /// Files and the server's history come over SSH only.
   bool get isSsh => target.protocol == ConnectionProtocol.ssh;
 
@@ -91,7 +103,7 @@ class TerminalSession extends ChangeNotifier {
       // Streams can split a multi-byte character; the decoders keep the
       // partial bytes until the rest arrives.
       _subscriptions.add(
-        link.output.transform(const Utf8Decoder(allowMalformed: true)).listen((data) {
+        _decode(link.output).listen((data) {
           terminal.write(data);
           _checkPrompt();
         }),
@@ -101,7 +113,7 @@ class TerminalSession extends ChangeNotifier {
         userActivity.ping();
         line.feed(data);
         if (autocomplete) notifyListeners();
-        link.write(utf8.encode(applyCtrl(data)));
+        link.write(_encode(applyCtrl(data)));
       };
       terminal.onResize = (width, height, pixelWidth, pixelHeight) =>
           link.resize(width, height, pixelWidth, pixelHeight);
@@ -140,7 +152,7 @@ class TerminalSession extends ChangeNotifier {
     );
     _client = client;
     final shell = _shell = await client.shell(
-      pty: SSHPtyConfig(type: 'xterm-256color', width: terminal.viewWidth, height: terminal.viewHeight),
+      pty: SSHPtyConfig(type: target.terminalType, width: terminal.viewWidth, height: terminal.viewHeight),
       environment: target.environment.isEmpty ? null : target.environment,
     );
     return _Link(
@@ -192,7 +204,12 @@ class TerminalSession extends ChangeNotifier {
 
   Future<_Link> _openTelnet(SshConnector connector, HostKeyPrompt promptHostKey) async {
     final socket = await connector.openSocket(target, promptHostKey: promptHostKey);
-    final telnet = TelnetChannel(socket, width: terminal.viewWidth, height: terminal.viewHeight);
+    final telnet = TelnetChannel(
+      socket,
+      terminalType: target.terminalType.toUpperCase(),
+      width: terminal.viewWidth,
+      height: terminal.viewHeight,
+    );
     return _Link(
       output: telnet.output.cast<List<int>>(),
       write: telnet.write,

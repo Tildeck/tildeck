@@ -84,6 +84,9 @@ void main() {
       300,
       scrollable: find.descendant(of: find.byType(HostEditorPage), matching: find.byType(Scrollable)).first,
     );
+    // Built is not on screen: bring the button fully into view.
+    await tester.ensureVisible(find.byKey(const ValueKey('saveHost')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('saveHost')));
     for (var i = 0; i < 1000 && find.byKey(const ValueKey('closePanel')).evaluate().isNotEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
