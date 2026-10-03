@@ -221,6 +221,38 @@ class _SessionsPageState extends State<SessionsPage> {
     const SingleActivator(LogicalKeyboardKey.keyP, control: true, shift: true): _openPalette,
   };
 
+  /// The saved hosts open in terminal tabs, in tab order, each once.
+  List<String> get _openHostIds {
+    final ids = <String>[];
+    for (var i = 0; i < _tabs.length; i++) {
+      final id = _term(i)?.target.hostId;
+      if (id != null && !ids.contains(id)) ids.add(id);
+    }
+    return ids;
+  }
+
+  /// Saves the open hosts as a workspace, named by the user.
+  Future<void> _saveWorkspace() async {
+    final ids = _openHostIds;
+    if (ids.isEmpty) return;
+    final name = await showDialog<String>(context: context, builder: (_) => const _WorkspaceNameDialog());
+    if (name == null || !mounted) return;
+    await widget.vault.put(WorkspaceEntry(id: widget.vault.newId(), name: name, hostIds: ids));
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).workspaceSaved(name, ids.length))));
+  }
+
+  Future<void> _openWorkspace(WorkspaceEntry workspace) async {
+    for (final id in workspace.hostIds) {
+      final host = widget.vault.entry<HostEntry>(id);
+      if (host == null || !mounted) continue;
+      final target = await connectionTargetFor(context, widget.vault, host);
+      if (target != null && mounted) _open(target);
+    }
+  }
+
   /// Everything there is to go to or do, found by typing: the open tabs,
   /// the saved hosts, the sections (on the desktop), and a few actions.
   void _openPalette() {
@@ -268,6 +300,13 @@ class _SessionsPageState extends State<SessionsPage> {
               _selected = -1;
             }),
           ),
+      for (final w in widget.vault.workspaces)
+        PaletteItem(
+          icon: Icons.dashboard_outlined,
+          title: w.name,
+          kind: t.paletteWorkspace,
+          run: () => _openWorkspace(w),
+        ),
       PaletteItem(icon: Icons.lock_outline, title: t.lockNow, kind: t.paletteAction, run: widget.vault.lock),
       PaletteItem(
         icon: Icons.keyboard_outlined,
@@ -497,6 +536,7 @@ class _SessionsPageState extends State<SessionsPage> {
             onSelect: (i) => setState(() => _selected = i),
             onClose: _close,
             onCloseOthers: _closeOthers,
+            onSaveWorkspace: _openHostIds.isEmpty ? null : _saveWorkspace,
           ),
         ),
         if (_selected >= 0 && _term(_selected) != null)
@@ -771,9 +811,13 @@ class _TabStrip extends StatelessWidget {
     required this.onClose,
     required this.onCloseOthers,
     required this.showHome,
+    this.onSaveWorkspace,
   });
 
   final ValueChanged<int> onCloseOthers;
+
+  /// Saves the open hosts as a workspace; null when none are saved hosts.
+  final VoidCallback? onSaveWorkspace;
 
   final List<_Tab> tabs;
   final int selected;
@@ -833,6 +877,8 @@ class _TabStrip extends StatelessWidget {
           PopupMenuItem(key: const ValueKey('tabClose'), value: 'close', child: Text(t.closeSession)),
           if (tabs.length > 1)
             PopupMenuItem(key: const ValueKey('tabCloseOthers'), value: 'others', child: Text(t.closeOtherTabs)),
+          if (onSaveWorkspace != null)
+            PopupMenuItem(key: const ValueKey('tabSaveWorkspace'), value: 'workspace', child: Text(t.saveWorkspace)),
         ],
       );
       if (!context.mounted) return;
@@ -843,6 +889,8 @@ class _TabStrip extends StatelessWidget {
           onClose(i);
         case 'others':
           onCloseOthers(i);
+        case 'workspace':
+          onSaveWorkspace?.call();
       }
     }
 
@@ -942,6 +990,48 @@ class _TabStrip extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Asks for a new workspace's name.
+class _WorkspaceNameDialog extends StatefulWidget {
+  const _WorkspaceNameDialog();
+
+  @override
+  State<_WorkspaceNameDialog> createState() => _WorkspaceNameDialogState();
+}
+
+class _WorkspaceNameDialogState extends State<_WorkspaceNameDialog> {
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _name.text.trim();
+    if (name.isNotEmpty) Navigator.pop(context, name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(t.saveWorkspace),
+      content: TextField(
+        key: const ValueKey('workspaceName'),
+        controller: _name,
+        autofocus: true,
+        decoration: InputDecoration(labelText: t.workspaceNameLabel, hintText: t.workspaceNameHint),
+        onSubmitted: (_) => _save(),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
+        FilledButton(key: const ValueKey('saveWorkspaceConfirm'), onPressed: _save, child: Text(t.save)),
+      ],
     );
   }
 }

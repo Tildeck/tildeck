@@ -25,6 +25,7 @@ sealed class VaultEntry {
     PortForwardEntry.recordType => PortForwardEntry.fromJson(id, data),
     ProxyEntry.recordType => ProxyEntry.fromJson(id, data),
     IdentityEntry.recordType => IdentityEntry.fromJson(id, data),
+    WorkspaceEntry.recordType => WorkspaceEntry.fromJson(id, data),
     _ => null,
   };
 }
@@ -297,6 +298,25 @@ class SnippetEntry extends VaultEntry {
     command: d['command'] as String,
     folder: (d['folder'] as String? ?? '').trim(),
   );
+}
+
+/// Saved hosts opened together, each in its tab, in this order.
+class WorkspaceEntry extends VaultEntry {
+  const WorkspaceEntry({required super.id, required this.name, required this.hostIds});
+
+  static const recordType = 'workspace';
+
+  final String name;
+  final List<String> hostIds;
+
+  @override
+  String get type => recordType;
+
+  @override
+  Map<String, Object?> dataJson() => {'name': name, 'host_ids': hostIds};
+
+  static WorkspaceEntry fromJson(String id, Map<String, dynamic> d) =>
+      WorkspaceEntry(id: id, name: d['name'] as String, hostIds: [...?(d['host_ids'] as List?)?.cast<String>()]);
 }
 
 /// Settings shared by every host in a group (hosts name their group). A

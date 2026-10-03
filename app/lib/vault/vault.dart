@@ -474,6 +474,9 @@ class Vault extends ChangeNotifier {
     return null;
   }
 
+  List<WorkspaceEntry> get workspaces =>
+      _of<WorkspaceEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
   List<SnippetEntry> get snippets =>
       _of<SnippetEntry>().toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   T? entry<T extends VaultEntry>(String? id) => id == null ? null : _entries[id] as T?;

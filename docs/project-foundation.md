@@ -434,6 +434,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - Logs are not encrypted, and the setting says so. A log that cannot be written does not stop the session.
 - Tests: the cleaning; the setting off by default and kept; a Telnet session's output in its file, under its name.
 
+### Workspaces (2026-10-02)
+
+- A workspace is saved hosts opened together, each in its tab, in order: a vault record (`workspace`: a name and host ids), encrypted and synced like hosts. Save tabs as a workspace, in a tab's right-click menu, saves the saved hosts open in terminal tabs (local terminals and quick connections are not saved hosts), asking only for a name.
+- The hosts page lists workspaces above the recent hosts; a tap opens each host as Connect does (a host that asks for its password asks), and a host deleted since is skipped. Removing one is a click on its chip, with Undo. The command palette finds them too.
+- Tests: the record read back the same; a workspace opening its hosts in order without a deleted one; removing and undoing. Saving from the tab menu is not covered by a test.
+
 ### Local terminal (2026-10-01)
 
 - On the desktop, a terminal button on the hosts screen opens a local shell in a tab, like a session. On Windows it offers the shells it finds: PowerShell 7 (on PATH or where it installs), Windows PowerShell, Command Prompt, and WSL; elsewhere the user's login shell. Phones have none.

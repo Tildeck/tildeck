@@ -445,6 +445,59 @@ class _HostsPageState extends State<HostsPage> {
     }
   }
 
+  /// The saved workspaces, each opening its hosts; removing one can be
+  /// undone.
+  List<Widget> _workspaceChips(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    final workspaces = vault.workspaces;
+    if (workspaces.isEmpty) return const [];
+    return [
+      Text(
+        t.workspacesTitle,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(color: c.muted, fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final w in workspaces)
+            InputChip(
+              key: ValueKey('workspace-${w.id}'),
+              avatar: Icon(Icons.dashboard_outlined, size: 18, color: c.brand),
+              label: Text(t.workspaceChip(w.name, w.hostIds.length)),
+              onPressed: () => _openWorkspace(context, w),
+              deleteButtonTooltipMessage: t.deleteWorkspace,
+              onDeleted: () async {
+                // The chip goes with the workspace: the messenger is taken first.
+                final messenger = ScaffoldMessenger.of(context);
+                await vault.delete(w.id);
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(t.workspaceDeleted(w.name)),
+                    action: SnackBarAction(label: t.undo, onPressed: () => vault.put(w)),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+      const SizedBox(height: 12),
+    ];
+  }
+
+  /// A workspace's hosts, each in a session; hosts deleted since are
+  /// skipped.
+  Future<void> _openWorkspace(BuildContext context, WorkspaceEntry workspace) async {
+    for (final id in workspace.hostIds) {
+      final host = vault.entry<HostEntry>(id);
+      if (host == null) continue;
+      if (!context.mounted) return;
+      await _connectHost(context, host);
+    }
+  }
+
   /// A copy of [host], everything but its name, then opened for editing.
   Future<void> _duplicate(BuildContext context, HostEntry host) async {
     final t = AppLocalizations.of(context);
@@ -613,6 +666,7 @@ class _HostsPageState extends State<HostsPage> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(t.damagedRecords, style: TextStyle(color: c.danger)),
               ),
+            if (_query.isEmpty) ..._workspaceChips(context),
             if (_query.isEmpty && _recent().isNotEmpty) ...[
               Text(
                 t.recentTitle,
@@ -898,6 +952,10 @@ class _HostsPageState extends State<HostsPage> {
                             ),
                     ),
                   ),
+                ],
+                if (_query.isEmpty && vault.workspaces.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  ..._workspaceChips(context),
                 ],
                 if (_query.isEmpty && _recent().isNotEmpty) ...[
                   const SizedBox(height: 18),
