@@ -989,5 +989,8 @@
   "baudRateLabel": "Baud rate",
   "baudRateInvalid": "A number such as 9600 or 115200",
   "terminalTypeLabel": "Terminal type",
-  "charsetLabel": "Character set"
+  "charsetLabel": "Character set",
+  "commandsTitle": "Commands",
+  "noCommandsYet": "Commands run in this session, and the server's history, show here.",
+  "saveAsSnippet": "Save as snippet"
 }

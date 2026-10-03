@@ -18,6 +18,7 @@ import '../vault/biometric_unlock.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'account_page.dart';
+import 'command_history.dart';
 import 'command_palette.dart';
 import 'desktop_sidebar.dart';
 import 'files_page.dart';
@@ -520,6 +521,13 @@ class _SessionsPageState extends State<SessionsPage> {
                         onPressed: () => _runSnippet(session),
                         icon: const Icon(Icons.code_rounded, size: 18),
                         label: Text(t.snippetsTitle),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        key: const ValueKey('openCommands'),
+                        onPressed: () => showCommandHistory(context, widget.vault, session),
+                        icon: const Icon(Icons.history_rounded, size: 18),
+                        label: Text(t.commandsTitle),
                       ),
                       if (session.isSsh) ...[
                         const SizedBox(width: 8),

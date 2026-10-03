@@ -25,6 +25,7 @@ class TerminalSession extends ChangeNotifier {
   TerminalSession(this.target, {int scrollback = 10000, this.openSerial = openSerialPort}) {
     terminal = Terminal(maxLines: scrollback);
     controller = TerminalController();
+    line.onEnter = _entered;
   }
 
   final ConnectionTarget target;
@@ -46,6 +47,19 @@ class TerminalSession extends ChangeNotifier {
 
   /// The line being typed, followed in memory to filter suggestions.
   final line = LineTracker();
+
+  /// The commands run in this session, oldest first, each once; in memory
+  /// only. What is typed at a password prompt is not one.
+  final commands = <String>[];
+
+  void _entered(String typed) {
+    final command = typed.trim();
+    if (command.isEmpty || atPasswordPrompt) return;
+    commands
+      ..remove(command)
+      ..add(command);
+    if (commands.length > 200) commands.removeAt(0);
+  }
 
   /// The cursor's line asks for a password.
   bool atPasswordPrompt = false;
