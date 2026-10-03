@@ -1219,7 +1219,9 @@ class _Transfers extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              if (tr.state == TransferState.running) ...[
+                              if (tr.state == TransferState.queued)
+                                Text(t.transferQueued, style: TextStyle(fontSize: 12, color: c.muted))
+                              else if (tr.state == TransferState.running) ...[
                                 LinearProgressIndicator(value: tr.progress, minHeight: 3),
                                 if (tr.files > 1)
                                   Padding(
@@ -1248,7 +1250,7 @@ class _Transfers extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (tr.state == TransferState.running)
+                        if (!tr.finished)
                           IconButton(
                             key: ValueKey('cancelTransfer-${tr.name}'),
                             tooltip: t.cancel,

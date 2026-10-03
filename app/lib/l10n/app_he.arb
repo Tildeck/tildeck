@@ -560,5 +560,6 @@
   "workspaceNameLabel": "שם סביבת העבודה",
   "workspaceNameHint": "בדיקות בוקר",
   "workspaceSaved": "{count, plural, =1{{name} נשמרה עם שרת אחד} other{{name} נשמרה עם {count} שרתים}}",
-  "paletteWorkspace": "סביבת עבודה"
+  "paletteWorkspace": "סביבת עבודה",
+  "transferQueued": "ממתין"
 }

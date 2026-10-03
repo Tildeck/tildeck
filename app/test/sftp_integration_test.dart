@@ -321,6 +321,37 @@ void main() {
       expect(names, containsAll(['_CON', 'a_b', 'a_b (2)']), reason: 'two names that end up the same both stay');
     });
 
+    test('transfers past two wait their turn, and one cancelled while waiting never starts', () async {
+      final browser = await browse();
+      Stream<List<int>> endless() =>
+          Stream<List<int>>.periodic(const Duration(milliseconds: 1), (_) => List.filled(8192, 7));
+      final runs = [
+        for (final name in ['a.bin', 'b.bin', 'c.bin', 'd.bin']) browser.upload(endless(), name, null),
+      ];
+      final byName = {for (final t in browser.transfers) t.name: t};
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(
+        [
+          for (final n in ['a.bin', 'b.bin', 'c.bin', 'd.bin']) byName[n]!.state,
+        ],
+        [TransferState.running, TransferState.running, TransferState.queued, TransferState.queued],
+      );
+      await byName['c.bin']!.cancel();
+      expect(byName['c.bin']!.state, TransferState.cancelled);
+      await byName['a.bin']!.cancel();
+      // The next one waiting, not the cancelled one, takes the turn.
+      while (byName['d.bin']!.state == TransferState.queued) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(byName['d.bin']!.state, TransferState.running);
+      await byName['b.bin']!.cancel();
+      await byName['d.bin']!.cancel();
+      await Future.wait(runs);
+      expect(browser.transfers.every((t) => t.state == TransferState.cancelled), isTrue);
+      final listing = utf8.decode(await client.run('ls ~/$folder'));
+      expect(listing, isNot(matches(RegExp('[abcd][.]bin'))), reason: 'nothing partial is left');
+    });
+
     test(
       'a cancelled download leaves nothing here, and a cancelled upload nothing there',
       () async {
@@ -329,7 +360,7 @@ void main() {
         final target = File('${local.path}/huge.bin');
         final running = browser.download(huge, target);
         final transfer = browser.transfers.first;
-        while (transfer.done == 0 && transfer.state == TransferState.running) {
+        while (transfer.done == 0 && !transfer.finished) {
           await Future<void>.delayed(const Duration(milliseconds: 5));
         }
         await transfer.cancel();

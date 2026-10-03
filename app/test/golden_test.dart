@@ -246,7 +246,11 @@ class SampleBrowser extends FileBrowser {
       ),
     ];
     transfers
-      ..add(Transfer('app-v1.4.3.tar.gz', TransferDirection.upload, 20000000)..done = 13000000)
+      ..add(
+        Transfer('app-v1.4.3.tar.gz', TransferDirection.upload, 20000000)
+          ..done = 13000000
+          ..state = TransferState.running,
+      )
       ..add(
         Transfer('deploy.log', TransferDirection.download, 48213)
           ..done = 48213
