@@ -417,6 +417,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 - A host chooses the terminal type it announces (TERM over SSH, TTYPE over Telnet, in capitals there): xterm-256color by default, or xterm, vt220, vt100, or linux, for devices that draw badly with the default. A type set elsewhere (an older record, another device) stays offered.
 - A host chooses its character set: UTF-8 by default, or ISO-8859-1 (Latin-1), which older devices and consoles use. Output is read and typing is sent in it; a character Latin-1 does not have is sent as `?`.
+- A serial host has the character set but no terminal type: a serial line does not negotiate one.
 - Records from before have neither field and keep the defaults.
 - Tests: the record with and without the fields; the connection target taking them; a Telnet session reading and writing Latin-1 and announcing vt100 when asked; against the OpenSSH container, TERM in the shell set to the host's type.
 

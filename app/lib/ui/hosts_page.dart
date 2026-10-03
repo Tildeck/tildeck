@@ -1480,24 +1480,24 @@ class _HostEditorPageState extends State<HostEditorPage> {
                     Row(
                       children: [
                         if (!_serial) ...[
-                        Expanded(
-                          child: DropdownButtonFormField<String?>(
-                            key: const ValueKey('terminalType'),
-                            initialValue: _terminalType,
-                            isExpanded: true,
-                            decoration: InputDecoration(labelText: t.terminalTypeLabel),
-                            items: [
-                              DropdownMenuItem(value: null, child: Text(defaultTerminalType)),
-                              for (final type in {
-                                ...terminalTypes,
-                                ?_terminalType,
-                              }.where((x) => x != defaultTerminalType))
-                                DropdownMenuItem(value: type, child: Text(type)),
-                            ],
-                            onChanged: (v) => setState(() => _terminalType = v),
+                          Expanded(
+                            child: DropdownButtonFormField<String?>(
+                              key: const ValueKey('terminalType'),
+                              initialValue: _terminalType,
+                              isExpanded: true,
+                              decoration: InputDecoration(labelText: t.terminalTypeLabel),
+                              items: [
+                                DropdownMenuItem(value: null, child: Text(defaultTerminalType)),
+                                for (final type in {
+                                  ...terminalTypes,
+                                  ?_terminalType,
+                                }.where((x) => x != defaultTerminalType))
+                                  DropdownMenuItem(value: type, child: Text(type)),
+                              ],
+                              onChanged: (v) => setState(() => _terminalType = v),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
+                          const SizedBox(width: 12),
                         ],
                         Expanded(
                           child: DropdownButtonFormField<TerminalCharset>(
