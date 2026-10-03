@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' show sqrt;
 
 import 'package:dartssh2/dartssh2.dart' show SSHClient;
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/gestures.dart' show kMiddleMouseButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,6 +27,7 @@ import 'account_page.dart';
 import 'command_history.dart';
 import 'command_palette.dart';
 import 'desktop_sidebar.dart';
+import 'drop_files.dart';
 import 'files_page.dart';
 import 'history_page.dart';
 import 'identities_page.dart';
@@ -465,7 +468,7 @@ class _SessionsPageState extends State<SessionsPage> {
       listenable: widget.vault,
       builder: (context, _) {
         final prefs = widget.vault.preferences;
-        return TerminalPanel(
+        final panel = TerminalPanel(
           session: session,
           showKeyBar: widget.showKeyBar,
           onReconnect: () => _open(session.target, replacing: i),
@@ -476,9 +479,45 @@ class _SessionsPageState extends State<SessionsPage> {
           snippets: {for (final x in widget.vault.snippets) x.name: x.command},
           options: TerminalOptions.of(prefs),
         );
+        if (!_dropSupported) return panel;
+        final t = AppLocalizations.of(context);
+        final c = context.colors;
+        return DropTarget(
+          onDragEntered: (_) => setState(() => _dragOver = i),
+          onDragExited: (_) => setState(() => _dragOver = null),
+          onDragDone: (detail) {
+            setState(() => _dragOver = null);
+            _dropped(session, [for (final f in detail.files) f.path]);
+          },
+          child: Stack(
+            children: [
+              panel,
+              if (_dragOver == i)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: ColoredBox(
+                      key: const ValueKey('dropHint'),
+                      color: c.brand.withValues(alpha: 0.18),
+                      child: Center(
+                        child: Text(
+                          session.target.protocol == ConnectionProtocol.local
+                              ? t.dropPastePaths
+                              : t.dropUploadTo(session.target.host),
+                          style: TextStyle(color: c.brand, fontSize: 20, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
       },
     );
   }
+
+  /// Files can be dragged in from the desktop's file manager.
+  static final _dropSupported = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
   /// Runs a snippet here, or opens a session on each chosen host and runs
   /// it there.
@@ -504,6 +543,33 @@ class _SessionsPageState extends State<SessionsPage> {
   void _openFiles(TerminalSession session) {
     final target = session.target;
     _showFiles(FileBrowser(session.openSftp), '${target.username}@${target.host}');
+  }
+
+  /// The terminal a drag is over, to show where the files will go.
+  int? _dragOver;
+
+  /// Files dropped on a terminal: over SSH they are uploaded to the
+  /// server's home folder, shown in a files tab with their progress; in a
+  /// local terminal their paths are typed, quoted, as a terminal does.
+  Future<void> _dropped(TerminalSession session, List<String> paths) async {
+    if (paths.isEmpty || session.state != SessionState.connected) return;
+    if (session.target.protocol == ConnectionProtocol.local) {
+      session.paste(droppedPathsInput(paths));
+      return;
+    }
+    if (!session.isSsh) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).dropNeedsSsh)));
+      return;
+    }
+    final target = session.target;
+    final browser = FileBrowser(session.openSftp);
+    await browser.start();
+    if (!mounted) {
+      browser.dispose();
+      return;
+    }
+    _showFiles(browser, '${target.username}@${target.host}');
+    await uploadDropped(browser, paths);
   }
 
   /// Files open as a tab beside the terminals on the desktop, and as a page

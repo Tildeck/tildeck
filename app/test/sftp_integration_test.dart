@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tildeck/ssh/file_browser.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
+import 'package:tildeck/ui/drop_files.dart';
 
 final env = Platform.environment;
 final host = env['TILDECK_TEST_SSH_HOST'];
@@ -251,6 +252,21 @@ void main() {
       ]);
       await browser.uploadFolder(target);
       expect(browser.transfers.first.problem, FileProblem.exists, reason: 'never over an existing folder');
+    });
+
+    test('dropped files and folders go up into the open folder, one after the other', () async {
+      final notes = File('${local.path}/notes.txt')..writeAsStringSync('hello');
+      final docs = Directory('${local.path}/docs')..createSync();
+      File('${docs.path}/a.md').writeAsStringSync('# a');
+      await client.run('mkdir -p ~/$folder/drop');
+      final browser = FileBrowser(client.sftp);
+      addTearDown(browser.dispose);
+      await browser.start();
+      await browser.goTo('$folder/drop');
+      await uploadDropped(browser, [notes.path, docs.path]);
+      expect(browser.transfers.map((t) => t.state), [TransferState.done, TransferState.done]);
+      final listing = utf8.decode(await client.run('cd ~/$folder/drop && find . | sort'));
+      expect(listing.trim().split('\n'), ['.', './docs', './docs/a.md', './notes.txt']);
     });
 
     test('entries copy to another server, folders whole, never over what is there', () async {
