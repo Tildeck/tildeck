@@ -9,6 +9,7 @@ import 'package:xterm/xterm.dart';
 
 import '../activity.dart';
 import '../local/local_shell.dart';
+import '../terminal/session_log.dart';
 import 'autocomplete.dart';
 import 'file_browser.dart';
 import 'serial.dart';
@@ -86,6 +87,9 @@ class TerminalSession extends ChangeNotifier {
 
   SSHClient? _client;
   _Link? _link;
+
+  /// Where the output is saved, when the user turned logs on.
+  SessionLog? log;
   final _subscriptions = <StreamSubscription<String>>[];
 
   /// The session's bytes as text, in the host's charset.
@@ -119,6 +123,7 @@ class TerminalSession extends ChangeNotifier {
       _subscriptions.add(
         _decode(link.output).listen((data) {
           terminal.write(data);
+          log?.add(data);
           _checkPrompt();
         }),
       );
@@ -323,6 +328,7 @@ class TerminalSession extends ChangeNotifier {
 
   void _close(ConnectProblem? why) {
     if (state == SessionState.closed) return;
+    unawaited(log?.close());
     problem = why;
     state = SessionState.closed;
     terminal.onOutput = null;

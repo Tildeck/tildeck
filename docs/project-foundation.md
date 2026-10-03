@@ -427,6 +427,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - A command is a line known in full when Enter is pressed (the line followed for suggestions; a line changed by Tab completion or an escape sequence is not known). What is typed while the cursor's line asks for a password is never kept. The list is in memory only, up to 200 commands per session, and ends with it.
 - Tests: commands kept once each and newest last, an empty line, a password at a prompt, and a Tab-completed line left out; the session's commands before the server's; a command saved as a snippet from the list.
 
+### Session logs (2026-10-02)
+
+- On the desktop, Settings, Terminal has Save session logs, off by default, kept on this device (not in the vault): each session's output is then saved as text in `Documents\Tildeck\logs`, one file per session named by when it started and what it connects to (`2026-10-02 09-05-07 ops@web.example.com.log`). On Windows a button opens the folder.
+- A log is what the screen showed as plain text: colors, cursor movement, titles, and other escape sequences and control characters are left out, and lines end with a line feed. What is typed and not echoed (a password at a prompt) is not in it; everything shown is.
+- Logs are not encrypted, and the setting says so. A log that cannot be written does not stop the session.
+- Tests: the cleaning; the setting off by default and kept; a Telnet session's output in its file, under its name.
+
 ### Local terminal (2026-10-01)
 
 - On the desktop, a terminal button on the hosts screen opens a local shell in a tab, like a session. On Windows it offers the shells it finds: PowerShell 7 (on PATH or where it installs), Windows PowerShell, Command Prompt, and WSL; elsewhere the user's login shell. Phones have none.

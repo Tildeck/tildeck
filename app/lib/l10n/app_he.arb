@@ -548,5 +548,8 @@
   "charsetLabel": "קידוד תווים",
   "commandsTitle": "פקודות",
   "noCommandsYet": "פקודות שהורצו ב-session הזה, וההיסטוריה של השרת, יופיעו כאן.",
-  "saveAsSnippet": "שמירה כ-snippet"
+  "saveAsSnippet": "שמירה כ-snippet",
+  "sessionLogsLabel": "שמירת יומני sessions",
+  "sessionLogsHelp": "הפלט של כל session נשמר כטקסט ב-Documents\\Tildeck\\logs במחשב הזה. היומנים אינם מוצפנים: יש בהם כל מה שהופיע על המסך.",
+  "openSessionLogs": "פתיחת תיקיית היומנים"
 }

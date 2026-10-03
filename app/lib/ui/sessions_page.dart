@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartssh2/dartssh2.dart' show SSHClient;
 import 'package:flutter/gestures.dart' show kMiddleMouseButton;
 import 'package:flutter/material.dart';
@@ -11,6 +13,7 @@ import '../ssh/history_recorder.dart';
 import '../ssh/port_forwarding.dart';
 import '../ssh/ssh_connector.dart';
 import '../ssh/terminal_session.dart';
+import '../terminal/session_log.dart';
 import '../terminal/terminal_options.dart';
 import '../terminal/terminal_themes.dart';
 import '../theme.dart';
@@ -323,7 +326,7 @@ class _SessionsPageState extends State<SessionsPage> {
 
   /// [attempt] counts automatic reconnections; one of those replaces its
   /// tab without switching to it.
-  void _open(ConnectionTarget target, {int? replacing, int attempt = 0}) {
+  Future<void> _open(ConnectionTarget target, {int? replacing, int attempt = 0}) async {
     final session = TerminalSession(target, scrollback: TerminalOptions.of(widget.vault.preferences).scrollback)
       ..autocomplete = widget.vault.preferences.autocomplete ?? true
       ..reconnectAttempt = attempt;
@@ -339,13 +342,23 @@ class _SessionsPageState extends State<SessionsPage> {
     });
     // A local shell is not a server: it stays out of the synced history.
     if (target.protocol != ConnectionProtocol.local) recordHistory(widget.vault, session);
-    session.start(
-      widget.connector,
-      // The prompt arrives after network round trips; if the page is gone
-      // by then, the key is simply not trusted.
-      ({required target, required presented, required status, previous}) async => mounted
-          ? showHostKeyDialog(context, target: target, presented: presented, status: status, previous: previous)
-          : false,
+    if (widget.settings.value.sessionLogs) {
+      try {
+        session.log = await SessionLog.open(await sessionLogsDirectory(), target.label, DateTime.now());
+      } catch (_) {
+        // A log that cannot be written does not stop the session.
+      }
+      if (!mounted) return;
+    }
+    unawaited(
+      session.start(
+        widget.connector,
+        // The prompt arrives after network round trips; if the page is gone
+        // by then, the key is simply not trusted.
+        ({required target, required presented, required status, previous}) async => mounted
+            ? showHostKeyDialog(context, target: target, presented: presented, status: status, previous: previous)
+            : false,
+      ),
     );
   }
 
