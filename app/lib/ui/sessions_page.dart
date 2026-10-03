@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show sqrt;
 
 import 'package:dartssh2/dartssh2.dart' show SSHClient;
 import 'package:flutter/gestures.dart' show kMiddleMouseButton;
@@ -166,19 +167,28 @@ class _SessionsPageState extends State<SessionsPage> {
     onFiles: _showFiles,
   );
 
-  /// A second session shown beside the selected one, on a wide screen.
-  int? _splitWith;
+  /// Every terminal shown at once, in a grid, on a wide screen.
+  bool _grid = false;
 
   static const _splitMinWidth = 840.0;
+  static const _maxPanes = 16;
 
-  /// Two terminals side by side; a files tab is not split.
-  bool get _splitShown =>
-      _selected >= 0 &&
-      _splitWith != null &&
-      _splitWith! < _tabs.length &&
-      _splitWith != _selected &&
-      _term(_selected) != null &&
-      _term(_splitWith!) != null;
+  /// The terminal tabs the grid shows, in tab order: all of them, or with
+  /// more than 16 the selected one and the newest others.
+  List<int> get _gridTabs {
+    final terms = [
+      for (var i = 0; i < _tabs.length; i++)
+        if (_term(i) != null) i,
+    ];
+    if (terms.length <= _maxPanes) return terms;
+    final others = terms.where((i) => i != _selected).toList();
+    final kept = {_selected, ...others.skip(others.length - (_maxPanes - 1))};
+    return terms.where(kept.contains).toList();
+  }
+
+  /// The grid shows while a terminal is selected and another is open; a
+  /// files tab is shown alone.
+  bool get _splitShown => _grid && _selected >= 0 && _term(_selected) != null && _gridTabs.length > 1;
 
   /// Port forwarding rules that run, for as long as the app does.
   final _forwards = ForwardManager();
@@ -222,7 +232,6 @@ class _SessionsPageState extends State<SessionsPage> {
         ..clear()
         ..add(kept);
       _selected = 0;
-      _splitWith = null;
     });
   }
 
@@ -420,34 +429,25 @@ class _SessionsPageState extends State<SessionsPage> {
     );
   }
 
-  /// Splits the view with the most recent other session, or unsplits it.
-  void _toggleSplit() {
-    setState(() {
-      if (_splitShown) {
-        _splitWith = null;
-      } else {
-        // The most recent other terminal.
-        for (var i = _tabs.length - 1; i >= 0; i--) {
-          if (i != _selected && _term(i) != null) {
-            _splitWith = i;
-            break;
-          }
-        }
-      }
-    });
-  }
+  /// Shows every terminal in a grid, or one again.
+  void _toggleSplit() => setState(() => _grid = !_splitShown);
 
-  /// One side of the split. A click on the other side makes it the active
-  /// one, whose tab is selected and whose actions the bar shows.
-  Widget _pane(int i, {required bool active}) => Listener(
-    onPointerDown: active
-        ? null
-        : (_) => setState(() {
-            _splitWith = _selected;
-            _selected = i;
-          }),
-    child: _panel(i),
-  );
+  /// One pane of the grid. A click on another pane makes it the active one,
+  /// whose tab is selected and whose actions the bar shows.
+  Widget _pane(int i) {
+    final c = context.colors;
+    final active = i == _selected;
+    return Listener(
+      onPointerDown: active ? null : (_) => setState(() => _selected = i),
+      child: Container(
+        key: ValueKey('pane-$i'),
+        foregroundDecoration: BoxDecoration(
+          border: Border.all(color: active ? c.brand : c.line, width: active ? 2 : 1),
+        ),
+        child: _panel(i),
+      ),
+    );
+  }
 
   Widget _panel(int i) {
     final tab = _tabs[i];
@@ -529,11 +529,6 @@ class _SessionsPageState extends State<SessionsPage> {
 
   void _close(int index) {
     setState(() {
-      if (_splitWith == index) {
-        _splitWith = null;
-      } else if (_splitWith != null && _splitWith! > index) {
-        _splitWith = _splitWith! - 1;
-      }
       _tabs.removeAt(index).dispose();
       // Keep showing the same session when a tab before it closes; when the
       // shown tab closes, show its left neighbour (or the new connection tab).
@@ -638,18 +633,23 @@ class _SessionsPageState extends State<SessionsPage> {
     );
   }
 
-  /// The selected session, the split, or [home] when no session is chosen.
+  /// The selected session, the grid, or [home] when no session is chosen.
   Widget _content(BuildContext context, Widget home) {
-    final c = context.colors;
-    return _splitShown && MediaQuery.sizeOf(context).width >= _splitMinWidth
-        ? Row(
-            children: [
-              Expanded(child: _pane(_selected, active: true)),
-              VerticalDivider(width: 2, thickness: 2, color: c.brand.withValues(alpha: 0.5)),
-              Expanded(child: _pane(_splitWith!, active: false)),
-            ],
-          )
-        : IndexedStack(index: _selected + 1, children: [home, for (final (i, _) in _tabs.indexed) _panel(i)]);
+    if (!_splitShown || MediaQuery.sizeOf(context).width < _splitMinWidth) {
+      return IndexedStack(index: _selected + 1, children: [home, for (final (i, _) in _tabs.indexed) _panel(i)]);
+    }
+    // As square as it gets: two side by side, four in two rows, and so on;
+    // a shorter last row's panes are wider.
+    final panes = _gridTabs;
+    final columns = sqrt(panes.length).ceil();
+    return Column(
+      children: [
+        for (var row = 0; row < panes.length; row += columns)
+          Expanded(
+            child: Row(children: [for (final i in panes.skip(row).take(columns)) Expanded(child: _pane(i))]),
+          ),
+      ],
+    );
   }
 
   /// A sidebar with the sections, the tabs above the content: a desktop

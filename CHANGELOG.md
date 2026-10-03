@@ -18,6 +18,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - Session logs on the desktop: each session's output saved as plain text in Documents\Tildeck\logs, turned on in Settings, Terminal.
 - Workspaces: save the open tabs' hosts under a name, from a tab's menu, and open them all again from the hosts page or the command palette.
 - Type in every open terminal at once, from a button above the terminal; only what the user types or pastes is sent.
+- Split view shows every open terminal at once, up to 16, in a grid.
 - Sessions reconnect on their own when the connection drops: a few times, each after a longer wait, counted down with a cancel; on by default, in Settings, Terminal.
 - Import hosts from a CSV (Termius's export, a spreadsheet) or from PuTTY's saved sessions on Windows, and export the hosts as CSV, without passwords or keys.
 - Files: copy files and folders from one server to another saved server, through this device, from an entry's menu.
