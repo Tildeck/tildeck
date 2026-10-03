@@ -132,7 +132,12 @@ class TerminalSession extends ChangeNotifier {
   }
 
   Future<_Link> _openSsh(SshConnector connector, HostKeyPrompt promptHostKey) async {
-    final client = await connector.connect(target, promptHostKey: promptHostKey);
+    // The banner shows before the shell, as with OpenSSH.
+    final client = await connector.connect(
+      target,
+      promptHostKey: promptHostKey,
+      onBanner: (banner) => terminal.write(bannerText(banner)),
+    );
     _client = client;
     final shell = _shell = await client.shell(
       pty: SSHPtyConfig(type: 'xterm-256color', width: terminal.viewWidth, height: terminal.viewHeight),

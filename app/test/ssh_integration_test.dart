@@ -155,6 +155,9 @@ void main() {
       unawaited(session.start(SshConnector(knownHosts: MemoryKnownHosts()), PromptLog().call));
 
       await _until(() => session.state == SessionState.connected);
+      // scripts/verify.sh gives the server a banner with a color escape in it.
+      expect(session.terminal.buffer.lines[0].getText().trimRight(), 'Tildeck test server: authorized use only');
+      expect(session.terminal.buffer.lines[0].getForeground(25), 0, reason: 'no color from the banner');
       session.terminal.textInput('echo "tildeck-$port-shell"\r');
       await _until(() => session.terminal.buffer.getText().contains('tildeck-$port-shell\n'));
 

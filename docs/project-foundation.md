@@ -408,6 +408,12 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The port is opened with the Windows API directly (`lib/ssh/serial.dart`, through `dart:ffi`): no native library to build or license. One background isolate owns it, writing what is typed and reading what arrives in turn (a read returns as soon as bytes arrive, or after 50 ms), so a slow line never blocks the window. The port is closed only after that isolate has ended. `flutter_libserialport` was tried first and dropped: its Android build no longer works with current Gradle, and the C library it builds is LGPL-3.0.
 - Tests: a session against an in-memory line (the port and baud rate it opens, output shown, typing sent, closing on purpose, a device that goes away, a port that will not open), the label, and the host editor making a serial host with the SSH-only fields hidden, the group's jump host left out, and the connection target it gives. On Windows, a test lists the ports and checks that a missing one will not open; by hand, a real COM1 with nothing attached opened at 9600, took a write, closed in 13 ms and opened again. Not tried with a device that answers.
 
+### Sign-in banner (2026-10-02)
+
+- A server's sign-in banner (sshd's `Banner`, often a legal notice) is shown at the top of the terminal before the shell, as OpenSSH shows it. Only the server being connected to shows one; a jump host's is not shown.
+- The banner is the server's text, so it is shown as text only: line breaks and tabs stay, and every other control character, escape sequences included, is dropped, so a banner cannot move the cursor, change colors, set the window title, or send the terminal commands.
+- Tests: the cleaning (escape and C1 sequences dropped, line breaks kept, an empty banner shows nothing), and against the OpenSSH container, whose banner `scripts/verify.sh` sets with a color escape in it: the banner on the first line, without the color.
+
 ### Local terminal (2026-10-01)
 
 - On the desktop, a terminal button on the hosts screen opens a local shell in a tab, like a session. On Windows it offers the shells it finds: PowerShell 7 (on PATH or where it installs), Windows PowerShell, Command Prompt, and WSL; elsewhere the user's login shell. Phones have none.
