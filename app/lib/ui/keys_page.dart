@@ -9,6 +9,7 @@ import '../l10n/app_localizations.dart';
 import '../ssh/certificates.dart';
 import '../ssh/keys.dart';
 import '../ssh/local_files.dart';
+import '../ssh/ppk.dart';
 import '../ssh/ssh_connector.dart';
 import '../theme.dart';
 import '../vault/models.dart';
@@ -444,14 +445,30 @@ class _ImportKeyState extends State<_ImportKey> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
-    final entry = keyEntryFor(
-      id: widget.vault.newId(),
-      name: _name.text.trim(),
-      pem: _pem.text,
-      passphrase: _passphrase.text,
-    );
+    final t = AppLocalizations.of(context);
+    var pem = _pem.text;
+    var passphrase = _passphrase.text;
+    // A PuTTY key is turned into an OpenSSH one; the vault keeps it, so it
+    // needs no passphrase of its own there.
+    if (looksLikePpk(pem)) {
+      try {
+        pem = ppkToOpenSsh(pem, passphrase: passphrase);
+        passphrase = '';
+      } on PpkException catch (e) {
+        setState(
+          () => _problem = switch (e.problem) {
+            PpkProblem.passphraseNeeded => t.ppkPassphraseNeeded,
+            PpkProblem.wrongPassphrase => t.ppkWrongPassphrase,
+            PpkProblem.unsupported => t.ppkUnsupported,
+            PpkProblem.malformed => t.keyUnreadable,
+          },
+        );
+        return;
+      }
+    }
+    final entry = keyEntryFor(id: widget.vault.newId(), name: _name.text.trim(), pem: pem, passphrase: passphrase);
     if (entry == null) {
-      setState(() => _problem = AppLocalizations.of(context).keyUnreadable);
+      setState(() => _problem = t.keyUnreadable);
       return;
     }
     await widget.vault.put(entry);

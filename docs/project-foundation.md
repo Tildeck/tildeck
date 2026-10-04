@@ -400,6 +400,14 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `scripts/verify.sh --area app` also starts BusyBox telnetd (`telnet` in `scripts/toolchain/Dockerfile`), which gives a shell without signing in.
 - Tests: negotiation against a fake server (supported and refused options, no loops, terminal type, window size with a 255 in it, a command split across reads, typing escaped, the end of the connection). Against BusyBox telnetd: a shell with the window size it was told, again after a resize, Telnet through an SSH jump host, and a closed port. BusyBox does not ask for the terminal type, so that part is covered by the fake server only.
 
+### PuTTY keys (2026-10-04)
+
+- Import a key takes a PuTTY private key file (.ppk), pasted or chosen, as well as OpenSSH and PEM keys: formats 2 and 3, as PuTTYgen writes them, unencrypted or encrypted (AES-256-CBC; format 3 with Argon2id, Argon2i, or Argon2d). RSA, Ed25519, and ECDSA keys (P-256, P-384, P-521) are taken; DSA and Ed448 are refused by name.
+- The file's MAC is checked before anything is used, so a wrong passphrase is told apart from a damaged file. The key is kept in OpenSSH's own format, without a passphrase of its own: the vault, which is encrypted, holds it. Argon2 settings beyond what PuTTY writes (more than 1 GiB of memory, 1000 passes, or 16 lanes) are refused rather than run.
+- Importing hosts from PuTTY's sessions or an SSH configuration brings a .ppk key that has no passphrase; one with a passphrase is listed as unreadable and added on the Keys page.
+- Conversion is `lib/ssh/ppk.dart`, with pointycastle (already a dependency) for AES, SHA, HMAC, and Argon2.
+- Tests: nine key files made by puttygen 0.83 (test/fixtures/ppk, test keys only), each read into a key with puttygen's own fingerprint whose signature verifies; a missing and a wrong passphrase, an edited file, and a DSA key; the import dialog asking for the passphrase and saving the key; a PuTTY session's .ppk key imported with its host.
+
 ### Serial connections (2026-10-02)
 
 - On Windows, a host can be a serial port: Serial in the host editor, beside SSH and Telnet. Its address is the port's name (COM3), picked from the ports on this computer or typed, and its port number is the baud rate (115200 by default; a default 22 or 23 moves to it). The line is 8 data bits, no parity, one stop bit, no flow control, what nearly every console uses.
@@ -691,7 +699,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 ### Importing from CSV and PuTTY, exporting CSV (2026-10-02)
 
-- Holiday plan, wave 4. The import dialog takes a chosen file as a hosts CSV when its header names a host column (Termius's export, a spreadsheet: name or label, host or Hostname/IP, port, user, group or folder, tags, protocol), and as an SSH configuration otherwise; on Windows it also reads PuTTY's saved sessions (`reg query HKCU\Software\SimonTatham\PuTTY\Sessions /s`: names decoded, "user@host" split, Default Settings and serial lines left out, a key file listed, which PuTTY's .ppk format leaves to the Keys page).
+- Holiday plan, wave 4. The import dialog takes a chosen file as a hosts CSV when its header names a host column (Termius's export, a spreadsheet: name or label, host or Hostname/IP, port, user, group or folder, tags, protocol), and as an SSH configuration otherwise; on Windows it also reads PuTTY's saved sessions (`reg query HKCU\Software\SimonTatham\PuTTY\Sessions /s`: names decoded, "user@host" split, Default Settings and serial lines left out, a key file listed; a .ppk key without a passphrase comes in with its host, one with a passphrase is added on the Keys page).
 - The same list, choices, and saving serve every source; a CSV row brings its folder, tags, and Telnet, and the same name twice gets a number. The dialog exports the vault's hosts as CSV (name, host, port, user, folder, tags, protocol), never passwords, keys, or identities.
 - Tests: CSV quoting; other tools' headers, a row without a host, duplicate names; an export read back the same without its password; PuTTY's registry output.
 

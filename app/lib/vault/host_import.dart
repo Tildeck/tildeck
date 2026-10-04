@@ -1,4 +1,5 @@
 import '../ssh/keys.dart';
+import '../ssh/ppk.dart';
 import '../ssh/ssh_config.dart';
 import '../ssh/ssh_connector.dart' show ConnectionProtocol;
 import 'models.dart';
@@ -46,7 +47,10 @@ Future<HostImportResult> importSshHosts(
     for (final path in host.identityFiles) {
       if (keyIds.containsKey(path)) continue;
       final name = path.split(RegExp(r'[\\/]')).last;
-      final text = await readFile(path);
+      final file = await readFile(path);
+      // A PuTTY key (as PuTTY sessions name them) comes in as OpenSSH when it
+      // has no passphrase; one with a passphrase is added on the Keys page.
+      final text = file != null && looksLikePpk(file) ? _openPpk(file) : file;
       final info = text == null ? null : readKey(text, comment: name);
       if (text == null || info == null) {
         keyIds[path] = null;
@@ -103,4 +107,12 @@ Future<HostImportResult> importSshHosts(
     );
   }
   return HostImportResult(hosts: chosen.length, keys: keysAdded, unreadableKeys: unreadable);
+}
+
+String? _openPpk(String text) {
+  try {
+    return ppkToOpenSsh(text);
+  } on PpkException {
+    return null;
+  }
 }
