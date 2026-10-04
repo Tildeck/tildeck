@@ -405,26 +405,50 @@ class UnlockPage extends StatefulWidget {
   State<UnlockPage> createState() => _UnlockPageState();
 }
 
-class _UnlockPageState extends State<UnlockPage> {
+class _UnlockPageState extends State<UnlockPage> with WidgetsBindingObserver {
   final _password = TextEditingController();
   bool _busy = false;
   bool _wrong = false;
   bool _biometric = false;
   String? _biometricProblem;
 
+  /// The biometric is asked when the app is next in front: this screen was
+  /// built in the background (the vault locks as the app leaves), or the
+  /// system closed the prompt.
+  bool _askWhenInFront = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _offerBiometric();
   }
 
-  /// Shows the biometric button, and asks once at once: the reason the
-  /// user turned it on.
+  /// Shows the biometric button, and asks at once (the reason the user
+  /// turned it on) when the app is in front; a prompt opened in the
+  /// background is closed by the system before anyone sees it.
   Future<void> _offerBiometric() async {
     final biometrics = widget.biometrics;
     if (biometrics == null || !await biometrics.offered() || !mounted) return;
     setState(() => _biometric = true);
-    await _unlockWithBiometrics();
+    if (_inFront) {
+      await _unlockWithBiometrics();
+    } else {
+      _askWhenInFront = true;
+    }
+  }
+
+  bool get _inFront {
+    final state = WidgetsBinding.instance.lifecycleState;
+    return state == null || state == AppLifecycleState.resumed;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _askWhenInFront && _biometric && !_busy) {
+      _askWhenInFront = false;
+      _unlockWithBiometrics();
+    }
   }
 
   Future<void> _unlockWithBiometrics() async {
@@ -446,7 +470,10 @@ class _UnlockPageState extends State<UnlockPage> {
         setState(() => _biometricProblem = t.biometricFailed);
       }
     } on BiometricException catch (e) {
-      if (mounted) {
+      if (e.failure == BiometricFailure.interrupted) {
+        // Not the user's answer: ask again when the app is back in front.
+        _askWhenInFront = true;
+      } else if (mounted) {
         setState(() {
           _biometric = widget.vault.biometricEnabled;
           _biometricProblem = e.failure == BiometricFailure.invalidated ? t.biometricInvalidated : t.biometricFailed;
@@ -459,6 +486,7 @@ class _UnlockPageState extends State<UnlockPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _password.dispose();
     super.dispose();
   }

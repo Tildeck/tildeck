@@ -70,6 +70,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Fixed
 
+- Biometric unlock on Android asked for the fingerprint before the app was back in front, so the system closed the prompt unseen and only the master password was left; it now asks when the app is in front, and again after the system closes it.
 - A transfer cancelled just as it started, while its file was opening, kept going; it now stops.
 - Email addresses are checked without a pattern that crafted input could make slow.
 - The terminal tells programs where its cursor is counting from 1, as other terminals do; it was one row and one column short.

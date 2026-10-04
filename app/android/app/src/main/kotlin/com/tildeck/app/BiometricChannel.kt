@@ -30,7 +30,8 @@ import javax.crypto.spec.GCMParameterSpec
  *   BK encrypted after a biometric check: {nonce, ciphertext}.
  * - obtain {vaultId, nonce, ciphertext, title, subtitle, cancel}: BK.
  * - remove {vaultId}: deletes the Keystore key.
- * Errors: cancelled, invalidated, unavailable, failed.
+ * Errors: cancelled (by the user), interrupted (by the system), invalidated,
+ * unavailable, failed.
  */
 class BiometricChannel(private val activity: FragmentActivity, messenger: BinaryMessenger) {
     private val keyStore: KeyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
@@ -124,8 +125,10 @@ class BiometricChannel(private val activity: FragmentActivity, messenger: Binary
             override fun onAuthenticationError(code: Int, message: CharSequence) {
                 val kind = when (code) {
                     BiometricPrompt.ERROR_USER_CANCELED,
-                    BiometricPrompt.ERROR_NEGATIVE_BUTTON,
-                    BiometricPrompt.ERROR_CANCELED -> "cancelled"
+                    BiometricPrompt.ERROR_NEGATIVE_BUTTON -> "cancelled"
+                    // The system closed it: the app went to the background,
+                    // or it was opened before the app came to the front.
+                    BiometricPrompt.ERROR_CANCELED -> "interrupted"
                     BiometricPrompt.ERROR_NO_BIOMETRICS,
                     BiometricPrompt.ERROR_HW_NOT_PRESENT,
                     BiometricPrompt.ERROR_HW_UNAVAILABLE,

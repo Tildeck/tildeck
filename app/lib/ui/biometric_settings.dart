@@ -53,7 +53,8 @@ class _BiometricSettingsState extends State<BiometricSettings> {
       final ok = await biometrics.enable(password, text);
       if (mounted) setState(() => _error = ok ? null : t.wrongPassword);
     } on BiometricException catch (e) {
-      if (mounted && e.failure != BiometricFailure.cancelled) setState(() => _error = t.biometricFailed);
+      final quiet = e.failure == BiometricFailure.cancelled || e.failure == BiometricFailure.interrupted;
+      if (mounted && !quiet) setState(() => _error = t.biometricFailed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
