@@ -171,28 +171,26 @@ class _SessionsPageState extends State<SessionsPage> {
     onFiles: _showFiles,
   );
 
-  /// Every terminal shown at once, in a grid, on a wide screen.
+  /// The terminals the split view shows, in their places: the ones the
+  /// user put there (the button, or a tab dropped on a terminal), not every
+  /// one open. A new connection does not join it.
+  final _split = <_Tab>[];
+
+  /// The split view is on: it shows while a terminal in it is selected.
   bool _grid = false;
 
   static const _splitMinWidth = 840.0;
   static const _maxPanes = 16;
 
-  /// The terminal tabs the grid shows, in tab order: all of them, or with
-  /// more than 16 the selected one and the newest others.
-  List<int> get _gridTabs {
-    final terms = [
-      for (var i = 0; i < _tabs.length; i++)
-        if (_term(i) != null) i,
-    ];
-    if (terms.length <= _maxPanes) return terms;
-    final others = terms.where((i) => i != _selected).toList();
-    final kept = {_selected, ...others.skip(others.length - (_maxPanes - 1))};
-    return terms.where(kept.contains).toList();
-  }
+  /// The split view's terminals as tab indexes, in their places.
+  List<int> get _gridTabs => [
+    for (final tab in _split)
+      if (_tabs.indexOf(tab) case final i when i >= 0 && _term(i) != null) i,
+  ];
 
-  /// The grid shows while a terminal is selected and another is open; a
-  /// files tab is shown alone.
-  bool get _splitShown => _grid && _selected >= 0 && _term(_selected) != null && _gridTabs.length > 1;
+  /// The grid shows while a terminal in it is selected and another is in
+  /// it too; any other tab is shown alone.
+  bool get _splitShown => _grid && _selected >= 0 && _gridTabs.contains(_selected) && _gridTabs.length > 1;
 
   /// Port forwarding rules that run, for as long as the app does.
   final _forwards = ForwardManager();
@@ -406,8 +404,12 @@ class _SessionsPageState extends State<SessionsPage> {
         _tabs.add(_TermTab(session));
         _selected = _tabs.length - 1;
       } else {
-        _tabs[replacing].dispose();
+        final old = _tabs[replacing];
+        old.dispose();
         _tabs[replacing] = _TermTab(session);
+        // A reconnected terminal keeps its place in the split view.
+        final place = _split.indexOf(old);
+        if (place >= 0) _split[place] = _tabs[replacing];
         if (attempt == 0) _selected = replacing;
       }
     });
@@ -434,88 +436,142 @@ class _SessionsPageState extends State<SessionsPage> {
   }
 
   /// Shows every terminal in a grid, or one again.
-  void _toggleSplit() => setState(() => _grid = !_splitShown);
+  /// Shows the split view, or one terminal again. Turned on with nothing
+  /// chosen, it takes the selected terminal and the newest other one.
+  void _toggleSplit() {
+    setState(() {
+      if (_splitShown) {
+        _grid = false;
+        return;
+      }
+      _split.removeWhere((tab) => !_tabs.contains(tab));
+      final current = _tabs[_selected];
+      if (!_split.contains(current) && _split.length < _maxPanes) _split.add(current);
+      if (_gridTabs.length < 2) {
+        for (var i = _tabs.length - 1; i >= 0; i--) {
+          if (_term(i) != null && !_split.contains(_tabs[i])) {
+            _split.add(_tabs[i]);
+            break;
+          }
+        }
+      }
+      _grid = true;
+    });
+  }
 
-  /// One pane of the grid. A click on another pane makes it the active one,
-  /// whose tab is selected and whose actions the bar shows. Its handle is
-  /// dragged onto another pane to swap the two, tabs included.
-  Widget _pane(int i) {
+  /// Puts [dragged] into the split view beside [target], before or after it
+  /// (in reading order, so the side it was dropped on). [target] joins too
+  /// when it was shown alone; the dragged terminal becomes the active one.
+  void _placeInSplit(_Tab dragged, _Tab target, {required bool after}) {
+    if (dragged == target) return;
+    setState(() {
+      _split.removeWhere((tab) => !_tabs.contains(tab));
+      if (!_split.contains(target)) _split.add(target);
+      final moving = _split.remove(dragged);
+      if (!moving && _split.length >= _maxPanes) return;
+      _split.insert(_split.indexOf(target) + (after ? 1 : 0), dragged);
+      _grid = true;
+      _selected = _tabs.indexOf(dragged);
+    });
+  }
+
+  /// Takes a terminal out of the split view; it stays open as a tab.
+  void _removeFromSplit(_Tab tab) {
+    setState(() {
+      _split.remove(tab);
+      if (_gridTabs.length < 2) {
+        _grid = false;
+      } else if (_tabs.indexOf(tab) == _selected) {
+        // The split view stays on screen, with another of its terminals active.
+        _selected = _gridTabs.first;
+      }
+    });
+  }
+
+  /// While a terminal is dragged over [target], its two halves take it:
+  /// before or after [target], as the side shows. They let every click
+  /// through to the terminal beneath.
+  Widget _dropHalves(_Tab target) {
     final c = context.colors;
-    final t = AppLocalizations.of(context);
-    final active = i == _selected;
-    final title = switch (_tabs[i]) {
-      _TermTab(:final session) => session.title ?? session.target.label,
-      _FilesTab(:final title) => title,
-    };
-    return DragTarget<int>(
-      onWillAcceptWithDetails: (d) => d.data != i,
-      onAcceptWithDetails: (d) => _swapTabs(d.data, i),
-      builder: (context, offered, _) => Listener(
-        onPointerDown: active ? null : (_) => setState(() => _selected = i),
-        child: Container(
-          key: ValueKey('pane-$i'),
-          foregroundDecoration: BoxDecoration(
-            color: offered.isEmpty ? null : c.brand.withValues(alpha: 0.12),
-            border: Border.all(
-              color: active || offered.isNotEmpty ? c.brand : c.line,
-              width: active || offered.isNotEmpty ? 2 : 1,
-            ),
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(child: _panel(i)),
-              PositionedDirectional(
-                top: 4,
-                end: 4,
-                child: Draggable<int>(
-                  key: ValueKey('paneHandle-$i'),
-                  data: i,
-                  feedback: Material(
-                    color: c.brand,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Text(
-                        title,
-                        style: TextStyle(color: c.brandContrast, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                  child: Tooltip(
-                    message: t.movePane,
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.grab,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: c.surface.withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Icon(Icons.drag_indicator_rounded, size: 16, color: c.muted),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+    Widget half({required bool after}) => Expanded(
+      child: DragTarget<_Tab>(
+        onWillAcceptWithDetails: (d) => d.data != target && d.data is _TermTab,
+        onAcceptWithDetails: (d) => _placeInSplit(d.data, target, after: after),
+        // The box itself takes no clicks: they reach the terminal.
+        builder: (context, offered, _) => IgnorePointer(
+          child: ColoredBox(
+            key: ValueKey('drop-${after ? 'after' : 'before'}-${_tabs.indexOf(target)}'),
+            color: offered.isEmpty ? Colors.transparent : c.brand.withValues(alpha: 0.22),
           ),
         ),
       ),
     );
+    return Positioned.fill(
+      // Stretched: an empty box is otherwise as high as nothing.
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [half(after: false), half(after: true)]),
+    );
   }
 
-  /// Swaps two tabs; the shown one stays shown where it went.
-  void _swapTabs(int a, int b) {
-    setState(() {
-      final tab = _tabs[a];
-      _tabs[a] = _tabs[b];
-      _tabs[b] = tab;
-      if (_selected == a) {
-        _selected = b;
-      } else if (_selected == b) {
-        _selected = a;
-      }
-    });
+  /// One pane of the grid. A click on another pane makes it the active one,
+  /// whose tab is selected and whose actions the bar shows. Its handle is
+  /// dragged to another place in the split view, as a tab is from the bar;
+  /// its other button takes it out of the split view.
+  Widget _pane(int i) {
+    final c = context.colors;
+    final t = AppLocalizations.of(context);
+    final active = i == _selected;
+    final tab = _tabs[i];
+    Widget button(Widget icon) => Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: c.surface.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(6)),
+      child: icon,
+    );
+    return Listener(
+      onPointerDown: active ? null : (_) => setState(() => _selected = i),
+      child: Container(
+        key: ValueKey('pane-$i'),
+        foregroundDecoration: BoxDecoration(
+          border: Border.all(color: active ? c.brand : c.line, width: active ? 2 : 1),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(child: _panel(i)),
+            _dropHalves(tab),
+            PositionedDirectional(
+              top: 4,
+              end: 4,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Draggable<_Tab>(
+                    key: ValueKey('paneHandle-$i'),
+                    data: tab,
+                    feedback: _dragChip(context, tab),
+                    child: Tooltip(
+                      message: t.movePane,
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.grab,
+                        child: button(Icon(Icons.drag_indicator_rounded, size: 16, color: c.muted)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: t.removeFromSplit,
+                    child: InkWell(
+                      key: ValueKey('paneRemove-$i'),
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: () => _removeFromSplit(tab),
+                      child: button(Icon(Icons.close_fullscreen_rounded, size: 16, color: c.muted)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _panel(int i) {
@@ -661,6 +717,8 @@ class _SessionsPageState extends State<SessionsPage> {
 
   void _close(int index) {
     setState(() {
+      _split.remove(_tabs[index]);
+      if (_gridTabs.length < 2) _grid = false;
       _tabs.removeAt(index).dispose();
       // Keep showing the same session when a tab before it closes; when the
       // shown tab closes, show its left neighbour (or the new connection tab).
@@ -676,6 +734,7 @@ class _SessionsPageState extends State<SessionsPage> {
       children: [
         Expanded(
           child: _TabStrip(
+            inSplit: _split.toSet(),
             tabs: _tabs,
             selected: _selected,
             showHome: showHome,
@@ -767,8 +826,20 @@ class _SessionsPageState extends State<SessionsPage> {
 
   /// The selected session, the grid, or [home] when no session is chosen.
   Widget _content(BuildContext context, Widget home) {
-    if (!_splitShown || MediaQuery.sizeOf(context).width < _splitMinWidth) {
-      return IndexedStack(index: _selected + 1, children: [home, for (final (i, _) in _tabs.indexed) _panel(i)]);
+    final wide = MediaQuery.sizeOf(context).width >= _splitMinWidth;
+    if (!_splitShown || !wide) {
+      final single = IndexedStack(
+        index: _selected + 1,
+        children: [home, for (final (i, _) in _tabs.indexed) _panel(i)],
+      );
+      // A terminal shown alone takes another dropped on it: the two split.
+      if (!wide || _selected < 0 || _term(_selected) == null) return single;
+      return Stack(
+        children: [
+          Positioned.fill(child: single),
+          _dropHalves(_tabs[_selected]),
+        ],
+      );
     }
     // As square as it gets: two side by side, four in two rows, and so on;
     // a shorter last row's panes are wider.
@@ -973,6 +1044,7 @@ class _RenameDialogState extends State<_RenameDialog> {
 
 class _TabStrip extends StatelessWidget {
   const _TabStrip({
+    required this.inSplit,
     required this.tabs,
     required this.selected,
     required this.onSelect,
@@ -989,6 +1061,9 @@ class _TabStrip extends StatelessWidget {
 
   final List<_Tab> tabs;
   final int selected;
+
+  /// The tabs in the split view, marked as such.
+  final Set<_Tab> inSplit;
 
   /// The hosts tab; on the desktop the sidebar takes its place.
   final bool showHome;
@@ -1088,7 +1163,7 @@ class _TabStrip extends StatelessWidget {
                   icon: const Icon(Icons.close),
                   onPressed: () => onClose(i),
                 );
-                return tab(
+                final shown = tab(
                   key: ValueKey('tab-$i'),
                   on: i == selected,
                   onTap: () => onSelect(i),
@@ -1099,6 +1174,10 @@ class _TabStrip extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: switch (item) {
                       _TermTab(:final session) => [
+                        if (inSplit.contains(item)) ...[
+                          Icon(Icons.grid_view_rounded, size: 13, color: c.brand),
+                          const SizedBox(width: 6),
+                        ],
                         Container(
                           width: 8,
                           height: 8,
@@ -1135,6 +1214,17 @@ class _TabStrip extends StatelessWidget {
                       ],
                     },
                   ),
+                );
+                // A terminal's tab is dragged onto a terminal to split
+                // beside it, on the side it is dropped.
+                if (item is! _TermTab) return shown;
+                return Draggable<_Tab>(
+                  key: ValueKey('tabDrag-$i'),
+                  data: item,
+                  // Pulled down out of the bar; sideways the bar scrolls.
+                  affinity: Axis.vertical,
+                  feedback: _dragChip(context, item),
+                  child: shown,
                 );
               },
             ),
@@ -1202,4 +1292,24 @@ class _WorkspaceNameDialogState extends State<_WorkspaceNameDialog> {
       ],
     );
   }
+}
+
+/// What follows the pointer while a terminal is dragged: its name.
+Widget _dragChip(BuildContext context, _Tab tab) {
+  final c = context.colors;
+  final title = switch (tab) {
+    _TermTab(:final session) => session.title ?? session.target.label,
+    _FilesTab(:final title) => title,
+  };
+  return Material(
+    color: c.brand,
+    borderRadius: BorderRadius.circular(8),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Text(
+        title,
+        style: TextStyle(color: c.brandContrast, fontWeight: FontWeight.w700),
+      ),
+    ),
+  );
 }
