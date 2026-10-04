@@ -403,6 +403,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `scripts/verify.sh --area app` also starts BusyBox telnetd (`telnet` in `scripts/toolchain/Dockerfile`), which gives a shell without signing in.
 - Tests: negotiation against a fake server (supported and refused options, no loops, terminal type, window size with a 255 in it, a command split across reads, typing escaped, the end of the connection). Against BusyBox telnetd: a shell with the window size it was told, again after a resize, Telnet through an SSH jump host, and a closed port. BusyBox does not ask for the terminal type, so that part is covered by the fake server only.
 
+### Forms in parts, lists as cards (2026-10-04)
+
+- The host editor is in parts, each under a small heading: General (name, group, icon and colour), Connection (protocol, address, jump host, proxy), Sign in (identity, user, password or key, agent forwarding; not for a serial line), Terminal (type, character set, startup snippet, environment), and Tags and notes. The group editor follows the same parts. Their Save (and the group's Clear) sit in a bar under the form, always in reach however long it is (`FormFooter`, `FormSectionTitle` in lib/ui/form_section.dart).
+- Keys, identities, snippets, and known hosts are drawn as the hosts are (`ItemCard`, `ItemGrid` in lib/ui/item_card.dart): on the raised layer, the icon in a tile, rising under the pointer, side by side where there is room, with the hosts' margins on the desktop. An unreadable key's tile is in the danger colour.
+- Phase 4 of design-plans/ui-polish-proposal.html. Next: the phone and motion.
+- Tests: goldens regenerated for every editor and list; the existing editor and list tests pass against the new layout.
+
 ### A mark for every host (2026-10-04)
 
 - Each host has a mark: its system's logo (Ubuntu, Debian, Fedora, CentOS, Red Hat, Rocky, Alma, Alpine, Arch, Manjaro, openSUSE, Mint, Kali, NixOS, Gentoo, FreeBSD, OpenBSD; Windows and macOS as plain symbols), on a colour the user chose or else the system's own. It shows on the host's card, in the phone's list, and on its tab, where the connection's state is a dot on its corner.

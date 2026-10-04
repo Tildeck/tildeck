@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- The host and group editors in short parts under headings, with Save always in reach; keys, identities, snippets, and known hosts as cards, like the hosts.
 - A mark for every host: its system's logo, found on the first SSH connection or chosen, on a colour of your choice; on its card, in the list, and on its tab.
 - Desktop tabs drawn as in a browser, named after the saved host, and a status line under each terminal (state, address, protocol, character set, terminal type, size).
 - Choose the app's look in Settings, General: Tildeck, Midnight, or Daylight, each light and dark; and a more polished, consistent UI underneath (type scale, one button family, fields, menus, dialogs).

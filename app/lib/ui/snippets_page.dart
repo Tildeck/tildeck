@@ -5,6 +5,7 @@ import '../ssh/snippet_variables.dart';
 import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
+import 'item_card.dart';
 
 const _mono = TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13, height: 1.4);
 
@@ -52,59 +53,55 @@ class SnippetsPage extends StatelessWidget {
           // By folder, alphabetically; those in none last.
           final folders = snippets.map((s) => s.folder).toSet().toList()
             ..sort((a, b) => a.isEmpty ? 1 : (b.isEmpty ? -1 : a.toLowerCase().compareTo(b.toLowerCase())));
-          final rows = <Object>[
-            for (final folder in folders) ...[
-              if (folders.length > 1 || folder.isNotEmpty) folder,
-              ...snippets.where((s) => s.folder == folder),
-            ],
-          ];
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-            itemCount: rows.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, i) {
-              final row = rows[i];
-              if (row is String) {
-                return Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(4, 10, 4, 0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.folder_outlined, size: 18, color: c.muted),
-                      const SizedBox(width: 8),
-                      Text(
-                        row.isEmpty ? t.ungrouped : row,
-                        key: ValueKey('snippetFolder-$row'),
-                        style: TextStyle(color: c.muted, fontWeight: FontWeight.w700),
+          final named = folders.length > 1 || folders.any((f) => f.isNotEmpty);
+          return ListView(
+            padding: listPadding(context),
+            children: [
+              for (final folder in folders) ...[
+                if (named)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(4, 10, 4, 10),
+                    child: Row(
+                      children: [
+                        Icon(Icons.folder_outlined, size: 18, color: c.muted),
+                        const SizedBox(width: 8),
+                        Text(
+                          folder.isEmpty ? t.ungrouped : folder,
+                          key: ValueKey('snippetFolder-$folder'),
+                          style: TextStyle(color: c.muted, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ItemGrid(
+                  children: [
+                    for (final snippet in snippets.where((s) => s.folder == folder))
+                      ItemCard(
+                        tapKey: ValueKey('snippet-${snippet.name}'),
+                        icon: Icons.code_rounded,
+                        title: snippet.name,
+                        subtitle: Text(
+                          snippet.command,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textDirection: TextDirection.ltr,
+                          // A command reads left to right, but sits at the start of the row.
+                          textAlign: Directionality.of(context) == TextDirection.rtl ? TextAlign.right : TextAlign.left,
+                          style: _mono.copyWith(color: c.muted),
+                        ),
+                        onTap: () => showSnippetEditor(context, vault, snippet: snippet),
+                        trailing: IconButton(
+                          tooltip: t.deleteAction,
+                          iconSize: 19,
+                          color: c.muted,
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => vault.delete(snippet.id),
+                        ),
                       ),
-                    ],
-                  ),
-                );
-              }
-              final snippet = row as SnippetEntry;
-              return Card(
-                margin: EdgeInsets.zero,
-                child: ListTile(
-                  key: ValueKey('snippet-${snippet.name}'),
-                  leading: Icon(Icons.code_rounded, color: c.brand),
-                  title: Text(snippet.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text(
-                    snippet.command,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textDirection: TextDirection.ltr,
-                    // A command reads left to right, but sits at the start of the row.
-                    textAlign: Directionality.of(context) == TextDirection.rtl ? TextAlign.right : TextAlign.left,
-                    style: _mono.copyWith(color: c.muted),
-                  ),
-                  onTap: () => showSnippetEditor(context, vault, snippet: snippet),
-                  trailing: IconButton(
-                    tooltip: t.deleteAction,
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => vault.delete(snippet.id),
-                  ),
+                  ],
                 ),
-              );
-            },
+              ],
+            ],
           );
         },
       ),

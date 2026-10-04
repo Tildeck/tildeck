@@ -15,6 +15,7 @@ import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
 import 'desktop_sidebar.dart' show isDesktopLayout;
+import 'item_card.dart';
 import 'known_hosts_page.dart';
 import 'terminal_panel.dart' show connectProblemText;
 
@@ -224,91 +225,103 @@ class _KeysPageState extends State<KeysPage> {
             );
           }
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            padding: listPadding(context, bottom: 96),
             children: [
-              for (final key in keys)
-                Builder(
-                  builder: (context) {
-                    final info = _info(key);
-                    return ListTile(
-                      key: ValueKey('key-${key.name}'),
-                      leading: Icon(Icons.key, color: c.brand),
-                      title: Text(key.name),
-                      subtitle: info == null
-                          ? Text(t.keyUnreadable, style: TextStyle(color: c.danger))
-                          : _withCertificate(
-                              context,
-                              key,
-                              Text(
-                                // The whole fingerprint: it is what is compared.
-                                '${info.type}\n${info.fingerprint}',
-                                textDirection: TextDirection.ltr,
-                                textAlign: Directionality.of(context) == TextDirection.rtl
-                                    ? TextAlign.right
-                                    : TextAlign.left,
-                                style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11.5, height: 1.4),
-                              ),
-                            ),
-                      trailing: PopupMenuButton<String>(
-                        key: ValueKey('keyMenu-${key.name}'),
-                        onSelected: (action) async {
-                          switch (action) {
-                            case 'copy':
-                              await Clipboard.setData(ClipboardData(text: info!.publicKey));
-                              _message(t.publicKeyCopied);
-                            case 'install':
-                              await _install(key, info!);
-                            case 'export':
-                              await _export(key);
-                            case 'certificate':
-                              await showDialog<void>(
-                                context: context,
-                                builder: (_) => _AddCertificate(vault: vault, keyEntry: key, files: widget.files),
-                              );
-                            case 'removeCertificate':
-                              await vault.put(key.withCertificate(null));
-                            case 'delete':
-                              if (vault.hosts.any((h) => h.keyId == key.id) ||
-                                  vault.groups.any((g) => g.keyId == key.id)) {
-                                _message(t.keyInUse);
-                                return;
+              ItemGrid(
+                minWidth: 420,
+                children: [
+                  for (final key in keys)
+                    Builder(
+                      builder: (context) {
+                        final info = _info(key);
+                        return ItemCard(
+                          key: ValueKey('key-${key.name}'),
+                          icon: Icons.key_rounded,
+                          iconColor: info == null ? c.danger : null,
+                          title: key.name,
+                          subtitle: info == null
+                              ? Text(t.keyUnreadable, style: TextStyle(color: c.danger))
+                              : _withCertificate(
+                                  context,
+                                  key,
+                                  Text(
+                                    // The whole fingerprint: it is what is compared.
+                                    '${info.type}\n${info.fingerprint}',
+                                    textDirection: TextDirection.ltr,
+                                    textAlign: Directionality.of(context) == TextDirection.rtl
+                                        ? TextAlign.right
+                                        : TextAlign.left,
+                                    style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11.5, height: 1.4),
+                                  ),
+                                ),
+                          trailing: PopupMenuButton<String>(
+                            key: ValueKey('keyMenu-${key.name}'),
+                            iconSize: 18,
+                            iconColor: c.muted,
+                            onSelected: (action) async {
+                              switch (action) {
+                                case 'copy':
+                                  await Clipboard.setData(ClipboardData(text: info!.publicKey));
+                                  _message(t.publicKeyCopied);
+                                case 'install':
+                                  await _install(key, info!);
+                                case 'export':
+                                  await _export(key);
+                                case 'certificate':
+                                  await showDialog<void>(
+                                    context: context,
+                                    builder: (_) => _AddCertificate(vault: vault, keyEntry: key, files: widget.files),
+                                  );
+                                case 'removeCertificate':
+                                  await vault.put(key.withCertificate(null));
+                                case 'delete':
+                                  if (vault.hosts.any((h) => h.keyId == key.id) ||
+                                      vault.groups.any((g) => g.keyId == key.id)) {
+                                    _message(t.keyInUse);
+                                    return;
+                                  }
+                                  await vault.delete(key.id);
                               }
-                              await vault.delete(key.id);
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          if (info != null) ...[
-                            PopupMenuItem(
-                              key: const ValueKey('copyPublicKey'),
-                              value: 'copy',
-                              child: Text(t.copyPublicKey),
-                            ),
-                            if (widget.connect != null)
-                              PopupMenuItem(
-                                key: const ValueKey('installKey'),
-                                value: 'install',
-                                child: Text(t.installKey),
-                              ),
-                            PopupMenuItem(key: const ValueKey('exportKey'), value: 'export', child: Text(t.exportKey)),
-                            if (key.certificate == null)
-                              PopupMenuItem(
-                                key: const ValueKey('addCertificate'),
-                                value: 'certificate',
-                                child: Text(t.addCertificate),
-                              )
-                            else
-                              PopupMenuItem(
-                                key: const ValueKey('removeCertificate'),
-                                value: 'removeCertificate',
-                                child: Text(t.removeCertificate),
-                              ),
-                          ],
-                          PopupMenuItem(value: 'delete', child: Text(t.deleteAction)),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                            },
+                            itemBuilder: (_) => [
+                              if (info != null) ...[
+                                PopupMenuItem(
+                                  key: const ValueKey('copyPublicKey'),
+                                  value: 'copy',
+                                  child: Text(t.copyPublicKey),
+                                ),
+                                if (widget.connect != null)
+                                  PopupMenuItem(
+                                    key: const ValueKey('installKey'),
+                                    value: 'install',
+                                    child: Text(t.installKey),
+                                  ),
+                                PopupMenuItem(
+                                  key: const ValueKey('exportKey'),
+                                  value: 'export',
+                                  child: Text(t.exportKey),
+                                ),
+                                if (key.certificate == null)
+                                  PopupMenuItem(
+                                    key: const ValueKey('addCertificate'),
+                                    value: 'certificate',
+                                    child: Text(t.addCertificate),
+                                  )
+                                else
+                                  PopupMenuItem(
+                                    key: const ValueKey('removeCertificate'),
+                                    value: 'removeCertificate',
+                                    child: Text(t.removeCertificate),
+                                  ),
+                              ],
+                              PopupMenuItem(value: 'delete', child: Text(t.deleteAction)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
             ],
           );
         },

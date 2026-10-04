@@ -587,5 +587,10 @@
   "tintOrange": "כתום",
   "tintRed": "אדום",
   "tintPink": "ורוד",
-  "tintSlate": "אפור"
+  "tintSlate": "אפור",
+  "formSectionGeneral": "כללי",
+  "formSectionConnection": "חיבור",
+  "formSectionSignIn": "כניסה",
+  "formSectionTerminal": "טרמינל",
+  "formSectionDetails": "תגיות והערות"
 }
