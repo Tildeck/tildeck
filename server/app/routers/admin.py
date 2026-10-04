@@ -528,7 +528,7 @@ async def create_invite(
     """An invitation for one address. The code is shown here once and, with
     email configured, sent to the address; the server keeps only its hash."""
     email = accounts.normalize_email(body.email)
-    if not accounts.EMAIL_RE.match(email):
+    if not accounts.is_email(email):
         raise ApiError(422, ErrorCode.invalid_email)
     if await session.scalar(select(Account).where(Account.email == email)) is not None:
         raise ApiError(409, ErrorCode.email_taken)

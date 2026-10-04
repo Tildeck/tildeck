@@ -387,7 +387,7 @@ async def register(body: RegisterRequest, request: Request, session: AsyncSessio
     the vault. Syncing waits until the email address is confirmed."""
     await _limit(session, request)
     email = accounts.normalize_email(body.email)
-    if not accounts.EMAIL_RE.match(email):
+    if not accounts.is_email(email):
         raise ApiError(422, ErrorCode.invalid_email)
     mode = await settings_store.get_value(session, "registration_mode")
     if mode == "closed":

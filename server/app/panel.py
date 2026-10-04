@@ -8,6 +8,7 @@ deploy removed.
 """
 
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -25,6 +26,7 @@ SECURITY_HEADERS = {
 def mount(app: FastAPI, panel_dir: str) -> bool:
     root = Path(panel_dir).resolve()
     shell = root / "index.html"
+    inside = str(root) + os.sep
     if not shell.is_file():
         logger.warning("Admin panel not found at %s; serving the API only", root)
         return False
@@ -33,8 +35,9 @@ def mount(app: FastAPI, panel_dir: str) -> bool:
     async def panel(path: str) -> FileResponse:
         if path == "api" or path.startswith("api/"):
             raise HTTPException(status_code=404)
-        candidate = (root / path).resolve()
-        if path and candidate.is_relative_to(root) and candidate.is_file():
+        # Resolved, links included, and only served from inside the panel.
+        candidate = os.path.realpath(os.path.join(root, path))
+        if path and candidate.startswith(inside) and os.path.isfile(candidate):
             cache = "public, max-age=31536000, immutable" if path.startswith("_nuxt/") else "no-cache"
             return FileResponse(candidate, headers={**SECURITY_HEADERS, "cache-control": cache})
         return FileResponse(shell, headers={**SECURITY_HEADERS, "cache-control": "no-cache"})

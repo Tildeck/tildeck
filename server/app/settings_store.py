@@ -9,13 +9,13 @@ not even when it comes from the environment: callers see only its state.
 
 import logging
 import os
-import re
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.accounts import is_email
 from app import audit, crypto
 from app.models import Setting
 
@@ -109,11 +109,8 @@ def _validate_port(key: str, value: str) -> None:
         raise InvalidSettingValue(key)
 
 
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
 def _validate_email(key: str, value: str) -> None:
-    if not _EMAIL.match(value):
+    if not is_email(value):
         raise InvalidSettingValue(key)
 
 
