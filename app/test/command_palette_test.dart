@@ -82,7 +82,12 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await settle();
     expect(find.byKey(const ValueKey('paletteQuery')), findsNothing);
-    expect(find.text('ops@127.0.0.1:1'), findsWidgets, reason: 'a tab for Beta');
+    expect(find.byKey(const ValueKey('tab-0')), findsOneWidget, reason: 'a tab for Beta');
+    expect(
+      find.descendant(of: find.byKey(const ValueKey('tab-0')), matching: find.text('Beta')),
+      findsOneWidget,
+      reason: "named by the host, not its address",
+    );
 
     // Arrows choose among the matches; a section opens in place.
     await palette();

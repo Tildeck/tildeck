@@ -395,6 +395,8 @@ class _TerminalPanelState extends State<TerminalPanel> {
                   ),
                 if (widget.showKeyBar && session.state == SessionState.connected)
                   KeyBar(session: session, onCopy: _copy, onPaste: _paste),
+                // On the desktop, where there is room: what this terminal is.
+                if (!widget.showKeyBar) _StatusLine(session: session),
               ],
             ),
           ),
@@ -576,10 +578,13 @@ class _StatusBanner extends StatelessWidget {
     final via = session.problemVia;
     final shown = !connecting && session.problem != null && via != null ? t.errConnVia(via, message) : message;
 
-    return Material(
-      color: c.surface,
-      elevation: 6,
-      borderRadius: BorderRadius.circular(14),
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.line),
+        boxShadow: [BoxShadow(color: c.shadow, blurRadius: 18, offset: const Offset(0, 6))],
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
         // In a narrow pane the buttons go under the text.
@@ -705,6 +710,97 @@ class KeyBar extends StatelessWidget {
             for (final symbol in ['|', '~', '/', '-', '_', r'$']) key(symbol, () => terminal.textInput(symbol)),
             key(t.copy, onCopy),
             key(t.paste, onPaste),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A thin line under a desktop terminal: whom it is connected to and how,
+/// and its size.
+class _StatusLine extends StatefulWidget {
+  const _StatusLine({required this.session});
+
+  final TerminalSession session;
+
+  @override
+  State<_StatusLine> createState() => _StatusLineState();
+}
+
+class _StatusLineState extends State<_StatusLine> {
+  // The size changes with the window: followed as the terminal changes.
+  late final Terminal _terminal = widget.session.terminal..addListener(_changed);
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _terminal.removeListener(_changed);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = widget.session;
+    final c = context.colors;
+    final target = session.target;
+    final local = target.protocol == ConnectionProtocol.local;
+    final style = TextStyle(fontSize: 11.5, color: c.muted, height: 1.2);
+    return Container(
+      key: const ValueKey('terminalStatusLine'),
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: c.page,
+        border: Border(top: BorderSide(color: c.line)),
+      ),
+      child: Builder(
+        builder: (context) => Row(
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              margin: const EdgeInsetsDirectional.only(end: 8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: switch (session.state) {
+                  SessionState.connected => c.success,
+                  SessionState.connecting => c.brandBright,
+                  SessionState.closed => session.problem == null ? c.muted : c.danger,
+                },
+              ),
+            ),
+            // One line that gives way in a narrow pane: the address first.
+            Expanded(
+              child: Text(
+                [
+                  target.label,
+                  if (!local) ...[
+                    switch (target.protocol) {
+                      ConnectionProtocol.ssh => 'SSH',
+                      ConnectionProtocol.telnet => 'Telnet',
+                      ConnectionProtocol.serial => 'Serial',
+                      ConnectionProtocol.local => '',
+                    },
+                    target.charset == TerminalCharset.utf8 ? 'UTF-8' : 'ISO-8859-1',
+                    if (target.protocol != ConnectionProtocol.serial) target.terminalType,
+                  ],
+                ].join('    '),
+                textDirection: TextDirection.ltr,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: style,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              '${session.terminal.viewWidth} × ${session.terminal.viewHeight}',
+              textDirection: TextDirection.ltr,
+              style: style,
+            ),
           ],
         ),
       ),

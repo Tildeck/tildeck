@@ -44,6 +44,16 @@ class TerminalSession extends ChangeNotifier {
   /// A name the user gave the tab; null shows the connection label.
   String? title;
 
+  /// The saved host's name, when it came from one.
+  String? hostName;
+
+  /// What the tab is called: the user's name for it, else the host's,
+  /// else the address.
+  String get displayName => title ?? hostName ?? target.label;
+
+  /// Whether [displayName] is the address, which reads left to right.
+  bool get namedByAddress => title == null && hostName == null;
+
   /// The server's own command history, for suggestions; read over a
   /// separate exec channel after connecting, and never stored.
   List<String> history = const [];

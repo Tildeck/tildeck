@@ -293,7 +293,7 @@ class _SessionsPageState extends State<SessionsPage> {
         PaletteItem(
           icon: tab is _FilesTab ? Icons.folder_outlined : Icons.terminal_rounded,
           title: switch (tab) {
-            _TermTab(:final session) => session.title ?? session.target.label,
+            _TermTab(:final session) => session.displayName,
             _FilesTab(:final title) => title,
           },
           kind: t.paletteOpenTab,
@@ -398,7 +398,8 @@ class _SessionsPageState extends State<SessionsPage> {
   Future<void> _open(ConnectionTarget target, {int? replacing, int attempt = 0}) async {
     final session = TerminalSession(target, scrollback: TerminalOptions.of(widget.vault.preferences).scrollback)
       ..autocomplete = widget.vault.preferences.autocomplete ?? true
-      ..reconnectAttempt = attempt;
+      ..reconnectAttempt = attempt
+      ..hostName = widget.vault.entry<HostEntry>(target.hostId)?.name;
     setState(() {
       if (replacing == null) {
         _tabs.add(_TermTab(session));
@@ -753,11 +754,18 @@ class _SessionsPageState extends State<SessionsPage> {
               final terminals = [for (var i = 0; i < _tabs.length; i++) _term(i)].nonNulls.length;
               final canSplit = terminals > 1 && MediaQuery.sizeOf(context).width >= _splitMinWidth;
               if (!connected && terminals < 2) return const SizedBox.shrink();
+              // Compact, as tools in a tab bar are.
+              final barButton = OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 32),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                visualDensity: VisualDensity.compact,
+              );
+              // The same band as the tabs beside it.
               return Container(
-                height: 52,
-                padding: const EdgeInsetsDirectional.only(end: 10),
+                height: 44,
+                padding: const EdgeInsetsDirectional.only(end: 8),
                 decoration: BoxDecoration(
-                  color: c.page,
+                  color: Color.alphaBlend(c.ink.withValues(alpha: 0.035), c.page),
                   border: Border(bottom: BorderSide(color: c.line)),
                 ),
                 child: Row(
@@ -793,6 +801,7 @@ class _SessionsPageState extends State<SessionsPage> {
                     ],
                     if (connected) ...[
                       OutlinedButton.icon(
+                        style: barButton,
                         key: const ValueKey('openSnippetPicker'),
                         onPressed: () => _runSnippet(session),
                         icon: const Icon(Icons.code_rounded, size: 18),
@@ -800,6 +809,7 @@ class _SessionsPageState extends State<SessionsPage> {
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
+                        style: barButton,
                         key: const ValueKey('openCommands'),
                         onPressed: () => showCommandHistory(context, widget.vault, session),
                         icon: const Icon(Icons.history_rounded, size: 18),
@@ -808,6 +818,7 @@ class _SessionsPageState extends State<SessionsPage> {
                       if (session.isSsh) ...[
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
+                          style: barButton,
                           key: const ValueKey('openFiles'),
                           onPressed: () => _openFiles(session),
                           icon: const Icon(Icons.folder_open_rounded, size: 18),
@@ -1077,37 +1088,41 @@ class _TabStrip extends StatelessWidget {
 
     Widget tab({
       required bool on,
-      required Widget child,
+      required Widget Function(bool hover) child,
       required VoidCallback onTap,
       VoidCallback? onRename,
       VoidCallback? onMiddleClick,
       void Function(Offset at)? onMenu,
       Key? key,
-    }) => Padding(
-      padding: const EdgeInsetsDirectional.only(end: 6),
-      // A middle click closes a tab, as in a browser.
-      child: Listener(
-        onPointerDown: (e) {
-          if (e.buttons == kMiddleMouseButton) onMiddleClick?.call();
-        },
-        child: Material(
-          key: key,
-          color: on ? c.surface : Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: on ? c.brand : c.line),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: onTap,
-            onDoubleTap: onRename,
-            onLongPress: onRename,
-            onSecondaryTapUp: onMenu == null ? null : (d) => onMenu(d.globalPosition),
-            child: Padding(padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 8, 8), child: child),
+    }) => _BrowserTab(
+      key: key,
+      on: on,
+      onTap: onTap,
+      onRename: onRename,
+      onMiddleClick: onMiddleClick,
+      onMenu: onMenu,
+      child: child,
+    );
+
+    /// The close button: on the shown tab, and on another under the pointer.
+    Widget closeButton(int i, bool hover) {
+      final visible = i == selected || hover;
+      return IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 120),
+          opacity: visible ? 1 : 0,
+          child: IconButton(
+            tooltip: t.closeSession,
+            visualDensity: VisualDensity.compact,
+            iconSize: 15,
+            color: c.muted,
+            icon: const Icon(Icons.close_rounded),
+            onPressed: () => onClose(i),
           ),
         ),
-      ),
-    );
+      );
+    }
 
     Future<void> menu(Offset at, int i, TerminalSession? session) async {
       final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
@@ -1137,13 +1152,15 @@ class _TabStrip extends StatelessWidget {
       }
     }
 
+    // Browser tabs: they stand on the line under them, and the shown one
+    // opens onto the content below.
     return Container(
-      height: 52,
+      height: 44,
       decoration: BoxDecoration(
-        color: c.page,
+        color: Color.alphaBlend(c.ink.withValues(alpha: 0.035), c.page),
         border: Border(bottom: BorderSide(color: c.line)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsetsDirectional.only(start: 8, end: 8, top: 6),
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
@@ -1155,14 +1172,6 @@ class _TabStrip extends StatelessWidget {
                   _TermTab(:final session) => session,
                   _FilesTab() => null,
                 };
-                final close = IconButton(
-                  tooltip: t.closeSession,
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 16,
-                  color: c.muted,
-                  icon: const Icon(Icons.close),
-                  onPressed: () => onClose(i),
-                );
                 final shown = tab(
                   key: ValueKey('tab-$i'),
                   on: i == selected,
@@ -1170,7 +1179,7 @@ class _TabStrip extends StatelessWidget {
                   onRename: session == null ? null : () => _rename(context, session),
                   onMiddleClick: () => onClose(i),
                   onMenu: (at) => menu(at, i, session),
-                  child: Row(
+                  child: (hover) => Row(
                     mainAxisSize: MainAxisSize.min,
                     children: switch (item) {
                       _TermTab(:final session) => [
@@ -1193,24 +1202,38 @@ class _TabStrip extends StatelessWidget {
                         const SizedBox(width: 8),
                         // A connection label is Latin content: always LTR. A
                         // name the user gave keeps its own direction.
-                        Text(
-                          session.title ?? session.target.label,
-                          textDirection: session.title == null ? TextDirection.ltr : null,
-                          style: TextStyle(color: c.ink, fontWeight: FontWeight.w500),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: Text(
+                            session.displayName,
+                            textDirection: session.namedByAddress ? TextDirection.ltr : null,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: i == selected ? c.ink : c.muted,
+                              fontWeight: i == selected ? FontWeight.w600 : FontWeight.w500,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 4),
-                        close,
+                        const SizedBox(width: 2),
+                        closeButton(i, hover),
                       ],
                       _FilesTab(:final title) => [
                         Icon(Icons.folder_open_rounded, size: 16, color: c.brand),
                         const SizedBox(width: 8),
-                        Text(
-                          title,
-                          textDirection: TextDirection.ltr,
-                          style: TextStyle(color: c.ink, fontWeight: FontWeight.w500),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: Text(
+                            title,
+                            textDirection: TextDirection.ltr,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: i == selected ? c.ink : c.muted,
+                              fontWeight: i == selected ? FontWeight.w600 : FontWeight.w500,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 4),
-                        close,
+                        const SizedBox(width: 2),
+                        closeButton(i, hover),
                       ],
                     },
                   ),
@@ -1233,7 +1256,7 @@ class _TabStrip extends StatelessWidget {
               key: const ValueKey('hostsTab'),
               on: selected == -1,
               onTap: () => onSelect(-1),
-              child: Row(
+              child: (_) => Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.dns_outlined, size: 18, color: c.brand),
@@ -1298,7 +1321,7 @@ class _WorkspaceNameDialogState extends State<_WorkspaceNameDialog> {
 Widget _dragChip(BuildContext context, _Tab tab) {
   final c = context.colors;
   final title = switch (tab) {
-    _TermTab(:final session) => session.title ?? session.target.label,
+    _TermTab(:final session) => session.displayName,
     _FilesTab(:final title) => title,
   };
   return Material(
@@ -1312,4 +1335,88 @@ Widget _dragChip(BuildContext context, _Tab tab) {
       ),
     ),
   );
+}
+
+/// One tab of the bar, as a browser draws it: the shown one in the content's
+/// colour, joined to it; the others plain, lit under the pointer.
+class _BrowserTab extends StatefulWidget {
+  const _BrowserTab({
+    super.key,
+    required this.on,
+    required this.onTap,
+    required this.child,
+    this.onRename,
+    this.onMiddleClick,
+    this.onMenu,
+  });
+
+  final bool on;
+  final VoidCallback onTap;
+  final VoidCallback? onRename;
+  final VoidCallback? onMiddleClick;
+  final void Function(Offset at)? onMenu;
+  final Widget Function(bool hover) child;
+
+  @override
+  State<_BrowserTab> createState() => _BrowserTabState();
+}
+
+class _BrowserTabState extends State<_BrowserTab> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    const radius = BorderRadius.vertical(top: Radius.circular(9));
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 2),
+      // A middle click closes a tab, as in a browser.
+      child: Listener(
+        onPointerDown: (e) {
+          if (e.buttons == kMiddleMouseButton) widget.onMiddleClick?.call();
+        },
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: widget.on
+                  ? c.page
+                  : _hover
+                  ? c.raised.withValues(alpha: 0.7)
+                  : Colors.transparent,
+              borderRadius: radius,
+            ),
+            foregroundDecoration: BoxDecoration(
+              // The shown tab's top edge in the brand's colour.
+              border: widget.on ? Border(top: BorderSide(color: c.brand, width: 2)) : null,
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                borderRadius: radius,
+                onTap: widget.onTap,
+                onDoubleTap: widget.onRename,
+                onLongPress: widget.onRename,
+                onSecondaryTapUp: widget.onMenu == null ? null : (d) => widget.onMenu!(d.globalPosition),
+                child: Semantics(
+                  selected: widget.on,
+                  // Marks the shown tab, for tests and screen readers alike.
+                  child: KeyedSubtree(
+                    key: widget.on ? const ValueKey('shownTab') : null,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 4, 4),
+                      child: widget.child(_hover),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
