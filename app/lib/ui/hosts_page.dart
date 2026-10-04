@@ -785,24 +785,27 @@ class _HostsPageState extends State<HostsPage> {
               ),
             ),
             if (panelOpen)
-              Container(
-                width: 460,
-                decoration: BoxDecoration(
-                  border: BorderDirectional(start: BorderSide(color: c.line)),
+              // The panel slides in from the side as it opens.
+              _PanelEntrance(
+                child: Container(
+                  width: 460,
+                  decoration: BoxDecoration(
+                    border: BorderDirectional(start: BorderSide(color: c.line)),
+                  ),
+                  child: panel.group != null
+                      ? GroupEditorPage(
+                          key: ValueKey('group-${panel.group}'),
+                          vault: vault,
+                          name: panel.group!,
+                          onDone: _closePanel,
+                        )
+                      : HostEditorPage(
+                          key: ValueKey('editor-${panelHost?.id ?? 'new'}'),
+                          vault: vault,
+                          host: panelHost,
+                          onDone: _closePanel,
+                        ),
                 ),
-                child: panel.group != null
-                    ? GroupEditorPage(
-                        key: ValueKey('group-${panel.group}'),
-                        vault: vault,
-                        name: panel.group!,
-                        onDone: _closePanel,
-                      )
-                    : HostEditorPage(
-                        key: ValueKey('editor-${panelHost?.id ?? 'new'}'),
-                        vault: vault,
-                        host: panelHost,
-                        onDone: _closePanel,
-                      ),
               ),
           ],
         );
@@ -861,70 +864,97 @@ class _HostsPageState extends State<HostsPage> {
                             ),
                         ],
                       ),
-                    if (widget.onOpenForwards != null)
-                      IconButton(
-                        key: const ValueKey('openForwards'),
-                        tooltip: t.forwardsTitle,
-                        icon: const Icon(Icons.swap_horiz_rounded),
-                        onPressed: widget.onOpenForwards,
-                      ),
-                    if (!widget.desktop) ...[
-                      IconButton(
-                        key: const ValueKey('openHistory'),
-                        tooltip: t.historyTitle,
-                        icon: const Icon(Icons.history_rounded),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => HistoryPage(vault: vault, onReconnect: (h) => _connectHost(context, h)),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        key: const ValueKey('openSnippets'),
-                        tooltip: t.snippetsTitle,
-                        icon: const Icon(Icons.code_rounded),
-                        onPressed: () => Navigator.of(
-                          context,
-                        ).push(MaterialPageRoute<void>(builder: (_) => SnippetsPage(vault: vault))),
-                      ),
-                      IconButton(
-                        key: const ValueKey('openIdentities'),
-                        tooltip: t.identitiesTitle,
-                        icon: const Icon(Icons.badge_outlined),
-                        onPressed: () => Navigator.of(
-                          context,
-                        ).push(MaterialPageRoute<void>(builder: (_) => IdentitiesPage(vault: vault))),
-                      ),
-                      IconButton(
-                        tooltip: t.keysTitle,
-                        icon: const Icon(Icons.key),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => KeysPage(vault: vault, connect: widget.connectHost),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
+                const SizedBox(height: 10),
+                // The other pages, named: a row of labels reads faster than
+                // icons alone, and scrolls when the screen is narrow.
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final (key, icon, label, open) in <(String, IconData, String, VoidCallback?)>[
+                        (
+                          'openKeys',
+                          Icons.key_rounded,
+                          t.keysTitle,
+                          widget.desktop
+                              ? null
+                              : () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => KeysPage(vault: vault, connect: widget.connectHost),
+                                  ),
+                                ),
+                        ),
+                        (
+                          'openIdentities',
+                          Icons.badge_outlined,
+                          t.identitiesTitle,
+                          widget.desktop
+                              ? null
+                              : () => Navigator.of(
+                                  context,
+                                ).push(MaterialPageRoute<void>(builder: (_) => IdentitiesPage(vault: vault))),
+                        ),
+                        (
+                          'openSnippets',
+                          Icons.code_rounded,
+                          t.snippetsTitle,
+                          widget.desktop
+                              ? null
+                              : () => Navigator.of(
+                                  context,
+                                ).push(MaterialPageRoute<void>(builder: (_) => SnippetsPage(vault: vault))),
+                        ),
+                        (
+                          'openHistory',
+                          Icons.history_rounded,
+                          t.historyTitle,
+                          widget.desktop
+                              ? null
+                              : () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        HistoryPage(vault: vault, onReconnect: (h) => _connectHost(context, h)),
+                                  ),
+                                ),
+                        ),
+                        ('openForwards', Icons.swap_horiz_rounded, t.forwardsTitle, widget.onOpenForwards),
+                      ])
+                        if (open != null)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.only(end: 8),
+                            child: ActionChip(
+                              key: ValueKey(key),
+                              avatar: Icon(icon, size: 18, color: c.brand),
+                              label: Text(label),
+                              onPressed: open,
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
                   children: [
-                    FilledButton.icon(
-                      key: const ValueKey('addHost'),
-                      icon: const Icon(Icons.add),
-                      label: Text(t.addHost),
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).push(MaterialPageRoute<void>(builder: (_) => HostEditorPage(vault: vault))),
+                    Expanded(
+                      child: FilledButton.icon(
+                        key: const ValueKey('addHost'),
+                        icon: const Icon(Icons.add),
+                        label: Text(t.addHost),
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).push(MaterialPageRoute<void>(builder: (_) => HostEditorPage(vault: vault))),
+                      ),
                     ),
-                    OutlinedButton.icon(
-                      key: const ValueKey('quickConnect'),
-                      icon: const Icon(Icons.bolt),
-                      label: Text(t.quickConnect),
-                      onPressed: () => _quickConnect(context),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('quickConnect'),
+                        icon: const Icon(Icons.bolt),
+                        label: Text(t.quickConnect),
+                        onPressed: () => _quickConnect(context),
+                      ),
                     ),
                   ],
                 ),
@@ -1623,6 +1653,29 @@ class _HostEditorPageState extends State<HostEditorPage> {
       ),
     );
   }
+}
+
+/// Shows its child sliding in from the end and fading in, once, when it
+/// first appears.
+class _PanelEntrance extends StatelessWidget {
+  const _PanelEntrance({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: 1),
+    duration: const Duration(milliseconds: 180),
+    curve: Curves.easeOutCubic,
+    child: child,
+    builder: (context, v, child) => ClipRect(
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        widthFactor: v,
+        child: Opacity(opacity: v, child: child),
+      ),
+    ),
+  );
 }
 
 /// A host in the desktop grid: a click connects, the menu or a right-click

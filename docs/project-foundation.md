@@ -403,6 +403,13 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `scripts/verify.sh --area app` also starts BusyBox telnetd (`telnet` in `scripts/toolchain/Dockerfile`), which gives a shell without signing in.
 - Tests: negotiation against a fake server (supported and refused options, no loops, terminal type, window size with a 255 in it, a command split across reads, typing escaped, the end of the connection). Against BusyBox telnetd: a shell with the window size it was told, again after a resize, Telnet through an SSH jump host, and a closed port. BusyBox does not ask for the terminal type, so that part is covered by the fake server only.
 
+### The phone, and motion (2026-10-04)
+
+- On a phone, the hosts page names its other pages: Keys, Identities, Snippets, History, and Port forwarding as labelled chips in a row that scrolls sideways, instead of five icons without words. Add host and Quick connect share the width below them.
+- On the desktop, the side panel (a host's or a group's editor) slides in from the side and fades in over 180 ms when it opens. Hover on cards and tabs already moves in 140 ms, and pages fade between each other (phase 1).
+- Phase 5, the last of design-plans/ui-polish-proposal.html.
+- Tests: the phone goldens regenerated; the desktop layout tests open the panel through its entrance.
+
 ### Forms in parts, lists as cards (2026-10-04)
 
 - The host editor is in parts, each under a small heading: General (name, group, icon and colour), Connection (protocol, address, jump host, proxy), Sign in (identity, user, password or key, agent forwarding; not for a serial line), Terminal (type, character set, startup snippet, environment), and Tags and notes. The group editor follows the same parts. Their Save (and the group's Clear) sit in a bar under the form, always in reach however long it is (`FormFooter`, `FormSectionTitle` in lib/ui/form_section.dart).
