@@ -31,6 +31,7 @@ import 'pane_grid.dart';
 import 'drop_files.dart';
 import 'files_page.dart';
 import 'history_page.dart';
+import 'host_avatar.dart';
 import 'identities_page.dart';
 import 'keys_page.dart';
 import 'known_hosts_page.dart';
@@ -396,10 +397,23 @@ class _SessionsPageState extends State<SessionsPage> {
   /// [attempt] counts automatic reconnections; one of those replaces its
   /// tab without switching to it.
   Future<void> _open(ConnectionTarget target, {int? replacing, int attempt = 0}) async {
+    final host = widget.vault.entry<HostEntry>(target.hostId);
     final session = TerminalSession(target, scrollback: TerminalOptions.of(widget.vault.preferences).scrollback)
       ..autocomplete = widget.vault.preferences.autocomplete ?? true
       ..reconnectAttempt = attempt
-      ..hostName = widget.vault.entry<HostEntry>(target.hostId)?.name;
+      ..hostName = host?.name
+      ..os = host?.os
+      ..tint = host?.tint;
+    // A host whose system is not known yet learns it from this connection.
+    if (host != null && host.os == null && host.isSsh) {
+      session.onOsDetected = (os) {
+        final latest = widget.vault.entry<HostEntry>(host.id);
+        if (latest == null || latest.os != null) return;
+        // Only the icon depends on it: a vault that cannot save now (locked
+        // meanwhile) leaves it to the next connection.
+        widget.vault.put(HostEntry.fromJson(latest.id, {...latest.dataJson(), 'os': os.name})).ignore();
+      };
+    }
     setState(() {
       if (replacing == null) {
         _tabs.add(_TermTab(session));
@@ -1187,17 +1201,9 @@ class _TabStrip extends StatelessWidget {
                           Icon(Icons.grid_view_rounded, size: 13, color: c.brand),
                           const SizedBox(width: 6),
                         ],
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: switch (session.state) {
-                              SessionState.connected => c.success,
-                              SessionState.connecting => c.brandBright,
-                              SessionState.closed => session.problem == null ? c.muted : c.danger,
-                            },
-                          ),
+                        _SessionMark(
+                          session: session,
+                          ring: i == selected ? c.page : Color.alphaBlend(c.ink.withValues(alpha: 0.035), c.page),
                         ),
                         const SizedBox(width: 8),
                         // A connection label is Latin content: always LTR. A
@@ -1416,6 +1422,62 @@ class _BrowserTabState extends State<_BrowserTab> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A tab's mark: the host's, with the connection's state as a dot on its
+/// corner; the dot alone for a terminal that is not a saved host.
+class _SessionMark extends StatelessWidget {
+  const _SessionMark({required this.session, required this.ring});
+
+  final TerminalSession session;
+
+  /// The tab's colour, around the dot.
+  final Color ring;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final state = switch (session.state) {
+      SessionState.connected => c.success,
+      SessionState.connecting => c.brandBright,
+      SessionState.closed => session.problem == null ? c.muted : c.danger,
+    };
+    if (session.hostName == null) {
+      return Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: state),
+      );
+    }
+    return SizedBox.square(
+      dimension: 20,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          HostAvatar(
+            os: session.os,
+            tint: session.tint,
+            serial: session.target.protocol == ConnectionProtocol.serial,
+            telnet: session.target.protocol == ConnectionProtocol.telnet,
+            size: 20,
+          ),
+          PositionedDirectional(
+            end: -3,
+            bottom: -3,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: state,
+                border: Border.all(color: ring, width: 2),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

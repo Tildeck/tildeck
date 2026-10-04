@@ -403,6 +403,16 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `scripts/verify.sh --area app` also starts BusyBox telnetd (`telnet` in `scripts/toolchain/Dockerfile`), which gives a shell without signing in.
 - Tests: negotiation against a fake server (supported and refused options, no loops, terminal type, window size with a 255 in it, a command split across reads, typing escaped, the end of the connection). Against BusyBox telnetd: a shell with the window size it was told, again after a resize, Telnet through an SSH jump host, and a closed port. BusyBox does not ask for the terminal type, so that part is covered by the fake server only.
 
+### A mark for every host (2026-10-04)
+
+- Each host has a mark: its system's logo (Ubuntu, Debian, Fedora, CentOS, Red Hat, Rocky, Alma, Alpine, Arch, Manjaro, openSUSE, Mint, Kali, NixOS, Gentoo, FreeBSD, OpenBSD; Windows and macOS as plain symbols), on a colour the user chose or else the system's own. It shows on the host's card, in the phone's list, and on its tab, where the connection's state is a dot on its corner.
+- The system is found the first time a host connects over SSH, on a separate exec channel (`cat /etc/os-release || uname -s || ver`), and saved with the host; nothing is typed into the shell. A server that refuses exec channels, or answers with something unknown, keeps the plain mark and is asked again next time. The editor shows the mark, eight colours (and none), and the system, which can be chosen or handed back to detection.
+- Logos are path data from Simple Icons (CC0 as a project), drawn with path_parsing (flutter.dev); each logo's licence and owner is noted in lib/ui/os_logos.dart. Apple's and Raspberry Pi's are left out for their strict trademark rules.
+- Host cards sit on the raised layer and rise a little, with a soft shadow, under the pointer.
+- Fixed from phase 1: the phone's top bar title was drawn in the ink colour on the dark band; the app bar theme no longer sets a title style of its own, so each bar's foreground applies.
+- Phase 3 of design-plans/ui-polish-proposal.html. Next: forms and panels, then the phone and motion.
+- Tests: parsing os-release (ID and ID_LIKE), uname, and Windows' cmd; unknown answers; the fields round-tripping; the editor choosing a colour and handing the system back to detection; goldens with logos, a colour, and marked tabs.
+
 ### The window frame (2026-10-04)
 
 - The desktop tabs are drawn as a browser draws them: a lower band, the shown tab in the content's colour and joined to it under a thin brand line, the others plain and lit under the pointer. A tab's close button shows on the shown tab and on the one under the pointer; long names end in an ellipsis. The actions beside the tabs share the band and are compact.

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../local/local_shell.dart';
+import '../ssh/host_os.dart';
 import '../ssh/serial.dart';
 import '../ssh/ssh_connector.dart';
 import '../theme.dart';
@@ -13,6 +14,7 @@ import 'connect_form.dart';
 import 'files_page.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
+import 'host_avatar.dart';
 import 'host_folders.dart';
 import 'server_picker.dart';
 import 'identities_page.dart';
@@ -1034,7 +1036,7 @@ class _HostsPageState extends State<HostsPage> {
                             if (i > 0) Divider(height: 1, color: c.line),
                             ListTile(
                               key: ValueKey('host-${host.id}'),
-                              leading: Icon(host.auth == HostAuth.key ? Icons.key : Icons.dns_outlined, color: c.brand),
+                              leading: HostAvatar.of(host, size: 36),
                               title: Text(host.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                               // Connection labels are Latin content: always LTR.
                               subtitle: Column(
@@ -1153,6 +1155,8 @@ class _HostEditorPageState extends State<HostEditorPage> {
   late String? _identityId = widget.host?.identityId;
   late String? _terminalType = widget.host?.terminalType;
   late TerminalCharset _charset = widget.host?.charset ?? TerminalCharset.utf8;
+  late HostOs? _os = widget.host?.os;
+  late HostTint? _tint = widget.host?.tint;
   late ConnectionProtocol _protocol = widget.host?.protocol ?? ConnectionProtocol.ssh;
   bool get _telnet => _protocol == ConnectionProtocol.telnet;
   bool get _serial => _protocol == ConnectionProtocol.serial;
@@ -1193,6 +1197,8 @@ class _HostEditorPageState extends State<HostEditorPage> {
         notes: _notes.text.trim(),
         terminalType: _terminalType,
         charset: _charset,
+        os: _os,
+        tint: _tint,
       ),
     );
     if (!mounted) return;
@@ -1262,6 +1268,15 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       controller: _group,
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(labelText: t.groupLabel, hintText: t.groupHint),
+                    ),
+                    const SizedBox(height: 14),
+                    _HostLook(
+                      os: _os,
+                      tint: _tint,
+                      serial: _serial,
+                      telnet: _telnet,
+                      onOs: (v) => setState(() => _os = v),
+                      onTint: (v) => setState(() => _tint = v),
                     ),
                     const SizedBox(height: 14),
                     SegmentedButton<ConnectionProtocol>(
@@ -1645,120 +1660,239 @@ class _HostCardState extends State<_HostCard> {
     final border = widget.selected
         ? c.brand
         : _hover
-        ? c.brand.withValues(alpha: 0.5)
+        ? c.brand.withValues(alpha: 0.45)
         : c.line;
+    // Under the pointer the card rises a little, as Termius's do.
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      child: Material(
-        color: c.surface,
-        shape: RoundedRectangleBorder(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        transform: Matrix4.translationValues(0, _hover ? -1 : 0, 0),
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: border, width: widget.selected ? 1.5 : 1),
+          boxShadow: [
+            if (_hover || widget.selected) BoxShadow(color: c.shadow, blurRadius: 14, offset: const Offset(0, 4)),
+          ],
         ),
-        child: InkWell(
-          key: ValueKey('host-${host.id}'),
-          borderRadius: BorderRadius.circular(12),
-          onTap: widget.onConnect,
-          onSecondaryTapUp: (d) => _contextMenu(d.globalPosition),
-          onLongPress: () {
-            final box = context.findRenderObject()! as RenderBox;
-            _contextMenu(box.localToGlobal(box.size.center(Offset.zero)));
-          },
-          child: Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(14, 12, 4, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: c.brand.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    host.isSerial
-                        ? Icons.usb_rounded
-                        : host.isTelnet
-                        ? Icons.lan_outlined
-                        : host.auth == HostAuth.key
-                        ? Icons.key_rounded
-                        : Icons.dns_outlined,
-                    size: 20,
-                    color: c.brand,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        host.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                      ),
-                      const SizedBox(height: 2),
-                      // A connection label is Latin content: LTR, at the start.
-                      Text(
-                        host.label,
-                        textDirection: TextDirection.ltr,
-                        textAlign: ltrStart,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: c.muted, fontSize: 12.5),
-                      ),
-                      if (widget.via != null) Text(widget.via!, style: TextStyle(color: c.muted, fontSize: 11.5)),
-                      if (host.notes.isNotEmpty)
-                        Tooltip(
-                          message: host.notes,
-                          child: Row(
-                            key: ValueKey('notes-${host.id}'),
-                            children: [
-                              Icon(Icons.sticky_note_2_outlined, size: 13, color: c.muted),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  host.notes.split('\n').first,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: c.muted, fontSize: 11.5),
+        child: Material(
+          color: c.raised,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: border, width: widget.selected ? 1.5 : 1),
+          ),
+          child: InkWell(
+            key: ValueKey('host-${host.id}'),
+            borderRadius: BorderRadius.circular(12),
+            onTap: widget.onConnect,
+            onSecondaryTapUp: (d) => _contextMenu(d.globalPosition),
+            onLongPress: () {
+              final box = context.findRenderObject()! as RenderBox;
+              _contextMenu(box.localToGlobal(box.size.center(Offset.zero)));
+            },
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 2, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  HostAvatar.of(host, key: ValueKey('avatar-${host.id}')),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          host.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                        ),
+                        const SizedBox(height: 2),
+                        // A connection label is Latin content: LTR, at the start.
+                        Text(
+                          host.label,
+                          textDirection: TextDirection.ltr,
+                          textAlign: ltrStart,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: c.muted, fontSize: 12.5),
+                        ),
+                        if (widget.via != null) Text(widget.via!, style: TextStyle(color: c.muted, fontSize: 11.5)),
+                        if (host.notes.isNotEmpty)
+                          Tooltip(
+                            message: host.notes,
+                            child: Row(
+                              key: ValueKey('notes-${host.id}'),
+                              children: [
+                                Icon(Icons.sticky_note_2_outlined, size: 13, color: c.muted),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    host.notes.split('\n').first,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: c.muted, fontSize: 11.5),
+                                  ),
                                 ),
-                              ),
+                              ],
+                            ),
+                          ),
+                        if (host.tags.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 5,
+                            runSpacing: 4,
+                            children: [
+                              for (final tag in host.tags)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: c.brand.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(tag, style: TextStyle(fontSize: 11.5, color: c.brand)),
+                                ),
                             ],
                           ),
-                        ),
-                      if (host.tags.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 5,
-                          runSpacing: 4,
-                          children: [
-                            for (final tag in host.tags)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: c.brand.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(tag, style: TextStyle(fontSize: 11.5, color: c.brand)),
-                              ),
-                          ],
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                PopupMenuButton<String>(
-                  key: ValueKey('hostMenu-${host.id}'),
-                  iconSize: 20,
-                  onSelected: widget.onAction,
-                  itemBuilder: (_) => widget.menu(),
-                ),
-              ],
+                  PopupMenuButton<String>(
+                    key: ValueKey('hostMenu-${host.id}'),
+                    iconSize: 18,
+                    iconColor: c.muted,
+                    onSelected: widget.onAction,
+                    itemBuilder: (_) => widget.menu(),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A host's mark in its editor: the colour, and the system, which is
+/// otherwise found on the first connection.
+class _HostLook extends StatelessWidget {
+  const _HostLook({
+    required this.os,
+    required this.tint,
+    required this.serial,
+    required this.telnet,
+    required this.onOs,
+    required this.onTint,
+  });
+
+  final HostOs? os;
+  final HostTint? tint;
+  final bool serial;
+  final bool telnet;
+  final ValueChanged<HostOs?> onOs;
+  final ValueChanged<HostTint?> onTint;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final c = context.colors;
+    String name(HostTint? tint) => switch (tint) {
+      null => t.tintNone,
+      HostTint.teal => t.tintTeal,
+      HostTint.blue => t.tintBlue,
+      HostTint.green => t.tintGreen,
+      HostTint.amber => t.tintAmber,
+      HostTint.orange => t.tintOrange,
+      HostTint.red => t.tintRed,
+      HostTint.pink => t.tintPink,
+      HostTint.slate => t.tintSlate,
+    };
+    Widget swatch(HostTint? value) {
+      final on = value == tint;
+      final color = hostTintColors[value];
+      return Tooltip(
+        message: name(value),
+        child: Semantics(
+          selected: on,
+          button: true,
+          label: name(value),
+          child: InkResponse(
+            key: ValueKey('tint-${value?.name ?? 'none'}'),
+            radius: 18,
+            onTap: () => onTint(value),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color,
+                border: Border.all(
+                  color: on ? c.ink : (color == null ? c.line : Colors.transparent),
+                  width: on ? 2 : 1,
+                ),
+              ),
+              child: color == null
+                  ? Icon(Icons.format_color_reset_outlined, size: 15, color: c.muted)
+                  : on
+                  ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                  : null,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          t.hostLookLabel,
+          style: TextStyle(color: c.muted, fontSize: 12.5, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            HostAvatar(
+              key: const ValueKey('hostLookPreview'),
+              os: os,
+              tint: tint,
+              serial: serial,
+              telnet: telnet,
+              size: 44,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [swatch(null), for (final value in HostTint.values) swatch(value)],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        DropdownButtonFormField<HostOs?>(
+          key: const ValueKey('hostOs'),
+          initialValue: os,
+          isExpanded: true,
+          decoration: InputDecoration(labelText: t.hostOsLabel),
+          items: [
+            DropdownMenuItem(value: null, child: Text(t.hostOsDetect)),
+            for (final value in HostOs.values)
+              DropdownMenuItem(
+                value: value,
+                child: Row(
+                  children: [
+                    HostAvatar(os: value, size: 22),
+                    const SizedBox(width: 10),
+                    Text(value.title),
+                  ],
+                ),
+              ),
+          ],
+          onChanged: onOs,
+        ),
+      ],
     );
   }
 }

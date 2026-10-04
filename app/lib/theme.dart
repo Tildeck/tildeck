@@ -423,7 +423,9 @@ ThemeData buildTheme(Brightness brightness, {ThemePalette palette = ThemePalette
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      titleTextStyle: TextStyle(fontFamily: 'Heebo', fontSize: d ? 18 : 20, fontWeight: FontWeight.w700, color: c.ink),
+      // No title style here: the default (titleLarge, already this size)
+      // takes each bar's foreground, which a style of its own would hide on
+      // the bars drawn in the band's colour.
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? c.brandContrast : c.muted),

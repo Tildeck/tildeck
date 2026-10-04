@@ -20,6 +20,7 @@ import 'package:tildeck/local/local_browser.dart';
 import 'package:tildeck/server_check.dart';
 import 'package:tildeck/settings/device_settings.dart';
 import 'package:tildeck/vault/password_rules.dart';
+import 'package:tildeck/ssh/host_os.dart';
 import 'package:tildeck/ssh/file_browser.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/proxy.dart';
@@ -157,6 +158,7 @@ Future<Vault> sampleVault({required bool unlocked}) async {
       auth: HostAuth.key,
       keyId: 'k1',
       tags: ['nginx', 'eu-west'],
+      os: HostOs.ubuntu,
     ),
     HostEntry(
       id: 'h2',
@@ -166,8 +168,17 @@ Future<Vault> sampleVault({required bool unlocked}) async {
       port: 2222,
       username: 'postgres',
       jumpHostId: 'h1',
+      os: HostOs.debian,
     ),
-    HostEntry(id: 'h3', name: 'Home server', group: 'Home', host: '192.168.1.20', username: 'shlomi'),
+    HostEntry(
+      id: 'h3',
+      name: 'Home server',
+      group: 'Home',
+      host: '192.168.1.20',
+      username: 'shlomi',
+      os: HostOs.alpine,
+      tint: HostTint.amber,
+    ),
     HostEntry(id: 'h4', name: 'Build box', host: 'ci.example.com', username: 'runner'),
   ]) {
     await vault.put(h);
@@ -1000,8 +1011,10 @@ void main() {
       desktop(tester);
       final vault = (await tester.runAsync(() async {
         final v = await sampleVault(unlocked: true);
-        for (final (id, name) in [('s1', 'Web 01'), ('s2', 'Database')]) {
-          await v.put(HostEntry(id: id, name: name, host: '127.0.0.1', port: 1, username: 'ops', password: 'x'));
+        for (final (id, name, os) in [('s1', 'Web 01', HostOs.ubuntu), ('s2', 'Database', HostOs.fedora)]) {
+          await v.put(
+            HostEntry(id: id, name: name, host: '127.0.0.1', port: 1, username: 'ops', password: 'x', os: os),
+          );
         }
         return v;
       }))!;

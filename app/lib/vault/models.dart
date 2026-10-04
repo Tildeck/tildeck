@@ -1,3 +1,4 @@
+import '../ssh/host_os.dart';
 import '../ssh/proxy.dart';
 import '../ssh/ssh_connector.dart' show ConnectionProtocol, TerminalCharset, defaultBaudRate;
 
@@ -32,6 +33,9 @@ sealed class VaultEntry {
 
 enum HostAuth { password, key }
 
+/// A colour the user can give a host, to tell it apart at a glance.
+enum HostTint { teal, blue, green, amber, orange, red, pink, slate }
+
 /// A saved server. Its group is a name; hosts with the same group name are
 /// listed together.
 class HostEntry extends VaultEntry {
@@ -56,6 +60,8 @@ class HostEntry extends VaultEntry {
     this.notes = '',
     this.terminalType,
     this.charset = TerminalCharset.utf8,
+    this.os,
+    this.tint,
   });
 
   static const recordType = 'host';
@@ -109,6 +115,12 @@ class HostEntry extends VaultEntry {
   final String? terminalType;
   final TerminalCharset charset;
 
+  /// The system it runs, for its icon; null until detected or chosen.
+  final HostOs? os;
+
+  /// A colour the user gave it, to tell it apart at a glance.
+  final HostTint? tint;
+
   bool get isTelnet => protocol == ConnectionProtocol.telnet;
   bool get isSerial => protocol == ConnectionProtocol.serial;
 
@@ -139,6 +151,8 @@ class HostEntry extends VaultEntry {
     'notes': notes,
     'terminal_type': terminalType,
     'charset': charset.name,
+    'os': os?.name,
+    'tint': tint?.name,
   };
 
   static HostEntry fromJson(String id, Map<String, dynamic> d) => HostEntry(
@@ -162,6 +176,8 @@ class HostEntry extends VaultEntry {
     notes: d['notes'] as String? ?? '',
     terminalType: d['terminal_type'] as String?,
     charset: TerminalCharset.values.asNameMap()[d['charset']] ?? TerminalCharset.utf8,
+    os: HostOs.values.asNameMap()[d['os']],
+    tint: HostTint.values.asNameMap()[d['tint']],
   );
 
   String get label {

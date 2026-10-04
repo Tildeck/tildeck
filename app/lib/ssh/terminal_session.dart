@@ -10,8 +10,10 @@ import 'package:xterm/xterm.dart';
 import '../activity.dart';
 import '../local/local_shell.dart';
 import '../terminal/session_log.dart';
+import '../vault/models.dart' show HostTint;
 import 'autocomplete.dart';
 import 'file_browser.dart';
+import 'host_os.dart';
 import 'serial.dart';
 import 'ssh_connector.dart';
 import 'telnet.dart';
@@ -46,6 +48,14 @@ class TerminalSession extends ChangeNotifier {
 
   /// The saved host's name, when it came from one.
   String? hostName;
+
+  /// The saved host's system and colour, for its mark on the tab.
+  HostOs? os;
+  HostTint? tint;
+
+  /// Told the system the server runs, read once after connecting when set
+  /// (for a host whose system is not known yet).
+  void Function(HostOs os)? onOsDetected;
 
   /// What the tab is called: the user's name for it, else the host's,
   /// else the address.
@@ -159,6 +169,7 @@ class TerminalSession extends ChangeNotifier {
       notifyListeners();
       final client = _client;
       if (autocomplete && client != null) unawaited(_loadHistory(client));
+      if (onOsDetected != null && client != null) unawaited(_detectOs(client));
       final startup = target.startupCommand;
       if (startup != null && startup.trim().isNotEmpty) run(startup);
 
@@ -292,6 +303,19 @@ class TerminalSession extends ChangeNotifier {
     } catch (_) {
       // A server that refuses exec channels, or no history: no suggestions.
       history = const [];
+    }
+  }
+
+  Future<void> _detectOs(SSHClient client) async {
+    try {
+      final out = await client.run(osCommand, stderr: false).timeout(const Duration(seconds: 8));
+      final found = parseOs(utf8.decode(out, allowMalformed: true));
+      if (found == null) return;
+      os = found;
+      onOsDetected?.call(found);
+      notifyListeners();
+    } catch (_) {
+      // A server that refuses exec channels keeps the plain mark.
     }
   }
 

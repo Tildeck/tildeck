@@ -575,5 +575,17 @@
   "settingsLook": "מראה",
   "paletteTildeck": "Tildeck",
   "paletteMidnight": "חצות",
-  "paletteDaylight": "אור יום"
+  "paletteDaylight": "אור יום",
+  "hostLookLabel": "סמל וצבע",
+  "hostOsLabel": "מערכת הפעלה",
+  "hostOsDetect": "זיהוי בהתחברות הבאה",
+  "tintNone": "בלי צבע",
+  "tintTeal": "טורקיז",
+  "tintBlue": "כחול",
+  "tintGreen": "ירוק",
+  "tintAmber": "ענבר",
+  "tintOrange": "כתום",
+  "tintRed": "אדום",
+  "tintPink": "ורוד",
+  "tintSlate": "אפור"
 }
