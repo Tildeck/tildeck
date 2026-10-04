@@ -1277,6 +1277,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       tint: _tint,
                       serial: _serial,
                       telnet: _telnet,
+                      ssh: _ssh,
                       onOs: (v) => setState(() => _os = v),
                       onTint: (v) => setState(() => _tint = v),
                     ),
@@ -1553,7 +1554,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    if (_ssh) const SizedBox(height: 14),
                     if (_ssh)
                       DropdownButtonFormField<String?>(
                         key: const ValueKey('startupSnippet'),
@@ -1565,7 +1566,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ],
                         onChanged: (v) => setState(() => _startupSnippetId = v),
                       ),
-                    const SizedBox(height: 14),
+                    if (_ssh) const SizedBox(height: 14),
                     if (_ssh)
                       TextFormField(
                         key: const ValueKey('hostEnv'),
@@ -1792,6 +1793,7 @@ class _HostLook extends StatelessWidget {
     required this.tint,
     required this.serial,
     required this.telnet,
+    required this.ssh,
     required this.onOs,
     required this.onTint,
   });
@@ -1800,6 +1802,9 @@ class _HostLook extends StatelessWidget {
   final HostTint? tint;
   final bool serial;
   final bool telnet;
+
+  /// The system is detected over SSH only; others choose it or go without.
+  final bool ssh;
   final ValueChanged<HostOs?> onOs;
   final ValueChanged<HostTint?> onTint;
 
@@ -1833,8 +1838,8 @@ class _HostLook extends StatelessWidget {
             onTap: () => onTint(value),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 120),
-              width: 28,
-              height: 28,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: color,
@@ -1872,11 +1877,11 @@ class _HostLook extends StatelessWidget {
               telnet: telnet,
               size: 44,
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 6,
+                runSpacing: 6,
                 children: [swatch(null), for (final value in HostTint.values) swatch(value)],
               ),
             ),
@@ -1889,7 +1894,7 @@ class _HostLook extends StatelessWidget {
           isExpanded: true,
           decoration: InputDecoration(labelText: t.hostOsLabel),
           items: [
-            DropdownMenuItem(value: null, child: Text(t.hostOsDetect)),
+            DropdownMenuItem(value: null, child: Text(ssh ? t.hostOsDetect : t.noneOption)),
             for (final value in HostOs.values)
               DropdownMenuItem(
                 value: value,

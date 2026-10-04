@@ -66,13 +66,14 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('hostName')), 'Web 01');
     await tester.enterText(find.byKey(const ValueKey('hostGroup')), 'Production');
     await tester.enterText(find.byKey(const ValueKey('host')), 'prod-web-01.example.com');
-    await tester.enterText(find.byKey(const ValueKey('username')), 'deploy');
-    // The editor's list builds lazily: scroll until the button exists.
+    // The editor's list builds lazily: scroll until the sign-in part exists.
+    // Save stays in the bar under it.
     await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('saveHost')),
-      300,
+      find.byKey(const ValueKey('username')),
+      200,
       scrollable: find.descendant(of: find.byType(HostEditorPage), matching: find.byType(Scrollable)).first,
     );
+    await tester.enterText(find.byKey(const ValueKey('username')), 'deploy');
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('saveHost')));
     // The editor closes once the host is saved; the list behind it shows it.
