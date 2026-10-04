@@ -571,5 +571,9 @@
   "ppkWrongPassphrase": "ה-passphrase לא פותח את מפתח ה-PuTTY הזה.",
   "ppkUnsupported": "Tildeck לא יכול להשתמש בסוג הזה של מפתח PuTTY. אפשר להשתמש ב-RSA, Ed25519 או ECDSA.",
   "movePane": "גוררים למקום אחר בתצוגה המפוצלת",
-  "removeFromSplit": "הוצאה מהתצוגה המפוצלת"
+  "removeFromSplit": "הוצאה מהתצוגה המפוצלת",
+  "settingsLook": "מראה",
+  "paletteTildeck": "Tildeck",
+  "paletteMidnight": "חצות",
+  "paletteDaylight": "אור יום"
 }

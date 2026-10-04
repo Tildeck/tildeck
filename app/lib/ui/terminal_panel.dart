@@ -582,34 +582,60 @@ class _StatusBanner extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-        child: Row(
-          children: [
-            if (connecting)
-              const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5))
-            else
-              Icon(
-                session.problem == null ? Icons.link_off : Icons.error_outline,
-                color: session.problem == null ? c.muted : c.danger,
-              ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                reconnectIn == null
-                    ? shown
-                    : '$shown ${t.reconnectingIn(reconnectIn!, attempt, reconnectDelays.length)}',
-                key: const ValueKey('sessionStatus'),
-                style: TextStyle(color: c.ink),
-              ),
-            ),
-            if (reconnectIn != null && onCancel != null)
-              TextButton(key: const ValueKey('cancelReconnect'), onPressed: onCancel, child: Text(t.cancel)),
-            if (!connecting)
-              TextButton(
-                key: const ValueKey('reconnectNow'),
-                onPressed: onReconnect,
-                child: Text(reconnectIn == null ? t.reconnect : t.reconnectNow),
-              ),
-          ],
+        // In a narrow pane the buttons go under the text.
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final status = Row(
+              children: [
+                if (connecting)
+                  const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5))
+                else
+                  Icon(
+                    session.problem == null ? Icons.link_off : Icons.error_outline,
+                    color: session.problem == null ? c.muted : c.danger,
+                  ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    reconnectIn == null
+                        ? shown
+                        : '$shown ${t.reconnectingIn(reconnectIn!, attempt, reconnectDelays.length)}',
+                    key: const ValueKey('sessionStatus'),
+                    style: TextStyle(color: c.ink),
+                  ),
+                ),
+              ],
+            );
+            final buttons = [
+              if (reconnectIn != null && onCancel != null)
+                TextButton(key: const ValueKey('cancelReconnect'), onPressed: onCancel, child: Text(t.cancel)),
+              if (!connecting)
+                TextButton(
+                  key: const ValueKey('reconnectNow'),
+                  onPressed: onReconnect,
+                  child: Text(reconnectIn == null ? t.reconnect : t.reconnectNow),
+                ),
+            ];
+            if (buttons.isEmpty) return status;
+            if (box.maxWidth >= 420) {
+              return Row(
+                children: [
+                  Expanded(child: status),
+                  ...buttons,
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                status,
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Wrap(children: buttons),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
