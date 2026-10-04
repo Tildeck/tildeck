@@ -7,6 +7,10 @@ enum BiometricFailure {
   /// The user cancelled, or chose the master password instead.
   cancelled,
 
+  /// The system closed the prompt, not the user: the app left the screen,
+  /// or the prompt was opened while it was not in front. Ask again later.
+  interrupted,
+
   /// The key is gone: a new fingerprint was enrolled (Android), or the
   /// Windows Hello key was deleted. Biometric unlock must be turned on again.
   invalidated,
@@ -84,6 +88,7 @@ class ChannelBiometricPlatform implements BiometricPlatform {
     } on PlatformException catch (e) {
       final failure = switch (e.code) {
         'cancelled' => BiometricFailure.cancelled,
+        'interrupted' => BiometricFailure.interrupted,
         'invalidated' || 'not_found' => BiometricFailure.invalidated,
         'unavailable' => BiometricFailure.unavailable,
         _ => BiometricFailure.failed,

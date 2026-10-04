@@ -10,6 +10,7 @@ import 'package:tildeck/theme.dart';
 import 'package:tildeck/ui/biometric_settings.dart';
 import 'package:tildeck/ui/vault_gate.dart';
 import 'package:tildeck/vault/password_rules.dart';
+import 'package:tildeck/settings/device_settings.dart';
 import 'package:tildeck/platform/biometric.dart';
 import 'package:tildeck/vault/biometric_unlock.dart';
 import 'package:tildeck/vault/models.dart';
@@ -36,10 +37,17 @@ class FakeBiometrics implements BiometricPlatform {
   BiometricFailure? next;
   final _secrets = <String, Uint8List>{};
 
+  /// Prompts shown, and whether the app is in front: like Android, a prompt
+  /// opened in the background is closed by the system at once.
+  int prompts = 0;
+  bool Function() inFront = () => true;
+
   Uint8List _xor(Uint8List data, Uint8List key) =>
       Uint8List.fromList([for (var i = 0; i < data.length; i++) data[i] ^ key[i % key.length]]);
 
   void _check() {
+    prompts++;
+    if (!inFront()) throw const BiometricException(BiometricFailure.interrupted);
     final failure = next;
     next = null;
     if (failure != null) throw BiometricException(failure);
@@ -222,6 +230,103 @@ void main() {
     expect(vault.status, VaultStatus.locked, reason: 'the first prompt was cancelled');
     await tester.tap(find.byKey(const ValueKey('unlockBiometric')));
     await waitFor(tester, () => vault.status == VaultStatus.unlocked, 'the unlock');
+  });
+
+  testWidgets('locked as the app leaves, it asks for the biometric when the app is back, not before', (tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    addTearDown(() => tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed));
+    final platform = FakeBiometrics(keepsKey: true)
+      ..inFront = () => const [null, AppLifecycleState.resumed].contains(WidgetsBinding.instance.lifecycleState);
+    final vault = (await tester.runAsync(() async {
+      final v = await open();
+      await v.create(password);
+      await BiometricUnlock(v, platform).enable(password, text);
+      return v;
+    }))!;
+    final settings = DeviceSettingsStore(initial: const DeviceSettings(backgroundLock: BackgroundLock.immediately));
+    await tester.pumpWidget(
+      app(
+        VaultGate(
+          vault: vault,
+          commonPasswords: CommonPasswords({}),
+          biometrics: BiometricUnlock(vault, platform),
+          settings: settings,
+          unlocked: (_) => const Scaffold(body: Text('open')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(vault.status, VaultStatus.unlocked);
+    platform.prompts = 0;
+
+    // The app leaves: the vault locks and the unlock screen is built in the background.
+    for (final state in [AppLifecycleState.inactive, AppLifecycleState.hidden, AppLifecycleState.paused]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    // No frames are drawn in the background; the lock and the screen's
+    // first steps still run.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pump();
+    expect(vault.status, VaultStatus.locked);
+    expect(platform.prompts, 0, reason: 'no prompt the system would close unseen');
+
+    // On the way back the first frame comes while the app is inactive, not
+    // yet in front: that is when the unlock screen is built. A prompt opened
+    // then is closed by the system.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('unlockBiometric')), findsOneWidget);
+    expect(platform.prompts, 0, reason: 'not yet in front');
+
+    // In front: the prompt comes, and unlocks.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await waitFor(tester, () => vault.status == VaultStatus.unlocked, 'the unlock');
+    expect(platform.prompts, 1);
+  });
+
+  testWidgets('a prompt the system closes is asked again when the app is back, without an error', (tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    addTearDown(() => tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed));
+    final platform = FakeBiometrics(keepsKey: true);
+    final vault = (await tester.runAsync(() async {
+      final v = await open();
+      await v.create(password);
+      await BiometricUnlock(v, platform).enable(password, text);
+      v.lock();
+      return v;
+    }))!;
+    platform
+      ..prompts = 0
+      ..next = BiometricFailure.interrupted;
+    await tester.pumpWidget(
+      app(
+        VaultGate(
+          vault: vault,
+          commonPasswords: CommonPasswords({}),
+          biometrics: BiometricUnlock(vault, platform),
+          unlocked: (_) => const Scaffold(body: Text('open')),
+        ),
+      ),
+    );
+    await waitFor(tester, () => platform.prompts == 1, 'the first prompt');
+    await tester.pumpAndSettle();
+    expect(vault.status, VaultStatus.locked);
+    expect(find.byKey(const ValueKey('biometricProblem')), findsNothing, reason: 'not the user cancelling');
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await waitFor(tester, () => vault.status == VaultStatus.unlocked, 'the unlock');
+    expect(platform.prompts, 2);
   });
 
   testWidgets('biometric unlock is turned on in the settings with the master password, and off', (tester) async {
