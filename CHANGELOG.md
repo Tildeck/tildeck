@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Split view panes are sized by dragging the lines between them (a double click evens them), and swapped by dragging a pane's handle onto another.
 - Import PuTTY keys (.ppk, formats 2 and 3, with or without a passphrase), pasted or from a file; PuTTY sessions bring their unprotected .ppk keys too.
 - Transfers queue: at most two run at once in a files tab, the rest wait their turn and can be cancelled while waiting.
 - Keyword highlighting in the terminal: errors, warnings, and successes stand out in the output, with the words editable in Settings, Terminal.

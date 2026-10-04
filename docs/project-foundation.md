@@ -357,7 +357,8 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 ### Split view (2026-10-01)
 
 - On a screen at least 840 pixels wide with two or more sessions, the Split button shows every terminal at once, in tab order, in a grid as square as it gets (two side by side, four in two rows, five in rows of three and two, up to 16; with more, the selected one and the newest others). A click on a pane makes it the active one (its tab is selected, its border is drawn in the brand color, and the bar shows its actions); the button returns to a single view of the active one. A files tab is shown alone. (Before 2026-10-02 the split showed two sessions only.)
-- Test: five sessions in a grid of three and two, the active pane changing on a click without the panes moving, and back to one.
+- Since 2026-10-04 the user arranges the grid freely: the line between two rows, or between two panes of a row, is dragged to size them (a pane at least 240 pixels wide and a row 140 high, where there is room), and double-clicked to make them even again; sizes are kept while the same layout stays. Each pane has a handle in its corner: dropped on another pane, the two swap places, and their tabs with them (the grid follows the tab order); the pane moved stays the active one. The dragging is mirrored in Hebrew.
+- Test: five sessions in a grid of three and two, the active pane changing on a click without the panes moving; a column line dragged (the two beside it change, a third does not), held at the smallest width, and evened by a double click; a row line dragged; a pane's handle dropped on another swapping them; and back to one.
 
 ### Port forwarding (2026-10-01)
 

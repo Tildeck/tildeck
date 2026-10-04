@@ -27,6 +27,7 @@ import 'account_page.dart';
 import 'command_history.dart';
 import 'command_palette.dart';
 import 'desktop_sidebar.dart';
+import 'pane_grid.dart';
 import 'drop_files.dart';
 import 'files_page.dart';
 import 'history_page.dart';
@@ -436,20 +437,85 @@ class _SessionsPageState extends State<SessionsPage> {
   void _toggleSplit() => setState(() => _grid = !_splitShown);
 
   /// One pane of the grid. A click on another pane makes it the active one,
-  /// whose tab is selected and whose actions the bar shows.
+  /// whose tab is selected and whose actions the bar shows. Its handle is
+  /// dragged onto another pane to swap the two, tabs included.
   Widget _pane(int i) {
     final c = context.colors;
+    final t = AppLocalizations.of(context);
     final active = i == _selected;
-    return Listener(
-      onPointerDown: active ? null : (_) => setState(() => _selected = i),
-      child: Container(
-        key: ValueKey('pane-$i'),
-        foregroundDecoration: BoxDecoration(
-          border: Border.all(color: active ? c.brand : c.line, width: active ? 2 : 1),
+    final title = switch (_tabs[i]) {
+      _TermTab(:final session) => session.title ?? session.target.label,
+      _FilesTab(:final title) => title,
+    };
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (d) => d.data != i,
+      onAcceptWithDetails: (d) => _swapTabs(d.data, i),
+      builder: (context, offered, _) => Listener(
+        onPointerDown: active ? null : (_) => setState(() => _selected = i),
+        child: Container(
+          key: ValueKey('pane-$i'),
+          foregroundDecoration: BoxDecoration(
+            color: offered.isEmpty ? null : c.brand.withValues(alpha: 0.12),
+            border: Border.all(
+              color: active || offered.isNotEmpty ? c.brand : c.line,
+              width: active || offered.isNotEmpty ? 2 : 1,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(child: _panel(i)),
+              PositionedDirectional(
+                top: 4,
+                end: 4,
+                child: Draggable<int>(
+                  key: ValueKey('paneHandle-$i'),
+                  data: i,
+                  feedback: Material(
+                    color: c.brand,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Text(
+                        title,
+                        style: TextStyle(color: c.brandContrast, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  child: Tooltip(
+                    message: t.movePane,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.grab,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: c.surface.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(Icons.drag_indicator_rounded, size: 16, color: c.muted),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: _panel(i),
       ),
     );
+  }
+
+  /// Swaps two tabs; the shown one stays shown where it went.
+  void _swapTabs(int a, int b) {
+    setState(() {
+      final tab = _tabs[a];
+      _tabs[a] = _tabs[b];
+      _tabs[b] = tab;
+      if (_selected == a) {
+        _selected = b;
+      } else if (_selected == b) {
+        _selected = a;
+      }
+    });
   }
 
   Widget _panel(int i) {
@@ -708,12 +774,9 @@ class _SessionsPageState extends State<SessionsPage> {
     // a shorter last row's panes are wider.
     final panes = _gridTabs;
     final columns = sqrt(panes.length).ceil();
-    return Column(
-      children: [
-        for (var row = 0; row < panes.length; row += columns)
-          Expanded(
-            child: Row(children: [for (final i in panes.skip(row).take(columns)) Expanded(child: _pane(i))]),
-          ),
+    return ResizableGrid(
+      rows: [
+        for (var row = 0; row < panes.length; row += columns) [for (final i in panes.skip(row).take(columns)) _pane(i)],
       ],
     );
   }
