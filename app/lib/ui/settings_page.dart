@@ -454,7 +454,132 @@ class _GeneralSettings extends StatelessWidget {
           selected: {device.themeMode},
           onSelectionChanged: (v) => draft.setDevice(device.copyWith(themeMode: v.single)),
         ),
+        _Label(t.settingsLook, t.thisDeviceOnly),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final (palette, name) in [
+              (ThemePalette.tildeck, t.paletteTildeck),
+              (ThemePalette.midnight, t.paletteMidnight),
+              (ThemePalette.daylight, t.paletteDaylight),
+            ])
+              _PaletteChoice(
+                palette: palette,
+                name: name,
+                selected: device.palette == palette,
+                onTap: () => draft.setDevice(device.copyWith(palette: palette)),
+              ),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+/// One look to choose: a small picture of it, light beside dark.
+class _PaletteChoice extends StatelessWidget {
+  const _PaletteChoice({required this.palette, required this.name, required this.selected, required this.onTap});
+
+  final ThemePalette palette;
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    Widget sample(Brightness brightness) {
+      final p = TildeckColors.of(palette, brightness);
+      return Expanded(
+        child: Container(
+          color: p.page,
+          child: Row(
+            children: [
+              Container(width: 18, color: p.desk),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        height: 8,
+                        decoration: BoxDecoration(color: p.brand, borderRadius: BorderRadius.circular(3)),
+                      ),
+                      const SizedBox(height: 5),
+                      Container(
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: p.raised,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: p.line),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: p.raised,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: p.line),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: name,
+      child: InkWell(
+        key: ValueKey('palette-${palette.name}'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: 176,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? c.brand : c.line, width: selected ? 2 : 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  height: 72,
+                  // The light side, then the dark: in that order in either direction.
+                  child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Row(children: [sample(Brightness.light), sample(Brightness.dark)]),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 2),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                    if (selected) Icon(Icons.check_circle_rounded, size: 18, color: c.brand),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

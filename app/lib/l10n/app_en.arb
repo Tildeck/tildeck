@@ -1056,5 +1056,9 @@
   "ppkWrongPassphrase": "The passphrase does not open this PuTTY key.",
   "ppkUnsupported": "Tildeck cannot use this kind of PuTTY key. Use RSA, Ed25519, or ECDSA.",
   "movePane": "Drag to another place in the split view",
-  "removeFromSplit": "Take out of the split view"
+  "removeFromSplit": "Take out of the split view",
+  "settingsLook": "Look",
+  "paletteTildeck": "Tildeck",
+  "paletteMidnight": "Midnight",
+  "paletteDaylight": "Daylight"
 }

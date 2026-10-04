@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
+
 /// When the vault locks after the app goes to the background (Android).
 enum BackgroundLock {
   immediately(Duration.zero),
@@ -24,6 +26,7 @@ class DeviceSettings {
   const DeviceSettings({
     this.locale,
     this.themeMode = ThemeMode.system,
+    this.palette = ThemePalette.tildeck,
     this.backgroundLock = BackgroundLock.oneMinute,
     this.blockScreenshots = false,
     this.sessionLogs = false,
@@ -32,6 +35,9 @@ class DeviceSettings {
   /// Null follows the device language.
   final Locale? locale;
   final ThemeMode themeMode;
+
+  /// The app's look; [themeMode] picks its light or dark side.
+  final ThemePalette palette;
   final BackgroundLock backgroundLock;
 
   /// Android: keeps the app out of screenshots, screen recordings, and the
@@ -44,12 +50,14 @@ class DeviceSettings {
   DeviceSettings copyWith({
     Locale? Function()? locale,
     ThemeMode? themeMode,
+    ThemePalette? palette,
     BackgroundLock? backgroundLock,
     bool? blockScreenshots,
     bool? sessionLogs,
   }) => DeviceSettings(
     locale: locale != null ? locale() : this.locale,
     themeMode: themeMode ?? this.themeMode,
+    palette: palette ?? this.palette,
     backgroundLock: backgroundLock ?? this.backgroundLock,
     blockScreenshots: blockScreenshots ?? this.blockScreenshots,
     sessionLogs: sessionLogs ?? this.sessionLogs,
@@ -58,6 +66,7 @@ class DeviceSettings {
   Map<String, Object?> toJson() => {
     'locale': locale?.languageCode,
     'theme': themeMode.name,
+    'palette': palette.name,
     'background_lock': backgroundLock.name,
     'block_screenshots': blockScreenshots,
     'session_logs': sessionLogs,
@@ -71,6 +80,7 @@ class DeviceSettings {
     return DeviceSettings(
       locale: code == 'he' || code == 'en' ? Locale(code as String) : null,
       themeMode: named(ThemeMode.values, json['theme']) ?? ThemeMode.system,
+      palette: named(ThemePalette.values, json['palette']) ?? ThemePalette.tildeck,
       backgroundLock: named(BackgroundLock.values, json['background_lock']) ?? BackgroundLock.oneMinute,
       blockScreenshots: json['block_screenshots'] == true,
       sessionLogs: json['session_logs'] == true,
@@ -82,12 +92,13 @@ class DeviceSettings {
       other is DeviceSettings &&
       other.locale == locale &&
       other.themeMode == themeMode &&
+      other.palette == palette &&
       other.backgroundLock == backgroundLock &&
       other.blockScreenshots == blockScreenshots &&
       other.sessionLogs == sessionLogs;
 
   @override
-  int get hashCode => Object.hash(locale, themeMode, backgroundLock, blockScreenshots, sessionLogs);
+  int get hashCode => Object.hash(locale, themeMode, palette, backgroundLock, blockScreenshots, sessionLogs);
 }
 
 /// This device's settings, loaded once and written on every change.

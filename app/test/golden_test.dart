@@ -943,4 +943,52 @@ void main() {
       );
     });
   }
+
+  // The looks to choose from, on the main screen.
+  for (final (palette, locale, mode) in [
+    (ThemePalette.midnight, 'he', ThemeMode.dark),
+    (ThemePalette.midnight, 'en', ThemeMode.light),
+    (ThemePalette.daylight, 'he', ThemeMode.light),
+    (ThemePalette.daylight, 'en', ThemeMode.dark),
+  ]) {
+    testWidgets('desktop hosts in ${palette.name} $locale ${mode.name}', (tester) async {
+      desktop(tester);
+      final vault = (await tester.runAsync(() => sampleVault(unlocked: true)))!;
+      await tester.pumpWidget(
+        TildeckApp(
+          vault: vault,
+          commonPasswords: CommonPasswords({'1q2w3e4r5t6y'}),
+          checker: ServerChecker(client: readyServer),
+          connector: SshConnector(knownHosts: MemoryKnownHosts()),
+          showKeyBar: false,
+          settings: DeviceSettingsStore(
+            initial: DeviceSettings(locale: Locale(locale), themeMode: mode, palette: palette),
+          ),
+        ),
+      );
+      await settle(tester);
+      await expectLater(
+        find.byType(TildeckApp),
+        matchesGoldenFile('goldens/desktop_hosts_${palette.name}_${locale}_${mode.name}.png'),
+      );
+    });
+  }
+
+  testWidgets('the look is chosen in the general settings', (tester) async {
+    desktop(tester);
+    final vault = (await tester.runAsync(() => sampleVault(unlocked: true)))!;
+    final store = DeviceSettingsStore();
+    final page = SettingsPage(
+      vault: vault,
+      settings: store,
+      sync: syncServices(vault, FakeSyncServer()),
+      initial: SettingsCategory.general,
+    );
+    await tester.pumpWidget(screen('he', ThemeMode.light, page));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('palette-midnight')));
+    await tester.tap(find.byKey(const ValueKey('palette-midnight')));
+    await tester.pumpAndSettle();
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/settings_look_he_light.png'));
+  });
 }

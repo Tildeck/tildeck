@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Choose the app's look in Settings, General: Tildeck, Midnight, or Daylight, each light and dark; and a more polished, consistent UI underneath (type scale, one button family, fields, menus, dialogs).
 - The split view holds only the terminals put there: a tab dragged onto a terminal goes beside it, on the side it is dropped, and a pane can be moved or taken out. New connections no longer join it.
 - Split view panes are sized by dragging the lines between them (a double click evens them), and swapped by dragging a pane's handle onto another.
 - Import PuTTY keys (.ppk, formats 2 and 3, with or without a passphrase), pasted or from a file; PuTTY sessions bring their unprotected .ppk keys too.

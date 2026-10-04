@@ -403,6 +403,15 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `scripts/verify.sh --area app` also starts BusyBox telnetd (`telnet` in `scripts/toolchain/Dockerfile`), which gives a shell without signing in.
 - Tests: negotiation against a fake server (supported and refused options, no loops, terminal type, window size with a 255 in it, a command split across reads, typing escaped, the end of the connection). Against BusyBox telnetd: a shell with the window size it was told, again after a resize, Telnet through an SSH jump host, and a closed port. BusyBox does not ask for the terminal type, so that part is covered by the fake server only.
 
+### Looks and the UI's foundations (2026-10-04)
+
+- Shlomi asked for the app's look to be chosen in the app, not by him once. Settings, General has Look beside the theme mode: Tildeck (the brand's teal band, the default), Midnight (one calm surface throughout, the band included, in the spirit of Termius), and Daylight (bright and open). Each comes light and dark; the light, dark, or device choice picks the side. It is kept on this device (`palette` in the device settings), like the theme mode. The terminal's color scheme stays its own choice.
+- One set of foundations for every look, in `buildTheme`: a type scale a step smaller on the desktop (body 13.5, titles 14.5 to 18) than on a phone; every button the same shape (radius 8) and height (38 on the desktop, 46 on a phone), as the panel's `.btn`, the outlined one as `.btn-quiet` (a quiet border, the ink colour) instead of Material's pill; fields, segmented buttons, chips, cards, list rows, dialogs, menus, tooltips, snack bars, switches, and scroll bars themed from the same tokens; a `raised` layer for cards above the `surface` of panels and the `page` behind them, with a `shadow` colour per look; quick fades between pages.
+- The language in the desktop sidebar's footer is no longer cut short in Hebrew ("Engli..."): the three icon actions beside it are compact.
+- A disconnected terminal's banner puts its buttons under the text in a narrow pane (under 420 pixels), where they overflowed.
+- The design proposal is design-plans/ui-polish-proposal.html (published to YAAPS); this is its phase 1. Next: the window frame (tabs in the title bar, a status bar), host cards with an identity per host, forms, and the phone.
+- Tests: every golden regenerated; new ones for the main screen in Midnight and Daylight, light and dark, in both languages, and for the Look choice in Settings.
+
 ### PuTTY keys (2026-10-04)
 
 - Import a key takes a PuTTY private key file (.ppk), pasted or chosen, as well as OpenSSH and PEM keys: formats 2 and 3, as PuTTYgen writes them, unencrypted or encrypted (AES-256-CBC; format 3 with Argon2id, Argon2i, or Argon2d). RSA, Ed25519, and ECDSA keys (P-256, P-384, P-521) are taken; DSA and Ed448 are refused by name.

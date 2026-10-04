@@ -149,8 +149,8 @@ class _TildeckAppState extends State<TildeckApp> {
     return MaterialApp(
       onGenerateTitle: (context) => AppLocalizations.of(context).appName,
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
+      theme: buildTheme(Brightness.light, palette: _settings.value.palette),
+      darkTheme: buildTheme(Brightness.dark, palette: _settings.value.palette),
       themeMode: _settings.value.themeMode,
       locale: _settings.value.locale,
       supportedLocales: AppLocalizations.supportedLocales,

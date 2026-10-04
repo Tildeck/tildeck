@@ -115,8 +115,15 @@ class DesktopSidebar extends StatelessWidget {
       ),
     );
 
-    Widget action(Key key, IconData icon, String tooltip, VoidCallback onPressed) =>
-        IconButton(key: key, tooltip: tooltip, color: c.deskMuted, icon: Icon(icon, size: 20), onPressed: onPressed);
+    // Compact, so the language beside them is never cut short.
+    Widget action(Key key, IconData icon, String tooltip, VoidCallback onPressed) => IconButton(
+      key: key,
+      tooltip: tooltip,
+      color: c.deskMuted,
+      visualDensity: VisualDensity.compact,
+      icon: Icon(icon, size: 20),
+      onPressed: onPressed,
+    );
 
     return Container(
       width: width,
@@ -174,7 +181,10 @@ class DesktopSidebar extends StatelessWidget {
                       alignment: AlignmentDirectional.centerEnd,
                       child: TextButton(
                         key: const ValueKey('toggleLanguage'),
-                        style: TextButton.styleFrom(foregroundColor: c.deskMuted),
+                        style: TextButton.styleFrom(
+                          foregroundColor: c.deskMuted,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
                         onPressed: onToggleLocale,
                         child: Text(otherLanguageName, overflow: TextOverflow.ellipsis),
                       ),
