@@ -69,6 +69,8 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Fixed
 
+- A transfer cancelled just as it started, while its file was opening, kept going; it now stops.
+- Email addresses are checked without a pattern that crafted input could make slow.
 - The terminal tells programs where its cursor is counting from 1, as other terminals do; it was one row and one column short.
 - A sync server that goes back to older data is reported instead of being followed quietly; this device's changes wait until you confirm the server was restored from a backup.
 - A deletion now proves it came from one of your devices: the sync server can no longer delete entries on your devices by itself.

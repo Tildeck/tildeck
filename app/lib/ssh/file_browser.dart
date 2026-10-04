@@ -477,6 +477,8 @@ class FileBrowser extends ChangeNotifier {
             onError: (Object e) => finished.isCompleted ? null : finished.completeError(e),
             cancelOnError: true,
           );
+      // Cancelled while the file was opening: no one stopped it yet.
+      if (transfer._cancelled) await stop();
       await finished.future;
     } finally {
       transfer._onCancel.remove(stop);
@@ -486,8 +488,6 @@ class FileBrowser extends ChangeNotifier {
     }
   }
 
-  /// Runs [work] for [transfer], recording how it ended; [cleanup] removes
-  /// what a failed or cancelled one left behind.
   /// At most this many transfers run at once; the rest wait their turn.
   static const maxRunning = 2;
   int _running = 0;
@@ -516,6 +516,8 @@ class FileBrowser extends ChangeNotifier {
     _running--;
   }
 
+  /// Runs [work] for [transfer] in its turn, recording how it ended;
+  /// [cleanup] removes what a failed or cancelled one left behind.
   Future<void> _run(Transfer transfer, Future<void> Function() work, {required Future<void> Function() cleanup}) async {
     try {
       await _waitTurn(transfer);
@@ -628,6 +630,8 @@ class FileBrowser extends ChangeNotifier {
       Future<void> stop() => writer.abort();
       transfer._onCancel.add(stop);
       try {
+        // Cancelled while the file was opening: no one stopped it yet.
+        if (transfer._cancelled) await stop();
         await writer.done;
       } finally {
         transfer._onCancel.remove(stop);

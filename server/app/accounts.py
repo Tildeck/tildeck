@@ -8,7 +8,6 @@ wrapped vault keys, and the KDF parameters the client chose.
 import base64
 import hashlib
 import hmac
-import re
 import secrets
 import time
 import uuid
@@ -33,7 +32,16 @@ MIN_KDF_OPS = 3
 MIN_KDF_MEM = 64 * 1024 * 1024
 DEFAULT_KDF = {"ops": MIN_KDF_OPS, "mem": MIN_KDF_MEM}
 
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+def is_email(value: str) -> bool:
+    """One @ with something before it, no whitespace, and a dot inside the
+    domain. Checked without a regular expression: the pattern this replaces
+    could backtrack for a long time on crafted input."""
+    local, at, domain = value.partition("@")
+    if not at or not local or "@" in domain or any(c.isspace() for c in value):
+        return False
+    name, dot, top = domain.rpartition(".")
+    return bool(dot and name and top)
 
 
 def _b64(value: str, *, length: int | None = None, min_length: int | None = None) -> bytes:

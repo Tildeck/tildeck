@@ -25,11 +25,13 @@ logger = logging.getLogger("tildeck.mail")
 
 LOCALES = ("en", "he")
 _LOCALE_DIR = Path(__file__).parent / "locales"
+# The files are fixed: a locale from a request only picks one of them.
+_LOCALE_FILES = {locale: _LOCALE_DIR / f"{locale}.json" for locale in LOCALES}
 
 
 @cache
 def strings(locale: str) -> dict[str, str]:
-    return json.loads((_LOCALE_DIR / f"{locale if locale in LOCALES else 'en'}.json").read_text(encoding="utf-8"))
+    return json.loads(_LOCALE_FILES.get(locale, _LOCALE_FILES["en"]).read_text(encoding="utf-8"))
 
 
 def text(locale: str, key: str, **values: str) -> str:

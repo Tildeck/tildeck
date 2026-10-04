@@ -59,5 +59,20 @@ async def test_no_file_outside_the_panel_is_served(panel_client):
     assert "secret" not in res.text
 
 
+async def test_a_link_out_of_the_panel_is_not_followed(tmp_path):
+    root = tmp_path / "panel"
+    root.mkdir()
+    (root / "index.html").write_text("<html>shell</html>")
+    (tmp_path / "panel-other").mkdir()
+    (tmp_path / "panel-other" / "file.txt").write_text("secret")
+    (root / "out").symlink_to(tmp_path / "panel-other")
+    app = FastAPI()
+    assert panel.mount(app, str(root))
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        res = await c.get("/out/file.txt")
+        assert "secret" not in res.text, "a link to a folder whose name starts like the panel's"
+        assert res.text == "<html>shell</html>"
+
+
 def test_missing_panel_serves_api_only(tmp_path):
     assert panel.mount(FastAPI(), str(tmp_path / "absent")) is False
