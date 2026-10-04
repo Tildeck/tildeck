@@ -84,9 +84,48 @@ void main() {
     expect((border(1), border(3)), (1, 2));
     expect(panels()[3].session, same(third));
 
+    // The line between two panes is dragged to size them, and a double
+    // click makes them even again.
+    double width(int i) => tester.getSize(find.byKey(ValueKey('pane-$i'))).width;
+    double height(int i) => tester.getSize(find.byKey(ValueKey('pane-$i'))).height;
+    final even = width(0);
+    await tester.drag(find.byKey(const ValueKey('columnDivider-0-0')), const Offset(120, 0));
+    await settle();
+    expect(width(0), closeTo(even + 120, 2));
+    expect(width(1), closeTo(even - 120, 2));
+    expect(width(2), closeTo(even, 2), reason: 'only the two beside the line');
+    // Never smaller than the smallest share.
+    await tester.drag(find.byKey(const ValueKey('columnDivider-0-0')), const Offset(2000, 0));
+    await settle();
+    expect(width(1), closeTo(240, 2), reason: 'the smallest a pane is dragged to');
+    await tester.tap(find.byKey(const ValueKey('columnDivider-0-0')));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const ValueKey('columnDivider-0-0')));
+    await settle();
+    expect(width(0), closeTo(even, 2));
+    // Rows too.
+    final rowHeight = height(0);
+    await tester.drag(find.byKey(const ValueKey('rowDivider-0')), const Offset(0, 80));
+    await settle();
+    expect(height(0), closeTo(rowHeight + 80, 2));
+    expect(height(4), closeTo(rowHeight - 80, 2));
+
+    // A pane's handle dropped on another pane swaps the two.
+    final first = panels()[0].session;
+    final last = panels()[4].session;
+    final gesture = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey('paneHandle-0'))));
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.moveTo(tester.getCenter(find.byKey(const ValueKey('pane-4'))));
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.up();
+    await settle();
+    expect(panels()[0].session, same(last));
+    expect(panels()[4].session, same(first));
+    expect(border(4), 2, reason: 'the pane that was moved is the active one, where it went');
+
     await tester.tap(find.byKey(const ValueKey('splitView')));
     await settle();
     expect(panels(), hasLength(1));
-    expect(panels().single.session, same(third), reason: 'the active pane stays');
+    expect(panels().single.session, same(first), reason: 'the active pane stays');
   });
 }
