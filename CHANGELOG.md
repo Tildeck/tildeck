@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Desktop tabs drawn as in a browser, named after the saved host, and a status line under each terminal (state, address, protocol, character set, terminal type, size).
 - Choose the app's look in Settings, General: Tildeck, Midnight, or Daylight, each light and dark; and a more polished, consistent UI underneath (type scale, one button family, fields, menus, dialogs).
 - The split view holds only the terminals put there: a tab dragged onto a terminal goes beside it, on the side it is dropped, and a pane can be moved or taken out. New connections no longer join it.
 - Split view panes are sized by dragging the lines between them (a double click evens them), and swapped by dragging a pane's handle onto another.

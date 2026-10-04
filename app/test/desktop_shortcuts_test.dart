@@ -8,7 +8,6 @@ import 'package:tildeck/app.dart';
 import 'package:tildeck/server_check.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
-import 'package:tildeck/theme.dart';
 import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/vault/vault.dart';
@@ -68,10 +67,11 @@ void main() {
     /// The tab drawn as chosen, or -1 for the hosts.
     int chosen() {
       for (var i = 0; i < tabs(); i++) {
-        final shape = tester.widget<Material>(find.byKey(ValueKey('tab-$i'))).shape! as RoundedRectangleBorder;
-        if (shape.side.color == tester.element(find.byKey(ValueKey('tab-$i'))).colors.brand) {
-          return i;
-        }
+        final shown = find.descendant(
+          of: find.byKey(ValueKey('tab-$i')),
+          matching: find.byKey(const ValueKey('shownTab')),
+        );
+        if (shown.evaluate().isNotEmpty) return i;
       }
       return -1;
     }

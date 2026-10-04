@@ -403,6 +403,15 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - `scripts/verify.sh --area app` also starts BusyBox telnetd (`telnet` in `scripts/toolchain/Dockerfile`), which gives a shell without signing in.
 - Tests: negotiation against a fake server (supported and refused options, no loops, terminal type, window size with a 255 in it, a command split across reads, typing escaped, the end of the connection). Against BusyBox telnetd: a shell with the window size it was told, again after a resize, Telnet through an SSH jump host, and a closed port. BusyBox does not ask for the terminal type, so that part is covered by the fake server only.
 
+### The window frame (2026-10-04)
+
+- The desktop tabs are drawn as a browser draws them: a lower band, the shown tab in the content's colour and joined to it under a thin brand line, the others plain and lit under the pointer. A tab's close button shows on the shown tab and on the one under the pointer; long names end in an ellipsis. The actions beside the tabs share the band and are compact.
+- A tab is named after its saved host ("Web 01") rather than its address; a name the user gives still wins, and an address stays left to right.
+- Under each desktop terminal, a status line: the connection's state, the user and address, the protocol, the character set, the terminal type, and the size in columns and rows. On a phone the key bar takes that place.
+- A disconnected terminal's banner is a bordered card with a soft shadow instead of a raised Material sheet.
+- Phase 2 of design-plans/ui-polish-proposal.html. Next: host cards with an identity per host, forms and panels, the phone and motion.
+- Tests: new goldens for the desktop sessions (two tabs, the status line, the banner) in English dark and Hebrew light; the shortcut and palette tests follow the new tab markup and names.
+
 ### Looks and the UI's foundations (2026-10-04)
 
 - Shlomi asked for the app's look to be chosen in the app, not by him once. Settings, General has Look beside the theme mode: Tildeck (the brand's teal band, the default), Midnight (one calm surface throughout, the band included, in the spirit of Termius), and Daylight (bright and open). Each comes light and dark; the light, dark, or device choice picks the side. It is kept on this device (`palette` in the device settings), like the theme mode. The terminal's color scheme stays its own choice.

@@ -991,4 +991,34 @@ void main() {
     await tester.pumpAndSettle();
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/settings_look_he_light.png'));
   });
+
+  // Sessions on the desktop: browser tabs, the bar beside them, and the
+  // terminal's status line. Nothing listens on port 1, so both show their
+  // dropped state and its banner.
+  for (final (locale, mode) in [('en', ThemeMode.dark), ('he', ThemeMode.light)]) {
+    testWidgets('desktop sessions $locale ${mode.name}', (tester) async {
+      desktop(tester);
+      final vault = (await tester.runAsync(() async {
+        final v = await sampleVault(unlocked: true);
+        for (final (id, name) in [('s1', 'Web 01'), ('s2', 'Database')]) {
+          await v.put(HostEntry(id: id, name: name, host: '127.0.0.1', port: 1, username: 'ops', password: 'x'));
+        }
+        return v;
+      }))!;
+      await tester.pumpWidget(app(vault, locale, mode));
+      await settle(tester);
+      for (final id in ['s1', 's2']) {
+        await tester.tap(find.byKey(ValueKey('host-$id')));
+        await settle(tester);
+        await tester.tap(find.byKey(const ValueKey('nav-hosts')));
+        await settle(tester);
+      }
+      await tester.tap(find.byKey(const ValueKey('tab-0')));
+      await settle(tester);
+      await expectLater(
+        find.byType(TildeckApp),
+        matchesGoldenFile('goldens/desktop_sessions_${locale}_${mode.name}.png'),
+      );
+    });
+  }
 }
