@@ -1072,5 +1072,10 @@
   "tintOrange": "Orange",
   "tintRed": "Red",
   "tintPink": "Pink",
-  "tintSlate": "Slate"
+  "tintSlate": "Slate",
+  "formSectionGeneral": "General",
+  "formSectionConnection": "Connection",
+  "formSectionSignIn": "Sign in",
+  "formSectionTerminal": "Terminal",
+  "formSectionDetails": "Tags and notes"
 }

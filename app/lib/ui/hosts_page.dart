@@ -12,6 +12,7 @@ import '../vault/vault.dart';
 import '../ssh/file_browser.dart';
 import 'connect_form.dart';
 import 'files_page.dart';
+import 'form_section.dart';
 import 'group_editor_page.dart';
 import 'history_page.dart';
 import 'host_avatar.dart';
@@ -1256,6 +1257,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                 child: ListView(
                   padding: const EdgeInsets.all(24),
                   children: [
+                    FormSectionTitle(t.formSectionGeneral, key: const ValueKey('section-general'), first: true),
                     TextFormField(
                       key: const ValueKey('hostName'),
                       controller: _name,
@@ -1275,10 +1277,11 @@ class _HostEditorPageState extends State<HostEditorPage> {
                       tint: _tint,
                       serial: _serial,
                       telnet: _telnet,
+                      ssh: _ssh,
                       onOs: (v) => setState(() => _os = v),
                       onTint: (v) => setState(() => _tint = v),
                     ),
-                    const SizedBox(height: 14),
+                    FormSectionTitle(t.formSectionConnection, key: const ValueKey('section-connection')),
                     SegmentedButton<ConnectionProtocol>(
                       key: const ValueKey('hostProtocol'),
                       showSelectedIcon: false,
@@ -1353,127 +1356,6 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    if (_ssh) ...[
-                      DropdownButtonFormField<String?>(
-                        key: const ValueKey('hostIdentity'),
-                        initialValue: _identityId,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: t.identityLabel,
-                          helperText: identity == null
-                              ? t.identityHelp
-                              : identityCredentials(t, widget.vault, identity),
-                          helperMaxLines: 3,
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                            value: null,
-                            child: Text(groupIdentity == null ? t.noIdentity : t.fromGroup(groupIdentity.name)),
-                          ),
-                          for (final x in identities) DropdownMenuItem(value: x.id, child: Text(x.name)),
-                        ],
-                        onChanged: (v) => setState(() => _identityId = v),
-                      ),
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: TextButton.icon(
-                          key: const ValueKey('hostNewIdentity'),
-                          icon: const Icon(Icons.add, size: 18),
-                          label: Text(t.addIdentity),
-                          onPressed: () async {
-                            final id = await showIdentityEditor(context, widget.vault);
-                            if (id != null) setState(() => _identityId = id);
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    if (identity == null && !_serial) ...[
-                      TextFormField(
-                        key: const ValueKey('username'),
-                        controller: _username,
-                        textDirection: TextDirection.ltr,
-                        autocorrect: false,
-                        validator: _telnet || group?.username?.isNotEmpty == true ? null : required,
-                        decoration: InputDecoration(
-                          labelText: _telnet ? t.usernameOptional : t.usernameLabel,
-                          helperText: group?.username?.isNotEmpty == true ? t.fromGroup(group!.username!) : null,
-                        ),
-                      ),
-                      SizedBox(height: _telnet ? 8 : 18),
-                      if (!_telnet)
-                        SegmentedButton<HostAuth>(
-                          segments: [
-                            ButtonSegment(
-                              value: HostAuth.password,
-                              label: Text(t.authPassword),
-                              icon: const Icon(Icons.password),
-                            ),
-                            ButtonSegment(
-                              value: HostAuth.key,
-                              label: Text(t.authPrivateKey),
-                              icon: const Icon(Icons.key),
-                            ),
-                          ],
-                          selected: {_auth},
-                          onSelectionChanged: (s) => setState(() => _auth = s.first),
-                        ),
-                      const SizedBox(height: 14),
-                      if (_telnet || _auth == HostAuth.password) ...[
-                        SwitchListTile(
-                          key: const ValueKey('savePassword'),
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(t.savePassword),
-                          subtitle: Text(
-                            _telnet ? t.telnetPasswordHelp : t.askPasswordEachTime,
-                            style: TextStyle(color: c.muted),
-                          ),
-                          value: _savePassword,
-                          onChanged: (v) => setState(() => _savePassword = v),
-                        ),
-                        if (_savePassword)
-                          TextFormField(
-                            key: const ValueKey('password'),
-                            controller: _password,
-                            obscureText: true,
-                            textDirection: TextDirection.ltr,
-                            validator: required,
-                            decoration: InputDecoration(labelText: t.passwordLabel),
-                          ),
-                      ] else ...[
-                        DropdownButtonFormField<String>(
-                          key: const ValueKey('keyChoice'),
-                          initialValue: _keyId,
-                          decoration: InputDecoration(labelText: t.keyLabel, hintText: t.chooseKey),
-                          validator: (v) => v == null && group?.keyId == null ? t.fieldRequired : null,
-                          items: [for (final k in keys) DropdownMenuItem(value: k.id, child: Text(k.name))],
-                          onChanged: (v) => setState(() => _keyId = v),
-                        ),
-                        Wrap(
-                          spacing: 4,
-                          children: [
-                            TextButton.icon(
-                              key: const ValueKey('hostGenerateKey'),
-                              icon: const Icon(Icons.auto_awesome_outlined),
-                              label: Text(t.generateKey),
-                              onPressed: () async {
-                                final id = await showKeyGenerator(context, widget.vault);
-                                if (id != null) setState(() => _keyId = id);
-                              },
-                            ),
-                            TextButton.icon(
-                              icon: const Icon(Icons.file_download_outlined),
-                              label: Text(t.importKey),
-                              onPressed: () async {
-                                final id = await showKeyEditor(context, widget.vault);
-                                if (id != null) setState(() => _keyId = id);
-                              },
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
                     if (!_serial) ...[
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String?>(
@@ -1501,55 +1383,140 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         onChanged: (v) => setState(() => _proxyId = v),
                       ),
                     ],
-                    const SizedBox(height: 6),
-                    if (_ssh)
-                      SwitchListTile(
-                        key: const ValueKey('agentForwarding'),
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(t.agentForwarding),
-                        subtitle: Text(t.agentForwardingHelp, style: TextStyle(color: c.muted)),
-                        value: _agentForwarding,
-                        onChanged: (v) => setState(() => _agentForwarding = v),
-                      ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      key: const ValueKey('hostTags'),
-                      controller: _tags,
-                      decoration: InputDecoration(labelText: t.tagsLabel, hintText: t.tagsHint),
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      key: const ValueKey('hostNotes'),
-                      controller: _notes,
-                      minLines: 2,
-                      maxLines: 8,
-                      maxLength: 4000,
-                      decoration: InputDecoration(
-                        labelText: t.notesLabel,
-                        hintText: t.notesHint,
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    if (_ssh)
-                      TextFormField(
-                        key: const ValueKey('hostEnv'),
-                        controller: _env,
-                        minLines: 2,
-                        maxLines: 6,
-                        textDirection: TextDirection.ltr,
-                        autocorrect: false,
-                        style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13),
-                        validator: (v) => parseEnv(v ?? '') == null ? t.envInvalid : null,
-                        decoration: InputDecoration(
-                          labelText: t.envLabel,
-                          hintText: 'LANG=en_US.UTF-8',
-                          helperText: t.envHelp,
-                          helperMaxLines: 3,
-                          alignLabelWithHint: true,
+                    if (!_serial) ...[
+                      FormSectionTitle(t.formSectionSignIn, key: const ValueKey('section-signIn')),
+                      if (_ssh) ...[
+                        DropdownButtonFormField<String?>(
+                          key: const ValueKey('hostIdentity'),
+                          initialValue: _identityId,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: t.identityLabel,
+                            helperText: identity == null
+                                ? t.identityHelp
+                                : identityCredentials(t, widget.vault, identity),
+                            helperMaxLines: 3,
+                          ),
+                          items: [
+                            DropdownMenuItem(
+                              value: null,
+                              child: Text(groupIdentity == null ? t.noIdentity : t.fromGroup(groupIdentity.name)),
+                            ),
+                            for (final x in identities) DropdownMenuItem(value: x.id, child: Text(x.name)),
+                          ],
+                          onChanged: (v) => setState(() => _identityId = v),
                         ),
-                      ),
-                    const SizedBox(height: 14),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: TextButton.icon(
+                            key: const ValueKey('hostNewIdentity'),
+                            icon: const Icon(Icons.add, size: 18),
+                            label: Text(t.addIdentity),
+                            onPressed: () async {
+                              final id = await showIdentityEditor(context, widget.vault);
+                              if (id != null) setState(() => _identityId = id);
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (identity == null && !_serial) ...[
+                        TextFormField(
+                          key: const ValueKey('username'),
+                          controller: _username,
+                          textDirection: TextDirection.ltr,
+                          autocorrect: false,
+                          validator: _telnet || group?.username?.isNotEmpty == true ? null : required,
+                          decoration: InputDecoration(
+                            labelText: _telnet ? t.usernameOptional : t.usernameLabel,
+                            helperText: group?.username?.isNotEmpty == true ? t.fromGroup(group!.username!) : null,
+                          ),
+                        ),
+                        SizedBox(height: _telnet ? 8 : 18),
+                        if (!_telnet)
+                          SegmentedButton<HostAuth>(
+                            segments: [
+                              ButtonSegment(
+                                value: HostAuth.password,
+                                label: Text(t.authPassword),
+                                icon: const Icon(Icons.password),
+                              ),
+                              ButtonSegment(
+                                value: HostAuth.key,
+                                label: Text(t.authPrivateKey),
+                                icon: const Icon(Icons.key),
+                              ),
+                            ],
+                            selected: {_auth},
+                            onSelectionChanged: (s) => setState(() => _auth = s.first),
+                          ),
+                        const SizedBox(height: 14),
+                        if (_telnet || _auth == HostAuth.password) ...[
+                          SwitchListTile(
+                            key: const ValueKey('savePassword'),
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(t.savePassword),
+                            subtitle: Text(
+                              _telnet ? t.telnetPasswordHelp : t.askPasswordEachTime,
+                              style: TextStyle(color: c.muted),
+                            ),
+                            value: _savePassword,
+                            onChanged: (v) => setState(() => _savePassword = v),
+                          ),
+                          if (_savePassword)
+                            TextFormField(
+                              key: const ValueKey('password'),
+                              controller: _password,
+                              obscureText: true,
+                              textDirection: TextDirection.ltr,
+                              validator: required,
+                              decoration: InputDecoration(labelText: t.passwordLabel),
+                            ),
+                        ] else ...[
+                          DropdownButtonFormField<String>(
+                            key: const ValueKey('keyChoice'),
+                            initialValue: _keyId,
+                            decoration: InputDecoration(labelText: t.keyLabel, hintText: t.chooseKey),
+                            validator: (v) => v == null && group?.keyId == null ? t.fieldRequired : null,
+                            items: [for (final k in keys) DropdownMenuItem(value: k.id, child: Text(k.name))],
+                            onChanged: (v) => setState(() => _keyId = v),
+                          ),
+                          Wrap(
+                            spacing: 4,
+                            children: [
+                              TextButton.icon(
+                                key: const ValueKey('hostGenerateKey'),
+                                icon: const Icon(Icons.auto_awesome_outlined),
+                                label: Text(t.generateKey),
+                                onPressed: () async {
+                                  final id = await showKeyGenerator(context, widget.vault);
+                                  if (id != null) setState(() => _keyId = id);
+                                },
+                              ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.file_download_outlined),
+                                label: Text(t.importKey),
+                                onPressed: () async {
+                                  final id = await showKeyEditor(context, widget.vault);
+                                  if (id != null) setState(() => _keyId = id);
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                      const SizedBox(height: 6),
+                      if (_ssh)
+                        SwitchListTile(
+                          key: const ValueKey('agentForwarding'),
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(t.agentForwarding),
+                          subtitle: Text(t.agentForwardingHelp, style: TextStyle(color: c.muted)),
+                          value: _agentForwarding,
+                          onChanged: (v) => setState(() => _agentForwarding = v),
+                        ),
+                    ],
+                    FormSectionTitle(t.formSectionTerminal, key: const ValueKey('section-terminal')),
                     Row(
                       children: [
                         if (!_serial) ...[
@@ -1587,7 +1554,7 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    if (_ssh) const SizedBox(height: 14),
                     if (_ssh)
                       DropdownButtonFormField<String?>(
                         key: const ValueKey('startupSnippet'),
@@ -1599,14 +1566,60 @@ class _HostEditorPageState extends State<HostEditorPage> {
                         ],
                         onChanged: (v) => setState(() => _startupSnippetId = v),
                       ),
-                    const SizedBox(height: 24),
-                    FilledButton(key: const ValueKey('saveHost'), onPressed: _save, child: Text(t.save)),
+                    if (_ssh) const SizedBox(height: 14),
+                    if (_ssh)
+                      TextFormField(
+                        key: const ValueKey('hostEnv'),
+                        controller: _env,
+                        minLines: 2,
+                        maxLines: 6,
+                        textDirection: TextDirection.ltr,
+                        autocorrect: false,
+                        style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13),
+                        validator: (v) => parseEnv(v ?? '') == null ? t.envInvalid : null,
+                        decoration: InputDecoration(
+                          labelText: t.envLabel,
+                          hintText: 'LANG=en_US.UTF-8',
+                          helperText: t.envHelp,
+                          helperMaxLines: 3,
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                    FormSectionTitle(t.formSectionDetails, key: const ValueKey('section-details')),
+                    TextFormField(
+                      key: const ValueKey('hostTags'),
+                      controller: _tags,
+                      decoration: InputDecoration(labelText: t.tagsLabel, hintText: t.tagsHint),
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      key: const ValueKey('hostNotes'),
+                      controller: _notes,
+                      minLines: 2,
+                      maxLines: 8,
+                      maxLength: 4000,
+                      decoration: InputDecoration(
+                        labelText: t.notesLabel,
+                        hintText: t.notesHint,
+                        alignLabelWithHint: true,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           );
         },
+      ),
+      bottomNavigationBar: FormFooter(
+        children: [
+          FilledButton.icon(
+            key: const ValueKey('saveHost'),
+            onPressed: _save,
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: Text(t.save),
+          ),
+        ],
       ),
     );
   }
@@ -1780,6 +1793,7 @@ class _HostLook extends StatelessWidget {
     required this.tint,
     required this.serial,
     required this.telnet,
+    required this.ssh,
     required this.onOs,
     required this.onTint,
   });
@@ -1788,6 +1802,9 @@ class _HostLook extends StatelessWidget {
   final HostTint? tint;
   final bool serial;
   final bool telnet;
+
+  /// The system is detected over SSH only; others choose it or go without.
+  final bool ssh;
   final ValueChanged<HostOs?> onOs;
   final ValueChanged<HostTint?> onTint;
 
@@ -1821,8 +1838,8 @@ class _HostLook extends StatelessWidget {
             onTap: () => onTint(value),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 120),
-              width: 28,
-              height: 28,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: color,
@@ -1860,11 +1877,11 @@ class _HostLook extends StatelessWidget {
               telnet: telnet,
               size: 44,
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 6,
+                runSpacing: 6,
                 children: [swatch(null), for (final value in HostTint.values) swatch(value)],
               ),
             ),
@@ -1877,7 +1894,7 @@ class _HostLook extends StatelessWidget {
           isExpanded: true,
           decoration: InputDecoration(labelText: t.hostOsLabel),
           items: [
-            DropdownMenuItem(value: null, child: Text(t.hostOsDetect)),
+            DropdownMenuItem(value: null, child: Text(ssh ? t.hostOsDetect : t.noneOption)),
             for (final value in HostOs.values)
               DropdownMenuItem(
                 value: value,

@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
+import 'form_section.dart';
 import 'proxy_editor.dart';
 
 /// Settings every host in a group inherits when it leaves them empty: the
@@ -106,6 +107,7 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
               children: [
                 Text(t.groupSettingsIntro, style: TextStyle(color: c.muted, height: 1.5)),
                 const SizedBox(height: 20),
+                FormSectionTitle(t.formSectionSignIn, first: true),
                 DropdownButtonFormField<String?>(
                   key: const ValueKey('groupIdentity'),
                   initialValue: widget.vault.identities.any((x) => x.id == _identityId) ? _identityId : null,
@@ -140,18 +142,7 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
                   ],
                   onChanged: (v) => setState(() => _keyId = v),
                 ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String?>(
-                  key: const ValueKey('groupSnippet'),
-                  initialValue: _snippetId,
-                  decoration: InputDecoration(labelText: t.startupSnippetLabel),
-                  items: [
-                    DropdownMenuItem(value: null, child: Text(t.noneOption)),
-                    for (final s in snippets) DropdownMenuItem(value: s.id, child: Text(s.name)),
-                  ],
-                  onChanged: (v) => setState(() => _snippetId = v),
-                ),
-                const SizedBox(height: 14),
+                FormSectionTitle(t.formSectionConnection),
                 DropdownButtonFormField<String?>(
                   key: const ValueKey('groupJumpHost'),
                   initialValue: _jumpHostId,
@@ -169,6 +160,17 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
                 ),
                 const SizedBox(height: 14),
                 ProxyField(vault: widget.vault, value: _proxyId, onChanged: (v) => setState(() => _proxyId = v)),
+                FormSectionTitle(t.formSectionTerminal),
+                DropdownButtonFormField<String?>(
+                  key: const ValueKey('groupSnippet'),
+                  initialValue: _snippetId,
+                  decoration: InputDecoration(labelText: t.startupSnippetLabel),
+                  items: [
+                    DropdownMenuItem(value: null, child: Text(t.noneOption)),
+                    for (final s in snippets) DropdownMenuItem(value: s.id, child: Text(s.name)),
+                  ],
+                  onChanged: (v) => setState(() => _snippetId = v),
+                ),
                 const SizedBox(height: 14),
                 TextFormField(
                   key: const ValueKey('groupEnv'),
@@ -187,21 +189,27 @@ class _GroupEditorPageState extends State<GroupEditorPage> {
                     alignLabelWithHint: true,
                   ),
                 ),
-                const SizedBox(height: 24),
-                FilledButton(key: const ValueKey('saveGroup'), onPressed: _save, child: Text(t.save)),
-                if (_existing != null) ...[
-                  const SizedBox(height: 8),
-                  TextButton(
-                    key: const ValueKey('clearGroup'),
-                    style: TextButton.styleFrom(foregroundColor: c.danger),
-                    onPressed: _clear,
-                    child: Text(t.clearGroupSettings),
-                  ),
-                ],
               ],
             ),
           ),
         ),
+      ),
+      bottomNavigationBar: FormFooter(
+        children: [
+          if (_existing != null)
+            TextButton(
+              key: const ValueKey('clearGroup'),
+              style: TextButton.styleFrom(foregroundColor: c.danger),
+              onPressed: _clear,
+              child: Text(t.clearGroupSettings),
+            ),
+          FilledButton.icon(
+            key: const ValueKey('saveGroup'),
+            onPressed: _save,
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: Text(t.save),
+          ),
+        ],
       ),
     );
   }

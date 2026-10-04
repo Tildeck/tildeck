@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
+import 'item_card.dart';
 import 'keys_page.dart' show showKeyEditor, showKeyGenerator;
 
 /// Who to sign in as, saved once for many hosts: a username with a key or a
@@ -51,40 +52,39 @@ class IdentitiesPage extends StatelessWidget {
               ),
             );
           }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-            itemCount: identities.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, i) {
-              final identity = identities[i];
-              final users = vault.hosts.where((h) => h.identityId == identity.id).length;
-              return Card(
-                margin: EdgeInsets.zero,
-                child: ListTile(
-                  key: ValueKey('identity-${identity.name}'),
-                  leading: Icon(Icons.badge_outlined, color: c.brand),
-                  title: Text(identity.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text(
-                    '${identityCredentials(t, vault, identity)} · ${t.identityHostCount(users)}',
-                    style: TextStyle(color: c.muted),
-                  ),
-                  onTap: () => showIdentityEditor(context, vault, identity: identity),
-                  trailing: IconButton(
-                    key: ValueKey('deleteIdentity-${identity.name}'),
-                    tooltip: t.deleteAction,
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () {
-                      if (vault.hosts.any((h) => h.identityId == identity.id) ||
-                          vault.groups.any((g) => g.identityId == identity.id)) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.identityInUse)));
-                        return;
-                      }
-                      vault.delete(identity.id);
-                    },
-                  ),
-                ),
-              );
-            },
+          return ListView(
+            padding: listPadding(context),
+            children: [
+              ItemGrid(
+                children: [
+                  for (final identity in identities)
+                    ItemCard(
+                      tapKey: ValueKey('identity-${identity.name}'),
+                      icon: Icons.badge_outlined,
+                      title: identity.name,
+                      subtitle: Text(
+                        '${identityCredentials(t, vault, identity)} · ${t.identityHostCount(vault.hosts.where((h) => h.identityId == identity.id).length)}',
+                      ),
+                      onTap: () => showIdentityEditor(context, vault, identity: identity),
+                      trailing: IconButton(
+                        key: ValueKey('deleteIdentity-${identity.name}'),
+                        tooltip: t.deleteAction,
+                        iconSize: 19,
+                        color: c.muted,
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () {
+                          if (vault.hosts.any((h) => h.identityId == identity.id) ||
+                              vault.groups.any((g) => g.identityId == identity.id)) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.identityInUse)));
+                            return;
+                          }
+                          vault.delete(identity.id);
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ],
           );
         },
       ),

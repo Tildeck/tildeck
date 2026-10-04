@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import '../vault/models.dart';
 import '../vault/vault.dart';
+import 'item_card.dart';
 
 /// The servers whose keys this vault trusts, with their fingerprints.
 /// Removing one makes the next connection ask again, as for a new server.
@@ -47,7 +48,7 @@ class _KnownHostsPageState extends State<KnownHostsPage> {
           final query = _query.trim().toLowerCase();
           final shown = query.isEmpty ? all : all.where((e) => _address(e).toLowerCase().contains(query)).toList();
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: listPadding(context),
             children: [
               Text(t.knownHostsIntro, style: TextStyle(color: c.muted, height: 1.45)),
               const SizedBox(height: 14),
@@ -69,33 +70,33 @@ class _KnownHostsPageState extends State<KnownHostsPage> {
                     style: TextStyle(color: c.muted),
                   ),
                 ),
-              for (final e in shown)
-                Card.outlined(
-                  key: ValueKey('knownHost-${_address(e)}'),
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: Icon(Icons.verified_user_outlined, color: c.brand),
-                    title: Text(
-                      _address(e),
-                      textDirection: TextDirection.ltr,
-                      textAlign: ltrStart,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+              ItemGrid(
+                minWidth: 420,
+                children: [
+                  for (final e in shown)
+                    ItemCard(
+                      key: ValueKey('knownHost-${_address(e)}'),
+                      icon: Icons.verified_user_outlined,
+                      title: _address(e),
+                      latinTitle: true,
+                      // The whole fingerprint: it is what is compared.
+                      subtitle: Text(
+                        '${e.keyType}\n${e.fingerprint}',
+                        textDirection: TextDirection.ltr,
+                        textAlign: ltrStart,
+                        style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11.5, height: 1.4),
+                      ),
+                      trailing: IconButton(
+                        key: ValueKey('forget-${_address(e)}'),
+                        tooltip: t.forgetKnownHost,
+                        iconSize: 19,
+                        color: c.muted,
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => _remove(e),
+                      ),
                     ),
-                    // The whole fingerprint: it is what is compared.
-                    subtitle: Text(
-                      '${e.keyType}\n${e.fingerprint}',
-                      textDirection: TextDirection.ltr,
-                      textAlign: ltrStart,
-                      style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11.5, height: 1.4),
-                    ),
-                    trailing: IconButton(
-                      key: ValueKey('forget-${_address(e)}'),
-                      tooltip: t.forgetKnownHost,
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _remove(e),
-                    ),
-                  ),
-                ),
+                ],
+              ),
             ],
           );
         },
