@@ -15,8 +15,8 @@ from urllib.parse import urlparse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.accounts import is_email
 from app import audit, crypto
+from app.accounts import is_email
 from app.models import Setting
 
 logger = logging.getLogger("tildeck.settings")
