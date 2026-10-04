@@ -1060,5 +1060,17 @@
   "settingsLook": "Look",
   "paletteTildeck": "Tildeck",
   "paletteMidnight": "Midnight",
-  "paletteDaylight": "Daylight"
+  "paletteDaylight": "Daylight",
+  "hostLookLabel": "Icon and color",
+  "hostOsLabel": "System",
+  "hostOsDetect": "Detect on the next connection",
+  "tintNone": "No color",
+  "tintTeal": "Teal",
+  "tintBlue": "Blue",
+  "tintGreen": "Green",
+  "tintAmber": "Amber",
+  "tintOrange": "Orange",
+  "tintRed": "Red",
+  "tintPink": "Pink",
+  "tintSlate": "Slate"
 }

@@ -26,6 +26,8 @@ dependencies:
   intl: any
   # Generated from server/openapi.json by `scripts/local.sh contract`.
   path_provider: ^2.1.5
+  # Draws the systems' logos (lib/ui/os_logos.dart) from SVG path data.
+  path_parsing: ^1.1.0
   # Key generation (RSA) and fingerprints; dartssh2 already depends on it.
   pointycastle: ^4.0.0
   # QR codes for setting up two-factor sign-in in an authenticator app.
