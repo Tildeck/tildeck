@@ -6,6 +6,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Import PuTTY keys (.ppk, formats 2 and 3, with or without a passphrase), pasted or from a file; PuTTY sessions bring their unprotected .ppk keys too.
 - Transfers queue: at most two run at once in a files tab, the rest wait their turn and can be cancelled while waiting.
 - Keyword highlighting in the terminal: errors, warnings, and successes stand out in the output, with the words editable in Settings, Terminal.
 - Snippet variables: {{name}} in a snippet is asked for when it runs, here or on several hosts at once.

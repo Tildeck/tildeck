@@ -25,7 +25,7 @@
   "authPrivateKey": "Private key",
   "passwordLabel": "Password",
   "privateKeyLabel": "Private key",
-  "privateKeyHint": "Paste the whole key, including the BEGIN and END lines",
+  "privateKeyHint": "Paste the whole key, including the BEGIN and END lines, or a PuTTY .ppk file",
   "passphraseLabel": "Key passphrase, if it has one",
   "connectButton": "Connect",
   "fieldRequired": "Required",
@@ -1051,5 +1051,8 @@
     }
   },
   "dropPastePaths": "Drop to type the paths",
-  "dropNeedsSsh": "Files can be dropped on SSH and local terminals."
+  "dropNeedsSsh": "Files can be dropped on SSH and local terminals.",
+  "ppkPassphraseNeeded": "This PuTTY key is protected: enter its passphrase.",
+  "ppkWrongPassphrase": "The passphrase does not open this PuTTY key.",
+  "ppkUnsupported": "Tildeck cannot use this kind of PuTTY key. Use RSA, Ed25519, or ECDSA."
 }

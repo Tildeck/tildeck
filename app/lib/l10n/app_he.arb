@@ -22,7 +22,7 @@
   "authPrivateKey": "מפתח פרטי",
   "passwordLabel": "סיסמה",
   "privateKeyLabel": "מפתח פרטי",
-  "privateKeyHint": "צריך להדביק את כל המפתח, כולל שורות ה-BEGIN וה-END",
+  "privateKeyHint": "צריך להדביק את כל המפתח, כולל שורות ה-BEGIN וה-END, או קובץ .ppk של PuTTY",
   "passphraseLabel": "סיסמת המפתח, אם יש לו",
   "connectButton": "התחברות",
   "fieldRequired": "שדה חובה",
@@ -566,5 +566,8 @@
   "broadcastOn": "ההקלדה נשלחת לכל {count} הטרמינלים",
   "dropUploadTo": "שחררו כדי להעלות אל {host}",
   "dropPastePaths": "שחררו כדי להקליד את הנתיבים",
-  "dropNeedsSsh": "אפשר לגרור קבצים לטרמינלים של SSH ולטרמינלים מקומיים."
+  "dropNeedsSsh": "אפשר לגרור קבצים לטרמינלים של SSH ולטרמינלים מקומיים.",
+  "ppkPassphraseNeeded": "מפתח ה-PuTTY הזה מוגן: צריך להזין את ה-passphrase שלו.",
+  "ppkWrongPassphrase": "ה-passphrase לא פותח את מפתח ה-PuTTY הזה.",
+  "ppkUnsupported": "Tildeck לא יכול להשתמש בסוג הזה של מפתח PuTTY. אפשר להשתמש ב-RSA, Ed25519 או ECDSA."
 }

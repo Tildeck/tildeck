@@ -85,6 +85,26 @@ void main() {
     });
     tearDown(() => dir.delete(recursive: true));
 
+    test("a PuTTY session's .ppk key comes in when it has no passphrase", () async {
+      final plain = File('test/fixtures/ppk/ed25519-v3-plain.ppk').readAsStringSync();
+      final locked = File('test/fixtures/ppk/rsa-v2-encrypted.ppk').readAsStringSync();
+      final result = await importSshHosts(
+        vault,
+        [
+          SshConfigHost(alias: 'router', hostName: '10.0.0.1', user: 'admin', identityFiles: [r'C:\keys\work.ppk']),
+          SshConfigHost(alias: 'vault', hostName: '10.0.0.2', user: 'admin', identityFiles: [r'C:\keys\locked.ppk']),
+        ],
+        readFile: (path) async => path.endsWith('work.ppk') ? plain : locked,
+        defaultUser: 'local',
+      );
+      expect((result.hosts, result.keys), (2, 1));
+      expect(result.unreadableKeys, [r'C:\keys\locked.ppk'], reason: 'a passphrase is asked on the Keys page');
+      final key = vault.keys.single;
+      expect(key.fingerprint, File('test/fixtures/ppk/ed25519-v3-plain.fp').readAsStringSync().trim().split(' ').last);
+      expect(key.privateKey, startsWith('-----BEGIN OPENSSH PRIVATE KEY-----'), reason: 'kept in OpenSSH form');
+      expect(vault.hosts.firstWhere((h) => h.name == 'router').keyId, key.id);
+    });
+
     test('hosts with their keys and jump hosts; an unreadable key leaves a password', () async {
       final read = <String>[];
       final result = await importSshHosts(
