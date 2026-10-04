@@ -9,6 +9,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tildeck/ssh/autocomplete.dart';
+import 'package:tildeck/ssh/host_os.dart';
 import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/ssh/terminal_session.dart';
@@ -179,6 +180,20 @@ void main() {
         '\r',
       );
       await _until(() => session.terminal.buffer.getText().contains('term=vt220\n'));
+      session.disconnect();
+    });
+
+    test("the server's system is read once, beside the shell, for the host's mark", () async {
+      final found = <HostOs>[];
+      final session = TerminalSession(target(pass: password))..onOsDetected = found.add;
+      addTearDown(session.dispose);
+      session.terminal.resize(100, 30);
+      unawaited(session.start(SshConnector(knownHosts: MemoryKnownHosts()), PromptLog().call));
+      await _until(() => found.isNotEmpty);
+      // The test server is linuxserver/openssh-server, built on Alpine.
+      expect(found, [HostOs.alpine]);
+      expect(session.os, HostOs.alpine);
+      expect(session.terminal.buffer.getText(), isNot(contains('os-release')), reason: 'nothing typed in the shell');
       session.disconnect();
     });
 
