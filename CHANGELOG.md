@@ -29,7 +29,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - Split view shows every open terminal at once, up to 16, in a grid.
 - Drop files on a terminal: on SSH they upload to the server's home folder, shown in a files tab; on a local terminal their paths are typed.
 - Sessions reconnect on their own when the connection drops: a few times, each after a longer wait, counted down with a cancel; on by default, in Settings, Terminal.
-- Import hosts from a CSV (Termius's export, a spreadsheet) or from PuTTY's saved sessions on Windows, and export the hosts as CSV, without passwords or keys.
+- Import hosts from a CSV (a spreadsheet or another tool's export) or from PuTTY's saved sessions on Windows, and export the hosts as CSV, without passwords or keys.
 - Files: copy files and folders from one server to another saved server, through this device, from an entry's menu.
 - Host notes, shown on the host and found by search; and opening every host in a folder at once.
 - Terminal settings: the font (JetBrains Mono or the system's monospace fonts), line height, cursor shape, what the bell does (flash, sound, or nothing), how many lines are kept above the screen, and copying on select.
