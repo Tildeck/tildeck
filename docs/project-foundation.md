@@ -744,7 +744,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 
 ### Importing from CSV and PuTTY, exporting CSV (2026-10-02)
 
-- Holiday plan, wave 4. The import dialog takes a chosen file as a hosts CSV when its header names a host column (Termius's export, a spreadsheet: name or label, host or Hostname/IP, port, user, group or folder, tags, protocol), and as an SSH configuration otherwise; on Windows it also reads PuTTY's saved sessions (`reg query HKCU\Software\SimonTatham\PuTTY\Sessions /s`: names decoded, "user@host" split, Default Settings and serial lines left out, a key file listed; a .ppk key without a passphrase comes in with its host, one with a passphrase is added on the Keys page).
+- Holiday plan, wave 4. The import dialog takes a chosen file as a hosts CSV when its header names a host column (a spreadsheet or another tool's CSV export: name or label, host or Hostname/IP, port, user, group or folder, tags, protocol), and as an SSH configuration otherwise; on Windows it also reads PuTTY's saved sessions (`reg query HKCU\Software\SimonTatham\PuTTY\Sessions /s`: names decoded, "user@host" split, Default Settings and serial lines left out, a key file listed; a .ppk key without a passphrase comes in with its host, one with a passphrase is added on the Keys page).
 - The same list, choices, and saving serve every source; a CSV row brings its folder, tags, and Telnet, and the same name twice gets a number. The dialog exports the vault's hosts as CSV (name, host, port, user, folder, tags, protocol), never passwords, keys, or identities.
 - Tests: CSV quoting; other tools' headers, a row without a host, duplicate names; an export read back the same without its password; PuTTY's registry output.
 

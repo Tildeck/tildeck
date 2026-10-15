@@ -104,8 +104,8 @@ class _ImportHostsState extends State<_ImportHosts> {
 
   void _show(String? text, {required _From from}) {
     if (!mounted) return;
-    // A picked file is MobaXterm's sessions, a hosts CSV (Termius's export,
-    // a spreadsheet), or an SSH configuration.
+    // A picked file is MobaXterm's sessions, a hosts CSV (a spreadsheet or
+    // another tool's export), or an SSH configuration.
     final hosts = text == null
         ? null
         : switch (from) {

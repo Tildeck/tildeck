@@ -1,8 +1,8 @@
 import '../ssh/ssh_config.dart';
 import 'models.dart';
 
-/// Hosts as CSV, for moving them in and out of other tools: Termius's
-/// export, a spreadsheet. No passwords or keys go out.
+/// Hosts as CSV, for moving them in and out of a spreadsheet or another
+/// tool's CSV export. No passwords or keys go out.
 const _columns = ['name', 'host', 'port', 'username', 'group', 'tags', 'protocol'];
 
 /// The header names other tools use, mapped to ours.
