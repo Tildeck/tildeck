@@ -11,6 +11,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 Future<bool> _trust({
   required ConnectionTarget target,
   required KnownHost presented,
@@ -27,12 +29,12 @@ Future<void> _until(bool Function() condition) async {
 
 void main() {
   test('a host keeps its terminal type and charset, and the connection takes them', () async {
-    const host = HostEntry(
+    final host = HostEntry(
       id: 'h',
       name: 'Old switch',
       host: '10.0.0.2',
       username: 'admin',
-      password: 'pw',
+      password: testSecret(),
       terminalType: 'vt100',
       charset: TerminalCharset.latin1,
     );
@@ -53,9 +55,11 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
-      await v.put(const HostEntry(id: 'a', name: 'A', host: 'a', username: 'u', password: 'pw', terminalType: 'vt220'));
-      await v.put(const HostEntry(id: 'b', name: 'B', host: 'b', username: 'u', password: 'pw'));
+      await v.create(testSecret());
+      await v.put(
+        HostEntry(id: 'a', name: 'A', host: 'a', username: 'u', password: testSecret(), terminalType: 'vt220'),
+      );
+      await v.put(HostEntry(id: 'b', name: 'B', host: 'b', username: 'u', password: testSecret()));
       return v;
     }))!;
     late BuildContext context;

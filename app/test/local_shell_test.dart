@@ -11,6 +11,8 @@ import 'package:tildeck/ui/hosts_page.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   group('shells on Windows', () {
     List<LocalShell> find(Map<String, String> env, Set<String> files) =>
@@ -62,7 +64,7 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       return v;
     }))!;
     Widget page(List<LocalShell>? shells, void Function(ConnectionTarget) onConnect) => MaterialApp(

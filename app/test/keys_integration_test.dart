@@ -13,6 +13,8 @@ import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 final env = Platform.environment;
 final host = env['TILDECK_TEST_SSH_HOST'];
 final port = int.tryParse(env['TILDECK_TEST_SSH_PORT'] ?? '') ?? 2222;
@@ -83,14 +85,15 @@ void main() {
     test('an exported key with a passphrase opens with ssh-keygen', () async {
       final pem = generateEd25519(crypto.sodium, 'tildeck-export');
       final info = readKey(pem, comment: 'tildeck-export')!;
-      final file = exportKey(pem, newPassphrase: 'orange-kettle');
+      final passphrase = testSecret();
+      final file = exportKey(pem, newPassphrase: passphrase);
       final admin = await connect(pass: password);
       addTearDown(admin.close);
       final b64 = base64.encode(utf8.encode(file));
       final opened = await run(
         admin,
         'echo $b64 | base64 -d > /tmp/exported && chmod 600 /tmp/exported && '
-        'ssh-keygen -y -P orange-kettle -f /tmp/exported',
+        "ssh-keygen -y -P '$passphrase' -f /tmp/exported",
       );
       expect(opened.split(' ').take(2).join(' '), info.publicKey.split(' ').take(2).join(' '));
       final refused = await run(admin, 'ssh-keygen -y -P wrong -f /tmp/exported 2>&1; echo exit:\$?');

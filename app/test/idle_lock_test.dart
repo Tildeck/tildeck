@@ -11,6 +11,8 @@ import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   testWidgets('typing into a terminal keeps the vault open; idling locks it', (tester) async {
     final dir = (await tester.runAsync(() => Directory.systemTemp.createTemp('tildeck-idle')))!;
@@ -18,7 +20,7 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       return v;
     }))!;
 

@@ -19,8 +19,9 @@ import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
 import 'fake_sync_server.dart';
+import 'test_secrets.dart';
 
-const password = 'orange-kettle-winter-42';
+final password = testSecret();
 
 Widget app(Widget home) => MaterialApp(
   theme: buildTheme(Brightness.light),

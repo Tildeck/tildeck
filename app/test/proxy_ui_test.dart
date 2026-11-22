@@ -11,6 +11,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 /// Real file work finishes outside the fake clock.
 Future<void> waitFor(WidgetTester tester, bool Function() done) async {
   for (var i = 0; i < 1000 && !done(); i++) {
@@ -30,8 +32,8 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
-      await v.put(const HostEntry(id: 'h1', name: 'Web', host: 'web.example.com', username: 'ops', password: 'pw'));
+      await v.create(testSecret());
+      await v.put(HostEntry(id: 'h1', name: 'Web', host: 'web.example.com', username: 'ops', password: testSecret()));
       return v;
     }))!;
     await tester.pumpWidget(

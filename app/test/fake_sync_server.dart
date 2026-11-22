@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'test_secrets.dart';
+
 /// The server's account and sync API (server/app/routers/account.py and
 /// sync.py), in memory, for tests of the client: exactly-next versions,
 /// account revisions, conflicts with the current record, tombstones,
@@ -10,14 +12,21 @@ import 'package:http/testing.dart';
 /// the server's own behavior is covered by server/tests against PostgreSQL,
 /// and this must follow it when that changes.
 class FakeSyncServer {
-  FakeSyncServer({this.pullLimit = 1000});
+  FakeSyncServer({this.pullLimit = 1000}) {
+    tokens.addAll([tokenA, tokenB]);
+  }
 
   int pullLimit;
   int revision = 0;
   final records = <String, Map<String, dynamic>>{};
 
+  /// Two device tokens the server takes from the start, new for each
+  /// server.
+  final tokenA = testSecret();
+  final tokenB = testSecret();
+
   /// Valid device tokens.
-  final tokens = <String>{'token-a', 'token-b'};
+  final tokens = <String>{};
 
   /// Refuse sync with this error code (403 `email_not_verified`, say).
   String? refuse;
@@ -37,7 +46,10 @@ class FakeSyncServer {
   /// Two-factor sign-in: when on, requests that prove a key need [totpCode]
   /// too (the one code the fake accepts, every time).
   bool totpEnabled = false;
-  String totpCode = '123456';
+  String totpCode = testCode();
+
+  /// The TOTP secret the server hands out when two-factor sign-in starts.
+  final totpSecret = testTotpSecret();
 
   http.Response? _secondFactor(Map<String, dynamic> body, String wrong) {
     if (!totpEnabled) return null;
@@ -126,8 +138,8 @@ class FakeSyncServer {
     if (request.method == 'POST' && path == '/api/account/totp/start') {
       if (totpEnabled) return _error(409, 'totp_already_enabled');
       return _json({
-        'secret': 'JBSWY3DPEHPK3PXP',
-        'uri': 'otpauth://totp/Tildeck:user%40example.test?secret=JBSWY3DPEHPK3PXP&issuer=Tildeck',
+        'secret': totpSecret,
+        'uri': 'otpauth://totp/Tildeck:user%40example.test?secret=$totpSecret&issuer=Tildeck',
         'qr_image': 'data:image/svg+xml;base64,',
       });
     }
@@ -184,8 +196,8 @@ class FakeSyncServer {
       'id': id,
       'name': name,
       'status': status,
-      'token': 'token-${devices.length + 1}-$id',
-      'claim': 'claim-$id',
+      'token': testSecret(),
+      'claim': testSecret(),
     };
     if (status == 'active') tokens.add(device['token'] as String);
     return devices[id] = device;

@@ -11,6 +11,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   test('notes are kept, searched, and empty on a host from before', () {
     const host = HostEntry(id: 'h', name: 'Db', host: 'db', username: 'ops', notes: 'Ask Dana before restarting');
@@ -28,9 +30,11 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/v.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       for (final (id, group) in [('a', 'Prod'), ('b', 'Prod/Web'), ('c', 'Dev')]) {
-        await v.put(HostEntry(id: id, name: id, group: group, host: '$id.example.com', username: 'ops', password: 'x'));
+        await v.put(
+          HostEntry(id: id, name: id, group: group, host: '$id.example.com', username: 'ops', password: testSecret()),
+        );
       }
       return v;
     }))!;

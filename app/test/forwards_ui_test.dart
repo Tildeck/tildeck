@@ -11,6 +11,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 Widget page(Vault vault, ForwardManager manager) => MaterialApp(
   theme: buildTheme(Brightness.light),
   localizationsDelegates: const [
@@ -60,7 +62,7 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       await v.put(const HostEntry(id: 'h1', name: 'Web 01', host: 'web.example.com', username: 'deploy'));
       return v;
     }))!;

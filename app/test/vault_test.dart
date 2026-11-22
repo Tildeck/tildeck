@@ -11,7 +11,9 @@ import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
-const password = 'orange-kettle-winter-42';
+import 'test_secrets.dart';
+
+final password = testSecret();
 
 late Directory dir;
 File get vaultFile => File('${dir.path}/vault.json');
@@ -31,19 +33,21 @@ Future<Vault> reopen() async {
   return vault;
 }
 
-const host = HostEntry(
+final host = HostEntry(
   id: 'host-1',
   name: 'Production web',
   group: 'Production',
   host: 'prod-web-01.example.com',
   username: 'deploy',
-  password: 'a-saved-ssh-password',
+  password: testSecret(),
 );
 
-const key = KeyEntry(
+/// The private key's material, new for each run, in an OpenSSH frame.
+final keyMaterial = testSecret();
+final key = KeyEntry(
   id: 'key-1',
   name: 'Laptop',
-  privateKey: '-----BEGIN OPENSSH PRIVATE KEY-----\nsecret-key-material\n-----END OPENSSH PRIVATE KEY-----',
+  privateKey: '-----BEGIN OPENSSH PRIVATE KEY-----\n$keyMaterial\n-----END OPENSSH PRIVATE KEY-----',
 );
 
 Map<String, dynamic> readFile() => jsonDecode(vaultFile.readAsStringSync()) as Map<String, dynamic>;
@@ -86,8 +90,8 @@ void main() {
     expect(again.status, VaultStatus.locked);
     expect(await again.unlock(password), isTrue);
     expect(again.hosts.single.host, host.host);
-    expect(again.hosts.single.password, host.password);
-    expect(again.keys.single.privateKey, key.privateKey);
+    expect(again.hosts.single.password == host.password, isTrue, reason: 'the saved password');
+    expect(again.keys.single.privateKey == key.privateKey, isTrue, reason: 'the private key');
   });
 
   test('adopting a synced vault never replaces a vault that is here', () async {
@@ -105,12 +109,12 @@ void main() {
         kdf: first.kdf,
         wrapPw: first.wrapPw,
         vaultKey: vaultKey,
-        account: const SyncAccount(
+        account: SyncAccount(
           server: 'https://s.example.test',
           email: 'e@example.test',
           deviceId: 'd',
           deviceName: 'n',
-          token: 't',
+          token: testSecret(),
         ),
       ),
       throwsStateError,
@@ -125,19 +129,20 @@ void main() {
     await vault.put(host);
     await vault.put(key);
     final stored = vaultFile.readAsStringSync();
-    for (final secret in [
-      password,
-      host.name,
-      host.group,
-      host.host,
-      host.username,
-      host.password!,
-      key.name,
-      'secret-key-material',
-      'BEGIN OPENSSH',
-      'deploy',
+    // Named by field: a value in a failure message would print a secret.
+    for (final (field, value) in [
+      ('the master password', password),
+      ('the host name', host.name),
+      ('the group', host.group),
+      ('the address', host.host),
+      ('the username', host.username),
+      ('the saved password', host.password!),
+      ('the key name', key.name),
+      ('the private key', keyMaterial),
+      ('the key frame', 'BEGIN OPENSSH'),
+      ('the username', 'deploy'),
     ]) {
-      expect(stored.contains(secret), isFalse, reason: '"$secret" must not appear in the vault file');
+      expect(stored.contains(value), isFalse, reason: '$field must not appear in the vault file');
     }
   });
 

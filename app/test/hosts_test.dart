@@ -7,6 +7,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 const web = HostEntry(
   id: 'h1',
   name: 'Web 01',
@@ -41,11 +43,12 @@ void main() {
   testWidgets('a host leaves fields empty and takes its group settings', (tester) async {
     final dir = (await tester.runAsync(() => Directory.systemTemp.createTemp('tildeck-hosts')))!;
     addTearDown(() => dir.delete(recursive: true));
+    final keyMaterial = testSecret();
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
-      await v.put(const KeyEntry(id: 'k1', name: 'Ops key', privateKey: 'KEY-MATERIAL'));
+      await v.create(testSecret());
+      await v.put(KeyEntry(id: 'k1', name: 'Ops key', privateKey: keyMaterial));
       await v.put(const SnippetEntry(id: 's1', name: 'Hello', command: 'echo hi'));
       await v.put(
         const GroupEntry(
@@ -82,7 +85,7 @@ void main() {
     );
     final target = (await connectionTargetFor(context, vault, bare))!;
     expect(target.username, 'ops');
-    expect(target.privateKey, 'KEY-MATERIAL');
+    expect(target.privateKey == keyMaterial, isTrue, reason: "the group's key");
     expect(target.startupCommand, 'echo hi');
     expect(target.environment, {'LANG': 'he_IL.UTF-8', 'TEAM': 'infra'}, reason: "the host's own value wins");
 
@@ -101,20 +104,28 @@ void main() {
   testWidgets('a host connects through its jump host or the group one, and loops end the chain', (tester) async {
     final dir = (await tester.runAsync(() => Directory.systemTemp.createTemp('tildeck-jump')))!;
     addTearDown(() => dir.delete(recursive: true));
-    const bastion = HostEntry(
+    final bastionPassword = testSecret();
+    final bastion = HostEntry(
       id: 'b',
       name: 'Bastion',
       group: 'Production',
       host: 'bastion.example.com',
       username: 'jump',
-      password: 'bastion-pw',
+      password: bastionPassword,
     );
-    const edge = HostEntry(id: 'e', name: 'Edge', host: 'edge.example.com', username: 'edge', password: 'edge-pw');
-    const db = HostEntry(id: 'd', name: 'Db', group: 'Production', host: '10.0.0.5', username: 'pg', password: 'db-pw');
+    final edge = HostEntry(id: 'e', name: 'Edge', host: 'edge.example.com', username: 'edge', password: testSecret());
+    final db = HostEntry(
+      id: 'd',
+      name: 'Db',
+      group: 'Production',
+      host: '10.0.0.5',
+      username: 'pg',
+      password: testSecret(),
+    );
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       for (final h in [bastion, edge, db]) {
         await v.put(h);
       }
@@ -139,13 +150,22 @@ void main() {
     final target = (await connectionTargetFor(context, vault, db))!;
     expect(target.host, '10.0.0.5');
     expect(target.jump?.host, 'bastion.example.com');
-    expect(target.jump?.password, 'bastion-pw');
+    expect(target.jump?.password == bastionPassword, isTrue, reason: "the jump host's password");
     expect(target.jump?.jump, isNull);
     expect(target.agentKeys, isNull, reason: 'agent forwarding is off unless chosen');
     await tester.runAsync(() => vault.put(HostEntry.fromJson('d', {...db.dataJson(), 'agent_forwarding': true})));
-    await tester.runAsync(() => vault.put(const KeyEntry(id: 'k', name: 'Git', privateKey: 'PEM', passphrase: 'pp')));
+    final (agentKey, agentPassphrase) = (testSecret(), testSecret());
+    await tester.runAsync(
+      () => vault.put(KeyEntry(id: 'k', name: 'Git', privateKey: agentKey, passphrase: agentPassphrase)),
+    );
     final agent = (await connectionTargetFor(context, vault, vault.entry<HostEntry>('d')!))!;
-    expect(agent.agentKeys, [(privateKey: 'PEM', passphrase: 'pp')]);
+    expect(
+      agent.agentKeys?.length == 1 &&
+          agent.agentKeys!.single.privateKey == agentKey &&
+          agent.agentKeys!.single.passphrase == agentPassphrase,
+      isTrue,
+      reason: 'the key and its passphrase go to the agent',
+    );
     expect(agent.jump?.agentKeys, isNull, reason: 'only the host that asked for it');
 
     // A chain: the bastion is reached through the edge.

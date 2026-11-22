@@ -20,8 +20,9 @@ import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
 import 'fake_sync_server.dart';
+import 'test_secrets.dart';
 
-const password = 'orange-kettle-winter-42';
+final password = testSecret();
 
 void main() {
   late Directory dir;
@@ -96,13 +97,13 @@ void main() {
     await waitFor(tester, () => shown(find.byKey(const ValueKey('totpCode'))), 'the code question');
 
     // A wrong code is refused like a wrong password.
-    await tester.enterText(find.byKey(const ValueKey('totpCode')), '999999');
+    await tester.enterText(find.byKey(const ValueKey('totpCode')), otherCode(server.totpCode));
     await tester.tap(find.byKey(const ValueKey('totpCodeContinue')));
     await waitFor(tester, () => shown(find.byKey(const ValueKey('syncError'))), 'the error');
 
     await tester.tap(find.byKey(const ValueKey('syncSignIn')));
     await waitFor(tester, () => shown(find.byKey(const ValueKey('totpCode'))), 'the code question again');
-    await tester.enterText(find.byKey(const ValueKey('totpCode')), '123 456');
+    await tester.enterText(find.byKey(const ValueKey('totpCode')), spaced(server.totpCode));
     await tester.tap(find.byKey(const ValueKey('totpCodeContinue')));
     await waitFor(tester, () => shown(find.text('Approve this device')), 'the approval screen');
   });
@@ -125,12 +126,12 @@ void main() {
     );
     await tester.runAsync(
       () => vault.setAccount(
-        const SyncAccount(
+        SyncAccount(
           server: 'https://sync.example.test',
           email: 'user@example.test',
           deviceId: 'device-a',
           deviceName: 'Laptop',
-          token: 'token-a',
+          token: server.tokenA,
         ),
       ),
     );
@@ -158,19 +159,19 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('totpTurnOn')));
     await waitFor(tester, () => shown(find.byKey(const ValueKey('totpQr'))), 'the QR code');
-    expect(find.text('JBSWY3DPEHPK3PXP'), findsOneWidget);
-    await tester.enterText(find.byKey(const ValueKey('totpCode')), '000000');
+    expect(find.text(server.totpSecret).evaluate().length == 1, isTrue, reason: 'the secret is shown once');
+    await tester.enterText(find.byKey(const ValueKey('totpCode')), otherCode(server.totpCode));
     await tester.tap(find.byKey(const ValueKey('totpConfirm')));
     await waitFor(tester, () => shown(find.byKey(const ValueKey('totpSetupError'))), 'the wrong code');
     expect(server.totpEnabled, isFalse);
-    await tester.enterText(find.byKey(const ValueKey('totpCode')), '123456');
+    await tester.enterText(find.byKey(const ValueKey('totpCode')), server.totpCode);
     await tester.tap(find.byKey(const ValueKey('totpConfirm')));
     await waitFor(tester, () => shown(find.byKey(const ValueKey('totpOn'))), 'on');
     expect(server.totpEnabled, isTrue);
 
     await tester.tap(find.byKey(const ValueKey('totpTurnOff')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('totpCode')), '123456');
+    await tester.enterText(find.byKey(const ValueKey('totpCode')), server.totpCode);
     await tester.tap(find.byKey(const ValueKey('totpCodeContinue')));
     await waitFor(tester, () => shown(find.byKey(const ValueKey('totpTurnOn'))), 'off');
     expect(server.totpEnabled, isFalse);

@@ -13,6 +13,8 @@ import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   testWidgets('the split view holds the terminals put there, sized and arranged by dragging', (tester) async {
     tester.view.physicalSize = const Size(2400, 1000);
@@ -23,11 +25,13 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       // Nothing listens on port 1: each session ends at once, which is all a
       // layout needs.
       for (final name in ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon']) {
-        await v.put(HostEntry(id: v.newId(), name: name, host: '127.0.0.1', port: 1, username: 'ops', password: 'x'));
+        await v.put(
+          HostEntry(id: v.newId(), name: name, host: '127.0.0.1', port: 1, username: 'ops', password: testSecret()),
+        );
       }
       return v;
     }))!;

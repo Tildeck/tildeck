@@ -13,8 +13,10 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
-const password = 'orange-kettle-winter-42';
-const other = 'lantern-river-autumn-77';
+import 'test_secrets.dart';
+
+final password = testSecret();
+final other = testSecret();
 
 /// Downloads into a folder, and hands back the file written last when a file
 /// is picked.
@@ -60,23 +62,25 @@ void main() {
 
   test('a backup opens with its master password into another vault, adding only what is new', () async {
     final a = await vaultNamed('a', password);
+    final keyMaterial = testSecret();
+    final token = testSecret();
     await a.put(const HostEntry(id: 'h1', name: 'Database', host: 'db.example.com', username: 'ops'));
-    await a.put(const KeyEntry(id: 'k1', name: 'Ops key', privateKey: 'KEY-MATERIAL'));
+    await a.put(KeyEntry(id: 'k1', name: 'Ops key', privateKey: keyMaterial));
     await a.put(const HostEntry(id: 'h2', name: 'Gone', host: 'gone.example.com', username: 'x'));
     await a.delete('h2');
     await a.setAccount(
-      const SyncAccount(
+      SyncAccount(
         server: 'https://s.example.test',
         email: 'e@example.test',
         deviceId: 'd',
         deviceName: 'n',
-        token: 'SECRET-TOKEN',
+        token: token,
       ),
     );
     final text = exportBackup(a);
-    expect(text, isNot(contains('SECRET-TOKEN')));
+    expect(text.contains(token), isFalse, reason: 'the device token');
     expect(text, isNot(contains('db.example.com')), reason: 'records stay encrypted');
-    expect(text, isNot(contains('KEY-MATERIAL')));
+    expect(text.contains(keyMaterial), isFalse, reason: 'the private key');
     expect((jsonDecode(text) as Map).containsKey('account'), isFalse);
 
     final crypto = await VaultCrypto.load();
@@ -92,7 +96,7 @@ void main() {
     final result = await importBackup(b, entries);
     expect((result.added, result.kept), (1, 1));
     expect(b.entry<HostEntry>('h1')!.name, 'Database (newer here)', reason: 'nothing here is overwritten');
-    expect(b.entry<KeyEntry>('k1')!.privateKey, 'KEY-MATERIAL');
+    expect(b.entry<KeyEntry>('k1')!.privateKey == keyMaterial, isTrue, reason: 'the private key');
   });
 
   test('a file that is not a backup, or from a newer version, is refused', () async {

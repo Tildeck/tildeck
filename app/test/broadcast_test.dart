@@ -8,6 +8,8 @@ import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/ssh/terminal_session.dart';
 
+import 'test_secrets.dart';
+
 /// A Telnet server that keeps what it is sent.
 class Device {
   late final ServerSocket server;
@@ -51,7 +53,7 @@ void main() {
         host: '127.0.0.1',
         port: d.server.port,
         username: '',
-        password: 'secret',
+        password: testSecret(),
         protocol: ConnectionProtocol.telnet,
       ),
     );

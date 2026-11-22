@@ -38,10 +38,19 @@ SSH_CONTAINER="tildeck-$RUN_ID-sshd"
 TELNET_CONTAINER="tildeck-$RUN_ID-telnetd"
 SERVER_TEST_IMAGE="tildeck-server:verify"
 SERVER_RUNTIME_IMAGE="tildeck-server:verify-runtime"
+# The label on this run's key-file volume and the containers that use it,
+# set once its random value exists, so cleanup finds only what this run made.
+KEYS_LABEL=""
 
 section() { printf '\n\033[1m== %s ==\033[0m\n' "$*"; }
 
 cleanup() {
+  # The labelled containers first (the key generator and the Flutter run of
+  # an interrupted run): the networks and the key volume below cannot go
+  # while a container still uses them.
+  if [[ -n "$KEYS_LABEL" ]]; then
+    docker ps -aq --filter "label=$KEYS_LABEL" | xargs -r docker rm -f -v >/dev/null 2>&1 || true
+  fi
   # -v: the postgres image declares a data volume; without it every run
   # would leave an anonymous volume behind.
   docker rm -f -v "$PG_CONTAINER" >/dev/null 2>&1 || true
@@ -49,6 +58,12 @@ cleanup() {
   docker rm -f -v "$SSH_CONTAINER" >/dev/null 2>&1 || true
   docker rm -f -v "$TELNET_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$SSH_NET" >/dev/null 2>&1 || true
+  if [[ -n "$KEYS_LABEL" ]]; then
+    docker volume ls -q --filter "label=$KEYS_LABEL" | xargs -r docker volume rm >/dev/null 2>&1 || true
+    if [[ -n "$(docker volume ls -q --filter "label=$KEYS_LABEL" 2>/dev/null)" ]]; then
+      warn "Could not remove this run's test key volume (label $KEYS_LABEL). Remove it with: docker volume rm \$(docker volume ls -q --filter label=$KEYS_LABEL)"
+    fi
+  fi
   rm -rf "${ROOT:?}/$CONTRACT_DIR"
 }
 trap cleanup EXIT
@@ -176,14 +191,16 @@ verify_image() {
 
 # A throwaway OpenSSH server for the client's SSH tests, with a password,
 # a plain Ed25519 key, and a passphrase-protected one. Everything it holds is
-# generated here for this run and removed with the container.
+# generated here for this run and removed with the container. The values
+# reach the containers through the environment of the docker client, never
+# on a command line.
 start_test_sshd() {
-  local password key_pass waited=0
-  password="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')"
-  key_pass="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')"
+  local password key_pass plain encrypted waited=0
+  password="$(random_hex 18)" || return 1
+  key_pass="$(random_hex 18)" || return 1
   docker network create "$SSH_NET" >/dev/null || return 1
-  docker run -d --name "$SSH_CONTAINER" --network "$SSH_NET" \
-    -e PUID=1000 -e PGID=1000 -e USER_NAME=tildeck -e "USER_PASSWORD=$password" -e PASSWORD_ACCESS=true \
+  USER_PASSWORD="$password" docker run -d --name "$SSH_CONTAINER" --network "$SSH_NET" \
+    -e PUID=1000 -e PGID=1000 -e USER_NAME=tildeck -e USER_PASSWORD -e PASSWORD_ACCESS=true \
     "$(toolchain_image openssh)" >/dev/null || return 1
   until docker exec "$SSH_CONTAINER" nc -z 127.0.0.1 2222 >/dev/null 2>&1; do
     sleep 1
@@ -196,7 +213,7 @@ start_test_sshd() {
   done
   # Keys are generated as the account's user, so authorized_keys has the
   # owner and mode sshd insists on.
-  docker exec -u tildeck -e "KEY_PASS=$key_pass" "$SSH_CONTAINER" sh -c '
+  KEY_PASS="$key_pass" docker exec -u tildeck -e KEY_PASS "$SSH_CONTAINER" sh -c '
     ssh-keygen -q -t ed25519 -N "" -f /tmp/plain &&
     ssh-keygen -q -t ed25519 -N "$KEY_PASS" -f /tmp/encrypted &&
     ssh-keygen -q -t ed25519 -N "" -f /tmp/ca &&
@@ -228,16 +245,25 @@ start_test_sshd() {
       return 1
     fi
   done
+  plain="$(docker exec "$SSH_CONTAINER" cat /tmp/plain)" || return 1
+  encrypted="$(docker exec "$SSH_CONTAINER" cat /tmp/encrypted)" || return 1
+  if [[ "$plain" != *"-----END OPENSSH PRIVATE KEY-----" || "$encrypted" != *"-----END OPENSSH PRIVATE KEY-----" ]]; then
+    err "The test SSH server's keys could not be read back whole."
+    return 1
+  fi
+  export TILDECK_TEST_SSH_PASSWORD="$password" TILDECK_TEST_SSH_KEY="$plain" \
+    TILDECK_TEST_SSH_KEY_ENCRYPTED="$encrypted" TILDECK_TEST_SSH_KEY_PASSPHRASE="$key_pass"
+  # This sets the Flutter options; the steps after it only add to them.
   FLUTTER_DOCKER_ARGS=(
     --network "$SSH_NET"
     -e TILDECK_REQUIRE_SSH_TESTS=1
     -e "TILDECK_TEST_SSH_HOST=$SSH_CONTAINER"
     -e TILDECK_TEST_SSH_PORT=2222
     -e TILDECK_TEST_SSH_USER=tildeck
-    -e "TILDECK_TEST_SSH_PASSWORD=$password"
-    -e "TILDECK_TEST_SSH_KEY=$(docker exec "$SSH_CONTAINER" cat /tmp/plain)"
-    -e "TILDECK_TEST_SSH_KEY_ENCRYPTED=$(docker exec "$SSH_CONTAINER" cat /tmp/encrypted)"
-    -e "TILDECK_TEST_SSH_KEY_PASSPHRASE=$key_pass"
+    -e TILDECK_TEST_SSH_PASSWORD
+    -e TILDECK_TEST_SSH_KEY
+    -e TILDECK_TEST_SSH_KEY_ENCRYPTED
+    -e TILDECK_TEST_SSH_KEY_PASSPHRASE
   )
 }
 
@@ -258,10 +284,83 @@ start_test_telnetd() {
   FLUTTER_DOCKER_ARGS+=(-e "TILDECK_TEST_TELNET_HOST=$TELNET_CONTAINER" -e TILDECK_TEST_TELNET_PORT=2323)
 }
 
+# Writes the key files the client's import tests read, made by puttygen for
+# this run, so the tests never check the client's own output against itself:
+# a PuTTY key file for each format the client reads (versions 2 and 3, plain
+# or encrypted, each Argon2 variant, RSA, DSA, ECDSA, Ed25519) with
+# puttygen's fingerprint of it, and a passphrase-protected OpenSSH key. The
+# Argon2 settings are fixed, so the cost does not depend on the machine.
+# Its first argument is the directory to write to, inside the generator
+# container. The passphrase comes in TILDECK_TEST_KEY_PASSPHRASE.
+# shellcheck disable=SC2016
+KEYGEN_SCRIPT='
+set -eu
+umask 077
+export DEBIAN_FRONTEND=noninteractive
+if ! apt-get update -qq --error-on=any >/dev/null \
+  || ! apt-get install -y -qq --no-install-recommends putty-tools >/dev/null; then
+  echo "Could not install putty-tools from the Debian mirrors." >&2
+  exit 1
+fi
+if ! puttygen --version | grep -qx "puttygen: Release 0.83"; then
+  echo "Expected puttygen 0.83, found: $(puttygen --version | head -n 1)" >&2
+  exit 1
+fi
+cd "$1"
+printf "%s" "$TILDECK_TEST_KEY_PASSPHRASE" >/tmp/passphrase
+: >/tmp/none
+argon="memory=8192,passes=21,parallelism=1"
+key() { # name, type, bits (or -), passphrase file, PPK parameters
+  if [ "$3" = - ]; then set -- "$1" "$2" "" "$4" "$5"; fi
+  puttygen -q -t "$2" ${3:+-b "$3"} -C "$1" --new-passphrase "$4" --ppk-param "$5" -o "$1.ppk"
+  puttygen -l -E sha256 "$1.ppk" | cut -d " " -f 1-3 >"$1.fp"
+}
+key ed25519-v3-plain ed25519 - /tmp/none version=3
+key ed25519-v3-argon2id ed25519 - /tmp/passphrase "version=3,kdf=argon2id,$argon"
+key ecdsa256-v3-plain ecdsa 256 /tmp/none version=3
+key ecdsa384-v3-argon2d ecdsa 384 /tmp/passphrase "version=3,kdf=argon2d,$argon"
+key rsa-v3-argon2i rsa 2048 /tmp/passphrase "version=3,kdf=argon2i,$argon"
+key rsa-v2-encrypted rsa 2048 /tmp/passphrase version=2
+key ed25519-v2-plain ed25519 - /tmp/none version=2
+key ecdsa521-v2-plain ecdsa 521 /tmp/none version=2
+key dsa-v3-plain dsa 1024 /tmp/none version=3
+key openssh-ed25519 ed25519 - /tmp/passphrase version=3
+puttygen openssh-ed25519.ppk --old-passphrase /tmp/passphrase --new-passphrase /tmp/passphrase \
+  -O private-openssh-new -o openssh-ed25519-encrypted
+rm openssh-ed25519.ppk
+mv openssh-ed25519.fp openssh-ed25519-encrypted.fp
+for f in *.ppk *.fp openssh-ed25519-encrypted; do test -s "$f"; done
+'
+
+make_test_key_files() {
+  local run_label passphrase volume
+  run_label="$(random_hex 16)" || return 1
+  passphrase="$(random_hex 24)" || return 1
+  KEYS_LABEL="tildeck.verify-run=$run_label"
+  volume="$(docker volume create --label "$KEYS_LABEL")" || return 1
+  if ! TILDECK_TEST_KEY_PASSPHRASE="$passphrase" docker run --rm --label "$KEYS_LABEL" \
+    -e TILDECK_TEST_KEY_PASSPHRASE -v "$volume:/keys" \
+    "$(toolchain_image keygen)" sh -c "$KEYGEN_SCRIPT" keygen /keys; then
+    err "The test key files could not be made."
+    return 1
+  fi
+  export TILDECK_TEST_KEY_PASSPHRASE="$passphrase"
+  FLUTTER_DOCKER_ARGS+=(
+    --label "$KEYS_LABEL"
+    -v "$volume:/keys:ro"
+    -e TILDECK_REQUIRE_KEY_FILE_TESTS=1
+    -e TILDECK_TEST_KEY_FILES=/keys
+    -e TILDECK_TEST_KEY_PASSPHRASE
+  )
+}
+
 verify_app() {
   section "app: throwaway OpenSSH and Telnet servers for the connection tests"
   start_test_sshd || return 1
   start_test_telnetd || return 1
+
+  section "app: one-time key files for the key import tests"
+  make_test_key_files || return 1
 
   section "app: format, analyze, tests and golden images, debug APK"
   # Formatting covers the code this repository owns; generated code (the API
@@ -281,6 +380,8 @@ verify_app() {
     flutter build apk --debug --build-name='"$(version)"'
   ' || return 1
   FLUTTER_DOCKER_ARGS=()
+  unset TILDECK_TEST_SSH_PASSWORD TILDECK_TEST_SSH_KEY TILDECK_TEST_SSH_KEY_ENCRYPTED \
+    TILDECK_TEST_SSH_KEY_PASSPHRASE TILDECK_TEST_KEY_PASSPHRASE
 }
 
 verify_contract() {
@@ -357,6 +458,26 @@ fixed_secret_lines() {
   grep -v '^$' <<<"$found" | cut -d: -f1,2 | sort -u || true
 }
 
+# Tracked files that hold a private key: a line that starts a PuTTY key
+# file or a PEM private key block, in the working tree or in the index
+# (what the next commit holds). Prints paths only. Fails when a search
+# itself fails.
+private_key_files() {
+  local pattern='^(PuTTY-User-Key-File-[0-9]+: |-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY-----)'
+  local found="" part status where
+  for where in worktree index; do
+    status=0
+    if [[ "$where" == index ]]; then
+      part="$(git grep -lIE --cached -e "$pattern")" || status=$?
+    else
+      part="$(git grep -lIE -e "$pattern")" || status=$?
+    fi
+    if ((status > 1)); then return 1; fi
+    found+="$part"$'\n'
+  done
+  grep -v '^$' <<<"$found" | sort -u || true
+}
+
 # The files allowed at the repository root (docs/project-foundation.md,
 # "Planned repository root").
 ROOT_FILES=".env.example .gitattributes .gitignore AGENTS.md CHANGELOG.md LICENSE README.md VERSION docker-compose.yml"
@@ -401,6 +522,19 @@ verify_guards() {
     ok=1
   else
     log "no fixed database passwords, encryption keys, or URLs with passwords"
+  fi
+
+  section "guards: no private keys in tracked files"
+  local key_files
+  if ! key_files="$(private_key_files)"; then
+    err "The search for private keys failed."
+    ok=1
+  elif [[ -n "$key_files" ]]; then
+    err "A private key is tracked (tests generate their keys per run instead):"
+    printf '%s\n' "$key_files" >&2
+    ok=1
+  else
+    log "no PuTTY or PEM private keys"
   fi
 
   section "guards: the repository root holds only the listed files"

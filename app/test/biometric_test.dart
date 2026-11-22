@@ -17,17 +17,16 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
-const password = 'orange-kettle-winter-42';
+import 'test_secrets.dart';
+
+final password = testSecret();
 const text = BiometricPromptText(title: 'Unlock', subtitle: 'Tildeck', cancel: 'Use the master password');
 
 /// The operating system, in memory. Android-like: keeps `BK` encrypted by a
 /// key only it has. Windows-like: signs deterministically with a key only it
 /// has.
 class FakeBiometrics implements BiometricPlatform {
-  FakeBiometrics({required this.keepsKey, this.seed = 0});
-
-  /// Another system (or another Hello key) has another seed.
-  final int seed;
+  FakeBiometrics({required this.keepsKey});
 
   @override
   final bool keepsKey;
@@ -36,6 +35,10 @@ class FakeBiometrics implements BiometricPlatform {
   /// What the user does at the next prompt.
   BiometricFailure? next;
   final _secrets = <String, Uint8List>{};
+
+  /// A system key, new for each registration: another system, or another
+  /// registration on this one, has another key.
+  static Uint8List _newKey() => Uint8List.fromList(testBytes(32));
 
   /// Prompts shown, and whether the app is in front: like Android, a prompt
   /// opened in the background is closed by the system at once.
@@ -59,7 +62,7 @@ class FakeBiometrics implements BiometricPlatform {
   @override
   Future<(Uint8List, Uint8List)> protect(String vaultId, Uint8List key, BiometricPromptText text) async {
     _check();
-    final secret = _secrets[vaultId] = Uint8List.fromList(List.generate(32, (i) => (i * 7 + 3 + seed) % 256));
+    final secret = _secrets[vaultId] = _newKey();
     return (Uint8List(12), _xor(key, secret));
   }
 
@@ -74,7 +77,7 @@ class FakeBiometrics implements BiometricPlatform {
   @override
   Future<Uint8List> enrollSigner(String vaultId, Uint8List challenge) async {
     _check();
-    _secrets[vaultId] = Uint8List.fromList(List.generate(32, (i) => (255 - i + seed) % 256));
+    _secrets[vaultId] = _newKey();
     return sign(vaultId, challenge);
   }
 
@@ -159,7 +162,7 @@ void main() {
     await BiometricUnlock(vault, FakeBiometrics(keepsKey: false)).enable(password, text);
     vault.lock();
     // A different system key (another Hello key with the same name, say).
-    final other = FakeBiometrics(keepsKey: false, seed: 1);
+    final other = FakeBiometrics(keepsKey: false);
     await other.enrollSigner(vault.vaultId, Uint8List(0));
     expect(await BiometricUnlock(vault, other).unlock(text), isFalse);
     expect(vault.status, VaultStatus.locked);

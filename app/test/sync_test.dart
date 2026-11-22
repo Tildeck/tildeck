@@ -11,8 +11,9 @@ import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
 import 'fake_sync_server.dart';
+import 'test_secrets.dart';
 
-const password = 'orange-kettle-winter-42';
+final password = testSecret();
 const address = 'https://sync.example.test';
 
 late Directory dir;
@@ -55,11 +56,11 @@ SyncEngine engineFor(Vault vault) => SyncEngine(
 Vault vaultAt(String name, Clock clock) =>
     Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/$name.json'), clock: clock.call);
 
-SyncAccount accountFor(String token) => SyncAccount(
+SyncAccount accountFor(String token, String deviceName) => SyncAccount(
   server: address,
   email: 'user@example.test',
   deviceId: VaultCrypto.newId(),
-  deviceName: token,
+  deviceName: deviceName,
   token: token,
 );
 
@@ -69,7 +70,7 @@ Future<Device> firstDevice() async {
   final vault = vaultAt('a', clock);
   await vault.load();
   await vault.create(password);
-  await vault.setAccount(accountFor('token-a'));
+  await vault.setAccount(accountFor(server.tokenA, 'a'));
   return Device('a', vault, clock, engineFor(vault));
 }
 
@@ -88,7 +89,7 @@ Future<Device> secondDevice(Device first) async {
     kdf: first.vault.kdf,
     wrapPw: first.vault.wrapPw,
     vaultKey: vaultKey,
-    account: accountFor('token-b'),
+    account: accountFor(server.tokenB, 'b'),
   );
   return Device('b', vault, clock, engineFor(vault));
 }
@@ -115,7 +116,8 @@ void main() {
     final a = await firstDevice();
     final hostId = a.vault.newId(), keyId = a.vault.newId();
     await a.vault.put(host(hostId, 'Database'));
-    await a.vault.put(KeyEntry(id: keyId, name: 'Laptop', privateKey: 'secret'));
+    final keyMaterial = testSecret();
+    await a.vault.put(KeyEntry(id: keyId, name: 'Laptop', privateKey: keyMaterial));
     await a.sync();
     expect(a.vault.dirtyRecords, isEmpty);
     expect(a.engine.problem, isNull);
@@ -123,7 +125,7 @@ void main() {
     final b = await secondDevice(a);
     await b.sync();
     expect(b.vault.hosts.single.name, 'Database');
-    expect(b.vault.keys.single.privateKey, 'secret');
+    expect(b.vault.keys.single.privateKey == keyMaterial, isTrue, reason: 'the private key');
 
     await b.vault.put(host(hostId, 'Primary database'));
     await b.vault.delete(keyId);
@@ -268,7 +270,7 @@ void main() {
     await reopened.load();
     await reopened.unlock(password);
     await reopened.put(host(id, 'v2'));
-    await reopened.setAccount(accountFor('token-a'));
+    await reopened.setAccount(accountFor(server.tokenA, 'a'));
     expect(reopened.dirtyRecords.single.version, 2);
 
     await engineFor(reopened).sync();
@@ -413,11 +415,11 @@ void main() {
     expect(a.vault.dirtyRecords, hasLength(1));
 
     server.refuse = null;
-    server.tokens.remove('token-a');
+    server.tokens.remove(server.tokenA);
     await a.sync();
     expect(a.engine.problem, SyncProblem.signedOut);
 
-    server.tokens.add('token-a');
+    server.tokens.add(server.tokenA);
     await a.sync();
     expect(a.engine.problem, isNull);
     expect(a.vault.dirtyRecords, isEmpty);
@@ -425,12 +427,12 @@ void main() {
 
   test('the device token is sealed in the vault file and returns on unlock', () async {
     final a = await firstDevice();
-    expect(a.file.readAsStringSync().contains('token-a'), isFalse);
+    expect(a.file.readAsStringSync().contains(server.tokenA), isFalse, reason: 'the device token');
     expect(a.file.readAsStringSync().contains('user@example.test'), isFalse);
     a.vault.lock();
     expect(a.vault.account, isNull);
     await a.vault.unlock(password);
-    expect(a.vault.account!.token, 'token-a');
+    expect(a.vault.account!.token == server.tokenA, isTrue, reason: 'the device token');
   });
 
   test('recovery keys: written with a checksum, forgiving of case and look-alike letters', () async {

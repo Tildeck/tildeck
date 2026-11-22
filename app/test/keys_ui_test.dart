@@ -15,6 +15,8 @@ import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
 import 'fake_certificates.dart';
+import 'generated_keys.dart';
+import 'test_secrets.dart';
 
 /// Files in a temporary folder, and one file to pick for import.
 class TempFiles implements LocalFiles {
@@ -52,7 +54,7 @@ Future<void> waitFor(WidgetTester tester, bool Function() done) async {
 }
 
 void main() {
-  testWidgets('a key is generated, its public key copied, exported with a passphrase, and one imported from a file', (
+  testWidgets('a key is generated, its public key copied, exported with a passphrase, and given a certificate', (
     tester,
   ) async {
     final dir = (await tester.runAsync(() => Directory.systemTemp.createTemp('tildeck-keys')))!;
@@ -60,12 +62,12 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       return v;
     }))!;
     final other = generateEd25519(vault.crypto.sodium, 'other');
-    final protectedOther = exportKey(other, newPassphrase: 'pp');
-    final files = TempFiles(dir, toPick: ('id_ed25519_work', protectedOther));
+    final files = TempFiles(dir);
+    final exportPassphrase = testSecret();
 
     String? clipboard;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
@@ -113,30 +115,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('exportKey')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('exportPassphrase')), 'file-secret');
+    await tester.enterText(find.byKey(const ValueKey('exportPassphrase')), exportPassphrase);
     await tester.tap(find.byKey(const ValueKey('saveExport')));
     final exported = File('${dir.path}/id_ed25519_laptop');
     await waitFor(tester, () => find.textContaining('Saved to').evaluate().isNotEmpty);
     final text = (await tester.runAsync(exported.readAsString))!;
     expect(readKey(text), isNull, reason: 'protected');
-    expect(readKey(text, passphrase: 'file-secret')!.fingerprint, key.fingerprint);
-
-    // Import from a file: refused without its passphrase, taken with it.
-    await tester.tap(find.byKey(const ValueKey('addKey')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('importKey')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('keyFromFile')));
-    await waitFor(tester, () => find.text('id_ed25519_work').evaluate().isNotEmpty);
-    await tester.tap(find.byKey(const ValueKey('saveKey')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('keyProblem')), findsOneWidget);
-    await tester.enterText(find.byKey(const ValueKey('keyPassphrase')), 'pp');
-    await tester.tap(find.byKey(const ValueKey('saveKey')));
-    await waitFor(tester, () => find.byKey(const ValueKey('saveKey')).evaluate().isEmpty);
-    final imported = vault.entry<KeyEntry>(vault.keys.firstWhere((k) => k.name == 'id_ed25519_work').id)!;
-    expect(imported.fingerprint, readKey(other)!.fingerprint);
-    expect(imported.passphrase, 'pp');
+    expect(readKey(text, passphrase: exportPassphrase)!.fingerprint, key.fingerprint);
 
     // A certificate for another key is refused; the key's own is kept and shown.
     await tester.tap(find.byKey(const ValueKey('keyMenu-Laptop')));
@@ -156,4 +141,52 @@ void main() {
       'Certificate for \u2066deploy\u2069, no end date',
     );
   });
+
+  // The file comes from puttygen (generated_keys.dart), not from this app's
+  // own export, so the import is checked against another tool's output.
+  testWidgets(
+    'a protected OpenSSH key is imported from a file: refused without its passphrase, taken with it',
+    skip: keyFilesSkip != null,
+    (tester) async {
+      final dir = (await tester.runAsync(() => Directory.systemTemp.createTemp('tildeck-keys')))!;
+      addTearDown(() => dir.delete(recursive: true));
+      final vault = (await tester.runAsync(() async {
+        final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
+        await v.load();
+        await v.create(testSecret());
+        return v;
+      }))!;
+      final files = TempFiles(dir, toPick: ('id_ed25519_work', keyFile('openssh-ed25519-encrypted')));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: KeysPage(vault: vault, files: files),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('addKey')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('importKey')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('keyFromFile')));
+      await waitFor(tester, () => find.text('id_ed25519_work').evaluate().isNotEmpty);
+      await tester.tap(find.byKey(const ValueKey('saveKey')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('keyProblem')), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('keyPassphrase')), keyFilePassphrase);
+      await tester.tap(find.byKey(const ValueKey('saveKey')));
+      await waitFor(tester, () => find.byKey(const ValueKey('saveKey')).evaluate().isEmpty);
+      final imported = vault.entry<KeyEntry>(vault.keys.single.id)!;
+      expect(imported.name, 'id_ed25519_work');
+      expect(imported.fingerprint, keyFileFingerprint('openssh-ed25519-encrypted').fingerprint, reason: "puttygen's");
+      expect(imported.passphrase == keyFilePassphrase, isTrue, reason: 'the key keeps its passphrase');
+    },
+  );
 }

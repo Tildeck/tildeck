@@ -455,7 +455,7 @@ Approved by Shlomi on 2026-10-01, after the proof of concept (steps 1 to 7) was 
 - The file's MAC is checked before anything is used, so a wrong passphrase is told apart from a damaged file. The key is kept in OpenSSH's own format, without a passphrase of its own: the vault, which is encrypted, holds it. Argon2 settings beyond what PuTTY writes (more than 1 GiB of memory, 1000 passes, or 16 lanes) are refused rather than run.
 - Importing hosts from PuTTY's sessions or an SSH configuration brings a .ppk key that has no passphrase; one with a passphrase is listed as unreadable and added on the Keys page.
 - Conversion is `lib/ssh/ppk.dart`, with pointycastle (already a dependency) for AES, SHA, HMAC, and Argon2.
-- Tests: nine key files made by puttygen 0.83 (test/fixtures/ppk, test keys only), each read into a key with puttygen's own fingerprint whose signature verifies; a missing and a wrong passphrase, an edited file, and a DSA key; the import dialog asking for the passphrase and saving the key; a PuTTY session's .ppk key imported with its host.
+- Tests: nine key files made by puttygen 0.83 for each verification run (`make_test_key_files` in `scripts/verify.sh`, `keygen` in `scripts/toolchain/Dockerfile`; none are kept in the repository), each first checked to be the format, cipher, and key derivation it stands for, then read into a key with puttygen's own fingerprint whose signature verifies; a missing and a wrong passphrase, an edited file, and a DSA key; the import dialog asking for the passphrase and saving the key; a PuTTY session's .ppk key imported with its host. Without `scripts/verify.sh`, a plain `flutter test` skips only the tests that read these files; `scripts/verify.sh` and CI require them.
 
 ### Serial connections (2026-10-02)
 

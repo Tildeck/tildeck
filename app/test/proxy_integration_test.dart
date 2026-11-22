@@ -10,6 +10,10 @@ import 'package:tildeck/ssh/proxy.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 
 import 'fake_proxies.dart';
+import 'test_secrets.dart';
+
+/// The proxy's password, new for each run.
+final proxyPassword = testSecret();
 
 final env = Platform.environment;
 final host = env['TILDECK_TEST_SSH_HOST'];
@@ -40,15 +44,15 @@ void main() {
     for (final kind in ProxyKind.values) {
       test('an SSH session through a ${kind.name} proxy that asks for a password', () async {
         final proxy = kind == ProxyKind.socks5
-            ? await FakeProxy.socks5(username: 'ops', password: 's3cret')
-            : await FakeProxy.http(username: 'ops', password: 's3cret');
+            ? await FakeProxy.socks5(username: 'ops', password: proxyPassword)
+            : await FakeProxy.http(username: 'ops', password: proxyPassword);
         addTearDown(proxy.close);
         final config = ProxyConfig(
           kind: kind,
           host: '127.0.0.1',
           port: proxy.port,
           username: 'ops',
-          password: 's3cret',
+          password: proxyPassword,
         );
         final client = await SshConnector(
           knownHosts: MemoryKnownHosts(),
@@ -60,7 +64,7 @@ void main() {
     }
 
     test('a refused proxy password is reported at the proxy', () async {
-      final proxy = await FakeProxy.http(username: 'ops', password: 's3cret');
+      final proxy = await FakeProxy.http(username: 'ops', password: proxyPassword);
       addTearDown(proxy.close);
       final config = ProxyConfig(kind: ProxyKind.http, host: '127.0.0.1', port: proxy.port, username: 'ops');
       await expectLater(
