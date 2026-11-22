@@ -13,7 +13,7 @@ import sys
 
 from fastapi.openapi.utils import get_openapi
 
-from app.config import MIN_KEY_LENGTH, database_url_problem, secret_problem
+from app.config import MIN_KEY_LENGTH, database_url_problem, generated_value_problem, variant_spellings
 from app.protocol import PROTOCOL_VERSION
 
 
@@ -25,8 +25,11 @@ def contract() -> dict:
     problems = []
     if problem := database_url_problem(os.environ.get("DATABASE_URL"), password_required=False):
         problems.append(f"DATABASE_URL {problem}")
-    if problem := secret_problem(os.environ.get("CONFIG_ENCRYPTION_KEY"), min_length=MIN_KEY_LENGTH):
+    if problem := generated_value_problem(os.environ.get("CONFIG_ENCRYPTION_KEY"), min_length=MIN_KEY_LENGTH):
         problems.append(f"CONFIG_ENCRYPTION_KEY {problem}")
+    for name in ("DATABASE_URL", "CONFIG_ENCRYPTION_KEY"):
+        if variant_spellings(os.environ, name):
+            problems.append(f"{name} is also set under another spelling")
     if problems:
         raise SystemExit(
             "Refusing to export the API contract: " + "; ".join(problems) + ". scripts/local.sh contract sets both."

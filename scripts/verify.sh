@@ -304,26 +304,40 @@ verify_contract() {
 
 # Tracked lines that give the bootstrap secrets a fixed value: a URL with
 # an inline password, or POSTGRES_PASSWORD / CONFIG_ENCRYPTION_KEY set to a
-# literal (shell and env files: NAME=value; any file: ["NAME"] = "value"
-# and ("NAME", "value")). The change-me placeholder and $ references are
-# allowed. Prints path:line only, never the matched text, so a found secret
-# does not land in a log. Fails when the search itself fails.
+# literal (shell and env files: NAME=value; YAML: NAME: value; any file:
+# ["NAME"] = "value" and ("NAME", "value")). The change-me placeholder and
+# $ references are allowed. Prints path:line only, never the matched text,
+# so a found secret does not land in a log. Fails when the search itself
+# fails. A focused regression guard for these values, not a general secret
+# scanner.
 fixed_secret_lines() {
   local q="[\"']" names="(POSTGRES_PASSWORD|CONFIG_ENCRYPTION_KEY)" found="" part status i
   local -a searches=(
     '[a-z][a-z0-9+.-]*://[^/:@[:space:]"'"'"']+:[^@[:space:]/"'"'"']+@'
     "$names=${q}?[^[:space:]\"'\$/]+"
     "$names${q}\]?[[:space:]]*(=|,)[[:space:]]*${q}[^[:space:]\"'\$]+"
+    "$names:[[:space:]]+${q}?[^[:space:]\"'\$]+"
   )
-  local -a where=(":!app/packages/tildeck_api" ":!app/packages/tildeck_api :!*.py" ":!app/packages/tildeck_api")
-  for i in 0 1 2; do
+  local -a where=(
+    ". :!app/packages/tildeck_api"
+    ". :!app/packages/tildeck_api :!*.py"
+    ". :!app/packages/tildeck_api"
+    "*.yml *.yaml"
+  )
+  local -a specs
+  for i in 0 1 2 3; do
     status=0
-    # shellcheck disable=SC2086 # the pathspecs are split on purpose
-    part="$(git grep -nIoE -e "${searches[i]}" -- . ${where[i]})" || status=$?
+    # Split into pathspecs without glob expansion by the shell.
+    read -ra specs <<<"${where[i]}"
+    part="$(git grep -nIoE -e "${searches[i]}" -- "${specs[@]}")" || status=$?
     if ((status > 1)); then return 1; fi
     found+="$part"$'\n'
   done
-  grep -vE 'change-me|:\$|^$' <<<"$found" | cut -d: -f1,2 | sort -u || true
+  # Dropped: placeholders, $ references, and a quoted NAME after a name (a
+  # list of variable names, not a value).
+  grep -vE 'change-me|:\$|^$' <<<"$found" \
+    | grep -vE '[,=][[:space:]]*["'"'"'][A-Z][A-Z0-9_]*$' \
+    | cut -d: -f1,2 | sort -u || true
 }
 
 # The files allowed at the repository root (docs/project-foundation.md,

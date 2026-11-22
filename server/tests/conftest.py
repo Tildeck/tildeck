@@ -15,7 +15,7 @@ import tempfile
 
 from sqlalchemy.engine import make_url
 
-from app.config import MIN_KEY_LENGTH, database_url_problem, secret_problem
+from app.config import MIN_KEY_LENGTH, database_url_problem, generated_value_problem, variant_spellings
 
 _HOW = "scripts/verify.sh --area server generates it for each run"
 
@@ -24,9 +24,15 @@ if _problem:
     raise RuntimeError(f"Refusing to run tests: TEST_DATABASE_URL {_problem}; {_HOW}")
 if not make_url(os.environ["TEST_DATABASE_URL"]).database.endswith("_test"):
     raise RuntimeError("Refusing to run tests: the database name in TEST_DATABASE_URL must end with _test")
-_problem = secret_problem(os.environ.get("TEST_CONFIG_ENCRYPTION_KEY"), min_length=MIN_KEY_LENGTH)
+_problem = generated_value_problem(os.environ.get("TEST_CONFIG_ENCRYPTION_KEY"), min_length=MIN_KEY_LENGTH)
 if _problem:
     raise RuntimeError(f"Refusing to run tests: TEST_CONFIG_ENCRYPTION_KEY {_problem}; {_HOW}")
+
+# Settings reads names case-insensitively: another spelling left in the
+# environment (database_url) could win over the values set here.
+for _var in ("DATABASE_URL", "CONFIG_ENCRYPTION_KEY", "APP_ENV"):
+    for _other in variant_spellings(os.environ, _var):
+        del os.environ[_other]
 
 os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
 os.environ["APP_ENV"] = "development"

@@ -86,6 +86,9 @@ def test_tests_refuse_a_missing_value(variable, value):
         url(DUMMY + ":5432"),
         url(DUMMY + "@x"),
         "postgresql+asyncpg://tildeck@db:5432/tildeck_test",
+        url(DUMMY).replace(":5432/", ":0/"),
+        url(DUMMY).replace(":5432/", ":99999/"),
+        url(DUMMY).replace("postgresql+asyncpg:", "postgresql:"),
     ],
     ids=[
         "placeholder-password",
@@ -98,6 +101,9 @@ def test_tests_refuse_a_missing_value(variable, value):
         "colon-in-password",
         "second-at",
         "no-password",
+        "port-zero",
+        "port-too-high",
+        "other-driver",
     ],
 )
 def test_tests_refuse_a_bad_database_url(value):
@@ -105,6 +111,23 @@ def test_tests_refuse_a_bad_database_url(value):
     assert result.returncode != 0
     assert "TEST_DATABASE_URL" in result.stderr
     assert DUMMY not in result.stdout + result.stderr
+
+
+def test_tests_drop_other_spellings_of_the_settings():
+    # Settings reads names case-insensitively: a leftover database_url must
+    # not compete with the test database.
+    result = run(
+        [
+            "-c",
+            "import os, runpy; runpy.run_path('tests/conftest.py');"
+            "print(sorted(k for k in os.environ if k.lower() in ('database_url', 'config_encryption_key')))",
+        ],
+        **good_tests_env(),
+        database_url=url(DUMMY, "other"),
+        Config_Encryption_Key="change-me",
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.stdout.strip().splitlines()[-1] == "['CONFIG_ENCRYPTION_KEY', 'DATABASE_URL']"
 
 
 @pytest.mark.parametrize(
@@ -154,6 +177,12 @@ def test_export_refuses_a_bad_value(variable, value, problem):
     assert DUMMY not in result.stderr
 
 
+def test_export_refuses_another_spelling():
+    result = run_export(DATABASE_URL=EXPORT_URL, CONFIG_ENCRYPTION_KEY=KEY, config_encryption_key="change-me")
+    assert result.returncode != 0
+    assert "CONFIG_ENCRYPTION_KEY is also set under another spelling" in result.stderr
+
+
 def compose_config(password: str = DUMMY, database_url: str | None = None, key: str = KEY) -> dict:
     return {
         "services": {
@@ -166,6 +195,12 @@ def compose_config(password: str = DUMMY, database_url: str | None = None, key: 
             },
         }
     }
+
+
+def with_another_spelling() -> dict:
+    config = compose_config()
+    config["services"]["server"]["environment"]["config_encryption_key"] = "change-me"
+    return config
 
 
 def test_dev_stack_with_generated_values_passes():
@@ -182,18 +217,37 @@ def test_dev_stack_with_generated_values_passes():
         (compose_config(key="change-me"), "CONFIG_ENCRYPTION_KEY is a placeholder"),
         (compose_config(key=KEY[:31]), "CONFIG_ENCRYPTION_KEY is too short"),
         ({"services": {"server": {}}}, "must define the services postgres and server"),
+        (with_another_spelling(), "CONFIG_ENCRYPTION_KEY is also set under another spelling"),
     ],
-    ids=["placeholder", "published", "mismatch", "query", "placeholder-key", "short-key", "missing-service"],
+    ids=[
+        "placeholder",
+        "published",
+        "mismatch",
+        "query",
+        "placeholder-key",
+        "short-key",
+        "missing-service",
+        "spelling",
+    ],
 )
 def test_dev_stack_refuses_bad_values(config, expected):
     found = dev_env_check.problems(config)
     assert any(expected in problem for problem in found), found
 
 
-@pytest.mark.parametrize("stdin", [json.dumps(compose_config(password="change-me")), "not json " + DUMMY])
-def test_dev_stack_check_never_prints_a_value(stdin, monkeypatch, capsys):
+@pytest.mark.parametrize(
+    ("stdin", "status"),
+    [
+        (json.dumps(compose_config(password="change-me")), 1),
+        ("not json " + DUMMY, 2),
+        (json.dumps({"services": {"server": {"environment": {"DATABASE_URL": url(DUMMY)}}}}), 2),
+    ],
+    ids=["value-to-replace", "unreadable", "missing-service"],
+)
+def test_dev_stack_check_never_prints_a_value(stdin, status, monkeypatch, capsys):
+    # 1 asks for new values; 2 means the check could not judge them.
     monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
-    assert dev_env_check.main() == 1
+    assert dev_env_check.main() == status
     out, err = capsys.readouterr()
     assert DUMMY not in out + err
     assert KEY not in out + err

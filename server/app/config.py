@@ -8,6 +8,7 @@ variable wins and locks the field.
 
 import os
 import re
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -76,15 +77,24 @@ RETIRED_VALUES = frozenset({"tildeck", "test-config-encryption-key-for-pytest-on
 # (app/migrations/env.py) all see the same user, password, host, and
 # database: no query (asyncpg applies it after the URL parts), no fragment,
 # no percent-encoding (Alembic's config would interpolate it), no second
-# host or "@".
+# host or "@". The port, when given, is 1-65535 (SQLAlchemy drops a port of
+# 0, asyncpg keeps it).
 _GENERATED_URL = re.compile(
-    r"(?P<scheme>[a-z0-9+]+)://(?P<user>[A-Za-z0-9_.-]+)(?::(?P<password>[A-Za-z0-9_.-]+))?"
-    r"@(?P<host>[A-Za-z0-9_.-]+)(?::(?P<port>[0-9]+))?/(?P<database>[A-Za-z0-9_]+)"
+    r"postgresql\+asyncpg://(?P<user>[A-Za-z0-9_.-]+)(?::(?P<password>[A-Za-z0-9_.-]+))?"
+    r"@(?P<host>[A-Za-z0-9_.-]+)(?::(?P<port>[1-9][0-9]{0,4}))?/(?P<database>[A-Za-z0-9_]+)"
 )
 
 
-def secret_problem(value: str | None, *, min_length: int = 0) -> str | None:
-    """Why a generated secret is not acceptable, or None. Never includes the
+def variant_spellings(environ: Mapping[str, str | None], name: str) -> list[str]:
+    """Other spellings of `name` in an environment. Settings reads variable
+    names case-insensitively, so DATABASE_URL and database_url both set the
+    same field, and a check that reads one spelling would not see the
+    other."""
+    return sorted(key for key in environ if key.lower() == name.lower() and key != name)
+
+
+def generated_value_problem(value: str | None, *, min_length: int = 0) -> str | None:
+    """Why a generated value is not acceptable, or None. Never includes the
     value. Stripped first, as app/crypto.py strips the key."""
     value = (value or "").strip()
     if not value:
@@ -105,12 +115,17 @@ def database_url_problem(url: str | None, *, password_required: bool) -> str | N
         return "is not set"
     match = _GENERATED_URL.fullmatch(url)
     if match is None:
-        return "must have the generated form: user, password, host, port, and database of letters, digits, _ . - only"
+        return (
+            "must have the generated form: postgresql+asyncpg, then user, password, host, port (1-65535),"
+            " and database of letters, digits, _ . - only"
+        )
     try:
         parsed = make_url(url)
     except Exception:
         return "cannot be parsed"
     port = match["port"]
+    if port and int(port) > 65535:
+        return "has a port above 65535"
     if (parsed.username, parsed.password, parsed.host, parsed.port, parsed.database) != (
         match["user"],
         match["password"],
@@ -120,7 +135,7 @@ def database_url_problem(url: str | None, *, password_required: bool) -> str | N
     ):
         return "cannot be parsed"
     if match["password"] is not None or password_required:
-        problem = secret_problem(match["password"])
+        problem = generated_value_problem(match["password"])
         if problem:
             return f"password {problem}"
     return None

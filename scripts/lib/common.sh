@@ -123,9 +123,19 @@ windows_owner_only() {
 # under WSL, chmod has no effect and the Windows access list decides; it is
 # tightened in one icacls command (never widened on the way) and checked.
 ensure_owner_only() {
-  local file="$1" win state sid
+  local file="$1" win="" state sid
   # A Windows drive gives C:\...; a WSL path gives \\wsl.localhost\...
-  if win="$(wslpath -w "$file" 2>/dev/null)" && [[ "$win" =~ ^[A-Za-z]: ]]; then
+  if command -v wslpath >/dev/null 2>&1; then
+    win="$(wslpath -w "$file" 2>/dev/null)" || win=""
+  fi
+  # Windows drives are mounted as 9p (v9fs). There, mode 600 can sit beside
+  # a Windows access list that lets other accounts read the file, so only
+  # the access list counts; when it cannot be checked, refuse.
+  if [[ "$win" =~ ^[A-Za-z]: || "$(stat -f -c %T "$file" 2>/dev/null)" == v9fs ]]; then
+    if [[ ! "$win" =~ ^[A-Za-z]: ]]; then
+      err "$file is on a Windows drive, but its Windows permissions cannot be checked."
+      return 1
+    fi
     state="$(windows_acl "$file")"
     windows_owner_only "$state" && return 0
     sid="${state%% *}"
@@ -172,15 +182,25 @@ require_dev_secrets() {
     err "Could not build the server's dependency image to check $DEV_ENV_FILE."
     exit 1
   fi
-  if ! printf '%s' "$config" | docker run --rm -i -v "$ROOT/server/app:/app/app:ro" -w /app "$image" \
-    /opt/venv/bin/python -m app.dev_env_check; then
-    err "The development stack does not start with these values (from $DEV_ENV_FILE, or exported in this shell)."
-    err "To start over with generated secrets, which DELETES the development data:"
-    err "  scripts/local.sh nuke              (with this $DEV_ENV_FILE still in place)"
-    err "  mv $DEV_ENV_FILE $DEV_ENV_FILE.old"
-    err "  scripts/local.sh up -b -d"
-    exit 1
-  fi
+  local status=0
+  printf '%s' "$config" | docker run --rm -i -v "$ROOT/server/app:/app/app:ro" -w /app "$image" \
+    /opt/venv/bin/python -m app.dev_env_check || status=$?
+  case "$status" in
+    0) ;;
+    1)
+      # Each step runs only when the one before succeeded: .env is moved
+      # aside only after the database volume is really gone.
+      err "The development stack does not start with these values (from $DEV_ENV_FILE, or exported in this shell)."
+      err "Values exported in this shell: unset them. Values in $DEV_ENV_FILE: start over with generated secrets,"
+      err "which DELETES the development data (nuke asks first):"
+      err "  scripts/local.sh nuke && ! docker volume inspect $DEV_DB_VOLUME >/dev/null 2>&1 && mv $DEV_ENV_FILE $DEV_ENV_FILE.old && scripts/local.sh up -b -d"
+      exit 1
+      ;;
+    *)
+      err "The check of $DEV_ENV_FILE could not run (exit status $status). Nothing was changed."
+      exit 1
+      ;;
+  esac
 }
 
 dev_compose() {
