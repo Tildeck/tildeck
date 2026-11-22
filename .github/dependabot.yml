@@ -17,6 +17,12 @@ updates:
       server-minor-patch:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      # pytest 9.2.0's monkeypatch undo deletes attributes of Starlette's
+      # app.state, which breaks the server test fixtures. 9.2.1 is expected
+      # to revert it (pytest-dev/pytest#15402), so only 9.2.0 is skipped.
+      - dependency-name: "pytest"
+        versions: ["9.2.0"]
     open-pull-requests-limit: 5
 
   - package-ecosystem: "npm"

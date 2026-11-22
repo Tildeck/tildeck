@@ -91,3 +91,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - A hostile server could make a download write outside its folder on Windows through a file name; every server name now becomes one safe local name, checked to stay inside the folder.
 - A device that had its own vault and locked while waiting for approval could have that vault replaced by the account's when the approval arrived. It now waits until the vault is open, and a different vault is refused as at sign-in.
 - A host's environment variable that the server does not accept no longer fails the session; it is skipped, as ssh does.
+
+### Security
+
+- The admin panel's dependencies are updated with upstream security fixes, and the PostgreSQL 18 image in `docker-compose.yml` is updated to the current release.
