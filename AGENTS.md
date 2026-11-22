@@ -36,7 +36,7 @@ Before reporting work as done, run `scripts/verify.sh --changed` (or `--area <na
 - Run Docker from WSL in a login shell (`bash -l`). Otherwise the Docker Desktop credential helper is not on `PATH` and pulls fail with "error getting credentials".
 - The repository path contains a space (`/mnt/c/Users/Shlomi Porush/...`). Quote every path in scripts.
 - `server/Dockerfile` builds the panel from a named build context: `docker build --build-context panel=./panel -f server/Dockerfile ./server`.
-- `docker-compose-dev.yml` is machine-local. Create it once with `cp docs/development/docker-compose-dev.example.yml docker-compose-dev.yml`, and `.env` with `cp .env.example .env`.
+- `docker-compose-dev.yml` is machine-local. Create it once with `cp docs/development/docker-compose-dev.example.yml docker-compose-dev.yml`. Do not copy `.env.example` to `.env`: the first `scripts/local.sh up` creates `.env` with generated secrets, readable only by its owner, and the stack refuses placeholder values. Every checkout and worktree on a machine shares one development stack and database, so another checkout needs a copy of the `.env` that created it; with a different one its server cannot sign in to PostgreSQL.
 - PostgreSQL 18 images keep data under `/var/lib/postgresql`, not `/var/lib/postgresql/data`.
 - Flutter, Dart, and the OpenAPI generator run only in the toolchain containers (`flutter_run` in `scripts/lib/common.sh`). Client golden images are platform-specific: regenerate them in the container (`flutter test --update-goldens`), never on Windows.
 - `app/lib/l10n/app_localizations*.dart` is generated and not committed; `flutter pub get` creates it.

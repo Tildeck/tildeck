@@ -78,6 +78,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 ### Changed
 
 - The PostgreSQL 18 image digest in `docker-compose.yml` is refreshed; it still runs PostgreSQL 18.6.
+- Development and test secrets are generated, never fixed: `scripts/local.sh up` creates the development `.env` with random secrets the first time (readable only by you), and refuses to start with placeholder values; each verification run generates its own test database password and key. An existing development `.env` that still holds `change-me` must be replaced: `scripts/local.sh nuke` (which deletes the development data), move the old `.env` aside, then `scripts/local.sh up -b -d`.
 
 ### Fixed
 

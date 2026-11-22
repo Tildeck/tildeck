@@ -3,7 +3,8 @@
 # local.sh - the local development stack (server with the panel, PostgreSQL).
 #
 #   scripts/local.sh build          build tildeck-server:dev (includes the panel)
-#   scripts/local.sh up [-b] [-d]   start (-b: build first, -d: detached and verified)
+#   scripts/local.sh up [-b] [-d]   start (-b: build first, -d: detached and verified);
+#                                   the first start creates .env with generated secrets
 #   scripts/local.sh down           stop and remove the containers, keep the data
 #   scripts/local.sh status         containers, health, running image, runtime UID
 #   scripts/local.sh nuke           down, then DELETE the database volume (asks first)
@@ -22,7 +23,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 cd "$ROOT"
 
 usage() {
-  sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,13p' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -53,7 +54,7 @@ cmd_up() {
       *) usage ;;
     esac
   done
-  require_dev_stack
+  require_dev_compose_file
   if [[ "$build" == true ]]; then
     cmd_build
   fi
@@ -61,6 +62,8 @@ cmd_up() {
     err "$DEV_SERVER_IMAGE does not exist. Run: scripts/local.sh up -b"
     exit 1
   fi
+  ensure_dev_env
+  require_dev_secrets
   log "Starting $DEV_PROJECT from $DEV_COMPOSE_FILE ..."
   if [[ "$detach" == true ]]; then
     dev_compose up -d --remove-orphans
