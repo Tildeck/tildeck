@@ -52,10 +52,10 @@ void main() {
         'a new ${kind.name} key is installed with the password, then signs in alone',
         () async {
           final pem = switch (kind) {
-            KeyKind.ed25519 => generateEd25519(crypto.sodium, 'tildeck-test'),
-            KeyKind.rsa4096 => await generateRsa4096('tildeck-test'),
+            KeyKind.ed25519 => generateEd25519(crypto.sodium, 'tildeck-integration'),
+            KeyKind.rsa4096 => await generateRsa4096('tildeck-integration'),
           };
-          final info = readKey(pem, comment: 'tildeck-test')!;
+          final info = readKey(pem, comment: 'tildeck-integration')!;
 
           // Before: the key alone is refused.
           await expectLater(

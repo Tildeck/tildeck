@@ -15,9 +15,10 @@ import 'dart:typed_data';
 
 import 'package:pointycastle/export.dart' as pc;
 
-/// The key files and passphrase these tests once kept in the repository.
-/// They are public now, so key files with one of these fingerprints, or
-/// that passphrase, are refused: every run must bring new ones.
+/// The key files and passphrase these tests once kept in the repository
+/// (the passphrase as its SHA-256 only). They are public now, so key files
+/// with one of these fingerprints, or that passphrase, are refused: every
+/// run must bring new ones.
 const _onceCommittedFingerprints = {
   'SHA256:LnelfUHA02MMwH8DiGpqBCQLWh3z3ywwt+jG3u+olto',
   'SHA256:TYoTdmyWDVJWiNV4xdfAhCD3dbbOVhm0i5LWouH844c',
@@ -29,7 +30,7 @@ const _onceCommittedFingerprints = {
   'SHA256:jhN19w733uwGARjOgEqoUoPIKWS3XzkKTamtVmjLCd0',
   'SHA256:tT2YbGADp2K9974keuRJAKm9ZKkV8nkILk2KDx5l6vI',
 };
-const _onceCommittedPassphrase = 'tildeck-test';
+const _onceCommittedPassphraseSha256 = '7f283d1d36ccf44c658ab59789ad102ba64353569dd374a010a8613b093a9a01';
 
 final _env = Platform.environment;
 final _dir = _env['TILDECK_TEST_KEY_FILES'];
@@ -50,16 +51,22 @@ final String? keyFilesSkip = () {
       'and TILDECK_TEST_KEY_PASSPHRASE are both needed; scripts/verify.sh sets them.',
     );
   }
-  if (_passphrase == _onceCommittedPassphrase) {
+  if (_sha256Hex(utf8.encode(_passphrase!)) == _onceCommittedPassphraseSha256) {
     throw StateError('This passphrase was once kept in the repository and is public; use a new one.');
   }
-  // Each key's fingerprint comes from the key file itself, so a stale .fp
-  // beside an old key cannot hide it.
+  // Every file but the .fp ones is a key the tests may read. Its fingerprint
+  // comes from the key file itself, so a stale .fp beside an old key cannot
+  // hide it, and a file that cannot be read as a key is refused, not skipped.
   for (final file in Directory(dir).listSync().whereType<File>()) {
     final name = file.uri.pathSegments.last;
     if (name.endsWith('.fp')) continue;
-    final fingerprint = _fingerprintOf(file.readAsStringSync());
-    if (fingerprint == null) continue;
+    final String fingerprint;
+    try {
+      fingerprint = _fingerprintOf(file.readAsStringSync());
+    } catch (_) {
+      // Only the name: the error itself may quote the file's content.
+      throw StateError('$name in the generated key files is not a key file these tests can read.');
+    }
     if (_onceCommittedFingerprints.contains(fingerprint)) {
       throw StateError('The key in $name was once kept in the repository and is public; generate new key files.');
     }
@@ -71,17 +78,27 @@ final String? keyFilesSkip = () {
   return null;
 }();
 
+String _sha256Hex(List<int> bytes) =>
+    pc.SHA256Digest().process(Uint8List.fromList(bytes)).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
 /// The SHA256 fingerprint of the public key in a PuTTY key file or an
 /// OpenSSH private key file, worked out here with pointycastle, not with
-/// the client's own key code; null for any other file.
-String? _fingerprintOf(String text) {
-  Uint8List? blob;
-  final lines = text.split('\n').map((l) => l.trim()).toList();
-  final publicLines = lines.indexWhere((l) => l.startsWith('Public-Lines: '));
-  if (lines.isNotEmpty && lines.first.startsWith('PuTTY-User-Key-File-') && publicLines >= 0) {
-    final count = int.parse(lines[publicLines].substring('Public-Lines: '.length));
-    blob = base64.decode(lines.sublist(publicLines + 1, publicLines + 1 + count).join());
-  } else if (lines.isNotEmpty && lines.first == '-----BEGIN OPENSSH PRIVATE KEY-----') {
+/// the client's own key code. Throws for anything else, and for a PuTTY
+/// file with more or fewer than one public key.
+String _fingerprintOf(String text) {
+  late final Uint8List blob;
+  // Surrounding whitespace is ignored, as the client ignores it.
+  final lines = text.trim().split('\n').map((l) => l.trim()).toList();
+  if (lines.first.startsWith('PuTTY-User-Key-File-')) {
+    final headers = [
+      for (var i = 0; i < lines.length; i++)
+        if (lines[i].startsWith('Public-Lines: ')) i,
+    ];
+    if (headers.length != 1) throw const FormatException('not one public key');
+    final at = headers.single;
+    final count = int.parse(lines[at].substring('Public-Lines: '.length));
+    blob = base64.decode(lines.sublist(at + 1, at + 1 + count).join());
+  } else if (lines.first == '-----BEGIN OPENSSH PRIVATE KEY-----') {
     final body = base64.decode(lines.skip(1).takeWhile((l) => !l.startsWith('-----END')).join());
     // "openssh-key-v1\0", then cipher, KDF, and KDF options as strings, the
     // number of keys, and the first public key as a string.
@@ -93,8 +110,9 @@ String? _fingerprintOf(String text) {
     offset += 4;
     final length = data.getUint32(offset);
     blob = body.sublist(offset + 4, offset + 4 + length);
+  } else {
+    throw const FormatException('not a key file');
   }
-  if (blob == null) return null;
   final digest = pc.SHA256Digest().process(blob);
   return 'SHA256:${base64.encode(digest).replaceAll('=', '')}';
 }
