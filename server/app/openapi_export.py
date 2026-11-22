@@ -13,14 +13,27 @@ import sys
 
 from fastapi.openapi.utils import get_openapi
 
+from app.config import MIN_KEY_LENGTH, database_url_problem, generated_value_problem, variant_spellings
 from app.protocol import PROTOCOL_VERSION
 
 
 def contract() -> dict:
-    # Building the app needs bootstrap values but never connects to anything,
-    # so an export runs anywhere, without a database or a real key.
-    os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://export@localhost:5432/export")
-    os.environ.setdefault("CONFIG_ENCRYPTION_KEY", "openapi-export-only")
+    # Building the app needs the bootstrap values but never connects to
+    # anything or encrypts, so an export runs without a database. The values
+    # have no defaults: scripts/local.sh contract and scripts/verify.sh
+    # --area contract pass one-time values.
+    problems = []
+    if problem := database_url_problem(os.environ.get("DATABASE_URL"), password_required=False):
+        problems.append(f"DATABASE_URL {problem}")
+    if problem := generated_value_problem(os.environ.get("CONFIG_ENCRYPTION_KEY"), min_length=MIN_KEY_LENGTH):
+        problems.append(f"CONFIG_ENCRYPTION_KEY {problem}")
+    for name in ("DATABASE_URL", "CONFIG_ENCRYPTION_KEY"):
+        if variant_spellings(os.environ, name):
+            problems.append(f"{name} is also set under another spelling")
+    if problems:
+        raise SystemExit(
+            "Refusing to export the API contract: " + "; ".join(problems) + ". scripts/local.sh contract sets both."
+        )
     from app.main import _stable_validation_errors, app
 
     schema = get_openapi(

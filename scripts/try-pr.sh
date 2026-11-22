@@ -109,6 +109,7 @@ cmd_restore() {
     remove_worktree
     return 0
   fi
+  require_dev_secrets
   log "Restoring the development stack to your working tree ..."
   if [[ -f "$SNAPSHOT_FILE" ]]; then
     restore_database
@@ -142,6 +143,10 @@ cmd_preview() {
     warn "This change touches neither server/, panel/, nor app/. Nothing to run."
     return 0
   fi
+
+  # The server restarts with this checkout's .env (an APK-only preview
+  # does not touch the stack).
+  if ((server > 0 || panel > 0)); then require_dev_secrets; fi
 
   mkdir -p "$STATE_DIR"
   remove_worktree

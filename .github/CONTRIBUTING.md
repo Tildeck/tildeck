@@ -11,7 +11,7 @@ Thank you for your interest. Tildeck is in its foundation stage, so the codebase
 
 Run these from the repository root, in WSL:
 
-- `scripts/local.sh up -b -d` builds and starts the sync server (with the admin panel) and PostgreSQL at http://localhost:8280. The first time, create the machine-local files: `cp .env.example .env` and `cp docs/development/docker-compose-dev.example.yml docker-compose-dev.yml`.
+- `scripts/local.sh up -b -d` builds and starts the sync server (with the admin panel) and PostgreSQL at http://localhost:8280. The first time, create the machine-local Compose file: `cp docs/development/docker-compose-dev.example.yml docker-compose-dev.yml`. The first start creates `.env` with generated secrets; keep it, because the development database needs it, and copy it into any other checkout or worktree of this machine.
 - `scripts/local.sh apk` builds a debug Android APK into `out/`.
 - `scripts/local.sh contract` re-exports the server's OpenAPI document and regenerates the Dart API client after a server API change.
 - `scripts/verify.sh --changed` verifies what you changed; `scripts/verify.sh` verifies everything. CI runs the same script.

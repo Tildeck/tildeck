@@ -114,9 +114,15 @@ verify_server() {
   docker run --rm "$SERVER_TEST_IMAGE" ruff format --check app tests || return 1
 
   section "server: pytest against a throwaway PostgreSQL"
+  # The database password and the settings encryption key are generated
+  # for this run. They reach the containers through the environment of the
+  # docker client, never on a command line.
+  local pg_password test_key
+  pg_password="$(random_hex 32)" || return 1
+  test_key="$(random_hex 32)" || return 1
   docker network create "$NET" >/dev/null || return 1
-  docker run -d --name "$PG_CONTAINER" --network "$NET" \
-    -e POSTGRES_USER=tildeck -e POSTGRES_PASSWORD=tildeck -e POSTGRES_DB=tildeck_test \
+  POSTGRES_PASSWORD="$pg_password" docker run -d --name "$PG_CONTAINER" --network "$NET" \
+    -e POSTGRES_USER=tildeck -e POSTGRES_PASSWORD -e POSTGRES_DB=tildeck_test \
     "$(toolchain_image postgres)" >/dev/null || return 1
   local waited=0
   until docker exec "$PG_CONTAINER" pg_isready -U tildeck -d tildeck_test >/dev/null 2>&1; do
@@ -128,8 +134,9 @@ verify_server() {
       return 1
     fi
   done
-  docker run --rm --network "$NET" \
-    -e "TEST_DATABASE_URL=postgresql+asyncpg://tildeck:tildeck@$PG_CONTAINER:5432/tildeck_test" \
+  TEST_DATABASE_URL="postgresql+asyncpg://tildeck:$pg_password@$PG_CONTAINER:5432/tildeck_test" \
+    TEST_CONFIG_ENCRYPTION_KEY="$test_key" \
+    docker run --rm --network "$NET" -e TEST_DATABASE_URL -e TEST_CONFIG_ENCRYPTION_KEY \
     "$SERVER_TEST_IMAGE" pytest -q || return 1
 }
 
@@ -295,6 +302,61 @@ verify_contract() {
   log "app/packages/tildeck_api is current"
 }
 
+# Tracked lines that give the bootstrap secrets a fixed value: a URL with
+# an inline password, or POSTGRES_PASSWORD / CONFIG_ENCRYPTION_KEY set to a
+# literal (shell and env files: NAME=value and NAME='value'; YAML:
+# NAME: value; any file: ["NAME"] = "value" and ("NAME", "value")). The
+# change-me placeholder and
+# $ references are allowed. Prints path:line only, never the matched text,
+# so a found secret does not land in a log. Fails when the search itself
+# fails. A focused regression guard for these values, not a general secret
+# scanner. It errs on the strict side: a quoted list of setting names on one
+# line also matches; write such a list one name per line.
+fixed_secret_lines() {
+  local q="[\"']" names="(POSTGRES_PASSWORD|CONFIG_ENCRYPTION_KEY)" found="" part status i
+  # Each value match ends with the character after the value (or the end of
+  # the line), so the check below sees whether a placeholder stands alone.
+  local term="([\"'[:space:],)\$/]|\$)"
+  local -a searches=(
+    '[a-z][a-z0-9+.-]*://[^/:@[:space:]"'"'"']+:[^@[:space:]/"'"'"']+@'
+    "$names=${q}?[^[:space:]\"'\$/]+$term"
+    "$names${q}\]?[[:space:]]*(=|,)[[:space:]]*${q}[^[:space:]\"'\$]+$term"
+    "$names:[[:space:]]+${q}?[^\"'\$]+([\"']|\$)"
+    "$names='[^']*'"
+  )
+  local -a where=(
+    ". :!app/packages/tildeck_api"
+    ". :!app/packages/tildeck_api :!*.py"
+    ". :!app/packages/tildeck_api"
+    "*.yml *.yaml"
+    ". :!app/packages/tildeck_api :!*.py"
+  )
+  # What is allowed, judged on the whole value: a URL password that is
+  # exactly change-me or a $ reference; any other value that is exactly
+  # change-me, quoted or ending the word (the other patterns never match a
+  # $ reference).
+  local placeholder="[=,:][[:space:]]*(${q}change-me${q}|change-me([[:space:]]|\$))\$"
+  local -a allowed=(
+    '://[^/:@[:space:]"'"'"']+:(change-me|\$[^@]*)@$'
+    "$placeholder"
+    "$placeholder"
+    ":[[:space:]]+(${q}change-me${q}|change-me[[:space:]]*)\$"
+    "='change-me'\$"
+  )
+  local -a specs
+  for i in 0 1 2 3 4; do
+    status=0
+    # Split into pathspecs without glob expansion by the shell.
+    read -ra specs <<<"${where[i]}"
+    part="$(git grep -nIoE -e "${searches[i]}" -- "${specs[@]}")" || status=$?
+    if ((status > 1)); then return 1; fi
+    if [[ -n "$part" ]]; then
+      found+="$(grep -vE "${allowed[i]}" <<<"$part" || true)"$'\n'
+    fi
+  done
+  grep -v '^$' <<<"$found" | cut -d: -f1,2 | sort -u || true
+}
+
 # The files allowed at the repository root (docs/project-foundation.md,
 # "Planned repository root").
 ROOT_FILES=".env.example .gitattributes .gitignore AGENTS.md CHANGELOG.md LICENSE README.md VERSION docker-compose.yml"
@@ -326,6 +388,19 @@ verify_guards() {
   if git ls-files | grep -E '\.(jks|keystore)$|(^|/)key\.properties$'; then
     err "Signing material is tracked by Git."
     ok=1
+  fi
+
+  section "guards: no fixed bootstrap secrets in tracked files"
+  local secret_hits
+  if ! secret_hits="$(fixed_secret_lines)"; then
+    err "The search for fixed secrets failed."
+    ok=1
+  elif [[ -n "$secret_hits" ]]; then
+    err "A fixed password, key, or database URL with a password is tracked (generate it per run instead):"
+    printf '%s\n' "$secret_hits" >&2
+    ok=1
+  else
+    log "no fixed database passwords, encryption keys, or URLs with passwords"
   fi
 
   section "guards: the repository root holds only the listed files"

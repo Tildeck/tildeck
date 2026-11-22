@@ -24,17 +24,204 @@ DEV_DB_CONTAINER="tildeck-postgres-dev"
 DEV_DB_VOLUME="tildeck-db-data"
 DEV_URL="http://localhost:8280"
 
-require_dev_stack() {
+require_dev_compose_file() {
   if [[ ! -f "$ROOT/$DEV_COMPOSE_FILE" ]]; then
     err "$DEV_COMPOSE_FILE is missing. It is machine-local; create it from the template:"
     err "  cp $DEV_COMPOSE_TEMPLATE $DEV_COMPOSE_FILE"
     exit 1
   fi
+}
+
+require_dev_stack() {
+  require_dev_compose_file
   if [[ ! -f "$ROOT/$DEV_ENV_FILE" ]]; then
-    err "$DEV_ENV_FILE is missing. Create it from the example:"
-    err "  cp .env.example $DEV_ENV_FILE"
+    err "$DEV_ENV_FILE is missing. scripts/local.sh up creates it with generated secrets."
+    err "Every checkout on this machine shares one development stack: if it already exists,"
+    err "copy the $DEV_ENV_FILE of the checkout that created it."
     exit 1
   fi
+}
+
+# Whether the development database volume exists. docker volume ls fails
+# when Docker cannot answer, and then this exits: an error is never taken
+# for a missing volume.
+dev_db_volume_exists() {
+  local found
+  if ! found="$(docker volume ls -q --filter "name=^${DEV_DB_VOLUME}\$")"; then
+    err "Docker did not answer whether $DEV_DB_VOLUME exists. Stopped here."
+    exit 1
+  fi
+  [[ -n "$found" ]]
+}
+
+# The ignored .env of the development stack, created once with generated
+# secrets (scripts/local.sh up). An existing file is never overwritten.
+ensure_dev_env() {
+  local env="$ROOT/$DEV_ENV_FILE" password key
+  if [[ -L "$env" || (-e "$env" && ! -f "$env") ]]; then
+    err "$DEV_ENV_FILE is not a regular file. Move it away and run this again."
+    exit 1
+  fi
+  [[ -f "$env" ]] && return 0
+
+  if dev_db_volume_exists; then
+    err "$DEV_ENV_FILE is missing, but the development database ($DEV_DB_VOLUME) exists."
+    err "It was set up with another $DEV_ENV_FILE: copy that file here, from the checkout that created it."
+    err "Or delete the development data, which cannot be undone:"
+    err "  docker rm -f $DEV_SERVER_CONTAINER $DEV_DB_CONTAINER && docker volume rm $DEV_DB_VOLUME"
+    exit 1
+  fi
+
+  log "Creating $DEV_ENV_FILE with generated secrets ..."
+  # Written completely into a file inside a private temporary directory,
+  # then published with a hard link, which fails instead of replacing an
+  # existing file. The directory is made owner-only first, so the file is
+  # owner-only from the moment it exists (an access granted when a file is
+  # opened stays with that handle, so tightening it later is not enough).
+  # The trap removes the directory on any exit, also an interrupted one.
+  local tmp_file
+  DEV_ENV_TMP="$(mktemp -d "$env.new.XXXXXX")" || exit 1
+  trap 'rm -rf -- "$DEV_ENV_TMP"' EXIT
+  trap 'exit 130' INT TERM HUP
+  ensure_owner_only "$DEV_ENV_TMP" dir || exit 1
+  tmp_file="$DEV_ENV_TMP/env"
+  (umask 077 && : >"$tmp_file") || exit 1
+  ensure_owner_only "$tmp_file" || exit 1
+  password="$(random_hex 32)" || exit 1
+  key="$(random_hex 32)" || exit 1
+  {
+    printf '# Created by scripts/local.sh with generated secrets. Never commit it.\n'
+    # The values reach awk through its environment, not its command line.
+    PASSWORD="$password" KEY="$key" awk '
+      /^POSTGRES_PASSWORD=/ { print "POSTGRES_PASSWORD=" ENVIRON["PASSWORD"]; next }
+      /^DATABASE_URL=/ { sub(/:change-me@/, ":" ENVIRON["PASSWORD"] "@"); print; next }
+      /^CONFIG_ENCRYPTION_KEY=/ { print "CONFIG_ENCRYPTION_KEY=" ENVIRON["KEY"]; next }
+      { print }
+    ' "$ROOT/.env.example"
+  } >>"$tmp_file" || exit 1
+  if grep -E '^(POSTGRES_PASSWORD|DATABASE_URL|CONFIG_ENCRYPTION_KEY)=' "$tmp_file" | grep -q 'change-me' \
+    || (($(grep -cE '^(POSTGRES_PASSWORD|DATABASE_URL|CONFIG_ENCRYPTION_KEY)=' "$tmp_file") != 3)); then
+    err ".env.example no longer has the expected POSTGRES_PASSWORD, DATABASE_URL, and CONFIG_ENCRYPTION_KEY lines."
+    exit 1
+  fi
+  if ! ln -T -- "$tmp_file" "$env"; then
+    err "$DEV_ENV_FILE appeared while it was being created. Nothing was overwritten."
+    exit 1
+  fi
+  rm -rf -- "$DEV_ENV_TMP"
+  trap - EXIT INT TERM HUP
+  log "Created $DEV_ENV_FILE. Keep it: the development database needs these values."
+}
+
+# The current Windows user's SID and a file's owner and access list (SDDL),
+# separated by a space. The path reaches PowerShell through WSLENV, which
+# translates it, not through the command string. stdin is closed: started
+# from WSL with an inherited stdin, PowerShell can print nothing.
+# shellcheck disable=SC2016 # the command is PowerShell code, expanded there
+windows_acl() {
+  TILDECK_ACL_PATH="$1" WSLENV="TILDECK_ACL_PATH/p${WSLENV:+:$WSLENV}" powershell.exe -NoProfile -NonInteractive -Command \
+    '$p = $env:TILDECK_ACL_PATH; $acl = if ([System.IO.Directory]::Exists($p)) { [System.IO.Directory]::GetAccessControl($p) } else { [System.IO.File]::GetAccessControl($p) }; [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value + " " + $acl.GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]"Owner, Access")' \
+    </dev/null 2>/dev/null | tr -d '\r'
+}
+
+# True when the SDDL says: owned by the SID, inheritance off, and one entry,
+# full control for the SID. $1: "SID SDDL" from windows_acl.
+# $2: "dir" for a directory, whose one entry is inherited by the files
+# created in it (OICI).
+windows_owner_only() {
+  local sid="${1%% *}" sddl="${1#* }" flags="" want
+  [[ "${2:-}" == dir ]] && flags="OICI"
+  want="^O:${sid}D:P[A-Z]*\\(A;${flags};FA;;;${sid}\\)\$"
+  [[ -n "$sid" && "$sddl" =~ $want ]]
+}
+
+# Make a file readable by its owner only, and verify it. On a Windows drive
+# under WSL, chmod has no effect and the Windows access list decides; it is
+# tightened in one icacls command (never widened on the way) and checked.
+# $2: "dir" for a directory (mode 700; on Windows, an entry its new files
+# inherit).
+ensure_owner_only() {
+  local file="$1" kind="${2:-file}" win="" state sid grant="F" mode=600
+  if [[ "$kind" == dir ]]; then grant="(OI)(CI)F" mode=700; fi
+  # A Windows drive gives C:\...; a WSL path gives \\wsl.localhost\...
+  if command -v wslpath >/dev/null 2>&1; then
+    win="$(wslpath -w "$file" 2>/dev/null)" || win=""
+  fi
+  # Windows drives are mounted as 9p (v9fs). There, mode 600 can sit beside
+  # a Windows access list that lets other accounts read the file, so only
+  # the access list counts; when it cannot be checked, refuse.
+  if [[ "$win" =~ ^[A-Za-z]: || "$(stat -f -c %T "$file" 2>/dev/null)" == v9fs ]]; then
+    if [[ ! "$win" =~ ^[A-Za-z]: ]]; then
+      err "$file is on a Windows drive, but its Windows permissions cannot be checked."
+      return 1
+    fi
+    state="$(windows_acl "$file")"
+    windows_owner_only "$state" "$kind" && return 0
+    sid="${state%% *}"
+    if [[ -z "$sid" || "${state#* }" != "O:${sid}D:"* ]]; then
+      err "$file must belong to your Windows account, and its permissions could not be checked."
+      return 1
+    fi
+    icacls.exe "$win" /inheritance:r /grant:r "*$sid:$grant" </dev/null >/dev/null 2>&1 || true
+    windows_owner_only "$(windows_acl "$file")" "$kind" && return 0
+    err "$file must be readable only by you. Remove the other accounts' access to it (Properties, Security) and run this again."
+    return 1
+  fi
+  chmod "$mode" "$file" 2>/dev/null || true
+  if [[ "$(stat -c '%a %u' "$file" 2>/dev/null)" != "$mode $(id -u)" ]]; then
+    err "$file must be yours and readable only by you (mode $mode), and could not be made so."
+    return 1
+  fi
+}
+
+# Refuse to start the development stack unless the values Compose resolves
+# (from .env, or exported in this shell) are present, generated, and agree.
+# The check runs in the server's dependency image with this checkout's code
+# (app/dev_env_check.py) and prints names, never values; Compose's own error
+# output, which can quote a .env line, is not shown.
+#
+# Known limits: the files are read again when the stack starts, so a change
+# to .env between this check and the start is not seen; and a checkout
+# whose .env differs from the one that set up the shared database passes
+# this check but its server cannot sign in to PostgreSQL (copy the right
+# .env and start again; no data is written or lost).
+require_dev_secrets() {
+  local env="$ROOT/$DEV_ENV_FILE" config image
+  if [[ -L "$env" || ! -f "$env" ]]; then
+    err "$DEV_ENV_FILE is missing or not a regular file."
+    exit 1
+  fi
+  ensure_owner_only "$env" || exit 1
+  if ! config="$(dev_compose config --format json 2>/dev/null)"; then
+    err "docker compose could not read $DEV_COMPOSE_FILE or $DEV_ENV_FILE. Check the syntax of both, and that"
+    err "$DEV_ENV_FILE sets POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, DATABASE_URL, and CONFIG_ENCRYPTION_KEY."
+    exit 1
+  fi
+  if ! image="$(server_deps_image)"; then
+    err "Could not build the server's dependency image to check $DEV_ENV_FILE."
+    exit 1
+  fi
+  local status=0
+  printf '%s' "$config" | docker run --rm -i -v "$ROOT/server/app:/app/app:ro" -w /app "$image" \
+    /opt/venv/bin/python -m app.dev_env_check || status=$?
+  case "$status" in
+    0) ;;
+    3)
+      # Each step runs only when the one before succeeded. nuke fails when it
+      # is cancelled or the volume survives, so .env is kept aside (never
+      # overwriting an earlier copy) only after the data is really gone.
+      err "The development stack does not start with these values (from $DEV_ENV_FILE, or exported in this shell)."
+      err "Values exported in this shell: unset them. Values in $DEV_ENV_FILE: start over with generated secrets,"
+      err "which DELETES the development data (nuke asks first):"
+      err "  test ! -e $DEV_ENV_FILE.old && test ! -L $DEV_ENV_FILE.old && scripts/local.sh nuke && ln -T $DEV_ENV_FILE $DEV_ENV_FILE.old && rm $DEV_ENV_FILE && scripts/local.sh up -b -d"
+      err "It stops at once if $DEV_ENV_FILE.old exists: move that file somewhere safe first."
+      exit 1
+      ;;
+    *)
+      err "The check of $DEV_ENV_FILE could not run (exit status $status). Stopped here."
+      exit 1
+      ;;
+  esac
 }
 
 dev_compose() {
@@ -54,6 +241,18 @@ toolchain_image() {
 
 version() {
   tr -d '[:space:]' <"$ROOT/VERSION"
+}
+
+# $1 random bytes from the kernel's CSPRNG, as lowercase hex. Used for every
+# secret the scripts generate. -v: od must not collapse repeated lines.
+random_hex() {
+  local hex
+  hex="$(od -An -v -tx1 -N"$1" /dev/urandom | tr -d ' \n')" || return 1
+  if ((${#hex} != $1 * 2)); then
+    err "Could not read $1 random bytes."
+    return 1
+  fi
+  printf '%s\n' "$hex"
 }
 
 # Run a shell command in the Flutter toolchain container, in app/ of the
@@ -153,15 +352,20 @@ verify_container_image() {
 # Build the server's dependency stage, used to run server code outside the
 # runtime image.
 server_deps_image() {
-  docker build -q --target deps -t tildeck-server:deps "$ROOT/server" >/dev/null
+  docker build -q --target deps -t tildeck-server:deps "$ROOT/server" >/dev/null || return 1
   printf 'tildeck-server:deps\n'
 }
 
-# Print the OpenAPI document the server code describes.
+# Print the OpenAPI document the server code describes. Building the app
+# needs the bootstrap values but never connects or encrypts, so it gets a
+# one-time key and a database URL without credentials.
 export_openapi() {
-  local image
-  image="$(server_deps_image)"
-  docker run --rm -v "$ROOT/server/app:/app/app:ro" -w /app "$image" \
+  local image key
+  image="$(server_deps_image)" || return 1
+  key="$(random_hex 32)" || return 1
+  DATABASE_URL="postgresql+asyncpg://export@localhost:5432/export" CONFIG_ENCRYPTION_KEY="$key" \
+    docker run --rm -e DATABASE_URL -e CONFIG_ENCRYPTION_KEY \
+    -v "$ROOT/server/app:/app/app:ro" -w /app "$image" \
     /opt/venv/bin/python -m app.openapi_export
 }
 
