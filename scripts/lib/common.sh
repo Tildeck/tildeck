@@ -102,12 +102,13 @@ ensure_dev_env() {
 
 # The current Windows user's SID and a file's owner and access list (SDDL),
 # separated by a space. The path reaches PowerShell through WSLENV, which
-# translates it, not through the command string.
+# translates it, not through the command string. stdin is closed: started
+# from WSL with an inherited stdin, PowerShell can print nothing.
 # shellcheck disable=SC2016 # the command is PowerShell code, expanded there
 windows_acl() {
   TILDECK_ACL_PATH="$1" WSLENV="TILDECK_ACL_PATH/p${WSLENV:+:$WSLENV}" powershell.exe -NoProfile -NonInteractive -Command \
     '[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value + " " + [System.IO.File]::GetAccessControl($env:TILDECK_ACL_PATH).GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]"Owner, Access")' \
-    2>/dev/null | tr -d '\r'
+    </dev/null 2>/dev/null | tr -d '\r'
 }
 
 # True when the SDDL says: owned by the SID, inheritance off, and one entry,
@@ -132,7 +133,7 @@ ensure_owner_only() {
       err "$file must belong to your Windows account, and its permissions could not be checked."
       return 1
     fi
-    icacls.exe "$win" /inheritance:r /grant:r "*$sid:F" >/dev/null 2>&1 || true
+    icacls.exe "$win" /inheritance:r /grant:r "*$sid:F" </dev/null >/dev/null 2>&1 || true
     windows_owner_only "$(windows_acl "$file")" && return 0
     err "$file must be readable only by you. Remove the other accounts' access to it (Properties, Security) and run this again."
     return 1
