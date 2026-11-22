@@ -48,7 +48,7 @@ require_dev_stack() {
 dev_db_volume_exists() {
   local found
   if ! found="$(docker volume ls -q --filter "name=^${DEV_DB_VOLUME}\$")"; then
-    err "Docker did not answer whether $DEV_DB_VOLUME exists. Nothing was changed."
+    err "Docker did not answer whether $DEV_DB_VOLUME exists. Stopped here."
     exit 1
   fi
   [[ -n "$found" ]]

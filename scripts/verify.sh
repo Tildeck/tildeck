@@ -313,11 +313,14 @@ verify_contract() {
 # line also matches; write such a list one name per line.
 fixed_secret_lines() {
   local q="[\"']" names="(POSTGRES_PASSWORD|CONFIG_ENCRYPTION_KEY)" found="" part status i
+  # Each value match ends with the character after the value (or the end of
+  # the line), so the check below sees whether a placeholder stands alone.
+  local term="([\"'[:space:],)\$/]|\$)"
   local -a searches=(
     '[a-z][a-z0-9+.-]*://[^/:@[:space:]"'"'"']+:[^@[:space:]/"'"'"']+@'
-    "$names=${q}?[^[:space:]\"'\$/]+"
-    "$names${q}\]?[[:space:]]*(=|,)[[:space:]]*${q}[^[:space:]\"'\$]+"
-    "$names:[[:space:]]+${q}?[^[:space:]\"'\$]+"
+    "$names=${q}?[^[:space:]\"'\$/]+$term"
+    "$names${q}\]?[[:space:]]*(=|,)[[:space:]]*${q}[^[:space:]\"'\$]+$term"
+    "$names:[[:space:]]+${q}?[^[:space:]\"'\$]+$term"
   )
   local -a where=(
     ". :!app/packages/tildeck_api"
@@ -325,14 +328,16 @@ fixed_secret_lines() {
     ". :!app/packages/tildeck_api"
     "*.yml *.yaml"
   )
-  # What is allowed, judged on the value alone: a URL password that is
-  # change-me or a $ reference; any other value that is change-me (the
-  # other patterns never match a $ reference).
+  # What is allowed, judged on the whole value: a URL password that is
+  # exactly change-me or a $ reference; any other value that is exactly
+  # change-me, quoted or ending the word (the other patterns never match a
+  # $ reference).
+  local placeholder="[=,:][[:space:]]*(${q}change-me${q}|change-me([[:space:]]|\$))\$"
   local -a allowed=(
-    ':(change-me|\$[^@]*)@$'
-    "[=,:][[:space:]]*${q}?change-me\$"
-    "[=,:][[:space:]]*${q}?change-me\$"
-    "[=,:][[:space:]]*${q}?change-me\$"
+    '://[^/:@[:space:]"'"'"']+:(change-me|\$[^@]*)@$'
+    "$placeholder"
+    "$placeholder"
+    "$placeholder"
   )
   local -a specs
   for i in 0 1 2 3; do
