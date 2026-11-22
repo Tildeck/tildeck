@@ -75,6 +75,6 @@ void main() {
     final key = vault.keys.single;
     expect(key.fingerprint, fingerprint);
     expect(key.privateKey.startsWith('-----BEGIN OPENSSH PRIVATE KEY-----'), isTrue, reason: 'OpenSSH form');
-    expect(key.passphrase, isNull, reason: 'the vault keeps it; it needs none of its own there');
+    expect(key.passphrase == null, isTrue, reason: 'the vault keeps it; it needs none of its own there');
   });
 }

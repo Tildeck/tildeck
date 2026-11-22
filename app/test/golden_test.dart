@@ -573,7 +573,7 @@ void main() {
             port: 3128,
             username: 'shlomi',
             // One character, as the image shows it masked: one dot.
-            password: testSecret().substring(0, 1),
+            password: testSecretLetter(),
           ),
         );
         return v;

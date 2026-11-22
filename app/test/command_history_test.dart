@@ -32,9 +32,12 @@ void main() {
     session.line.feed('\r');
     session.line.feed('ls -la\r');
     session.atPasswordPrompt = true;
-    session.line.feed('${testSecret()}\r');
+    final typedPassword = testSecret();
+    session.line.feed('$typedPassword\r');
     session.atPasswordPrompt = false;
     session.line.feed('cd /tmp\t\r');
+    // Checked first and on its own, so a failure never prints the password.
+    expect(session.commands.any((c) => c.contains(typedPassword)), isFalse, reason: 'never the password');
     expect(session.commands, ['df -h', 'ls -la'], reason: 'a line changed by Tab completion is not known');
 
     session.history = ['uptime', 'df -h'];

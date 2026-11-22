@@ -17,10 +17,21 @@ final _passphrase = _env['TILDECK_TEST_KEY_PASSPHRASE'];
 final _required = _env['TILDECK_REQUIRE_KEY_FILE_TESTS'] != null;
 
 /// The skip reason for a test that reads generated key files, or null when
-/// it runs.
-final String? keyFilesSkip = _dir == null && _passphrase == null && !_required
-    ? 'no generated key files in the environment (scripts/verify.sh --area app makes them)'
-    : null;
+/// it runs. With only part of the environment, or a directory that does not
+/// exist, the test file fails to load, so no test passes without its files.
+final String? keyFilesSkip = () {
+  if (_dir == null && _passphrase == null && !_required) {
+    return 'no generated key files in the environment (scripts/verify.sh --area app makes them)';
+  }
+  final dir = _dir;
+  if (dir == null || dir.isEmpty || (_passphrase ?? '').isEmpty || !Directory(dir).existsSync()) {
+    throw StateError(
+      'The generated key files are set up only in part: TILDECK_TEST_KEY_FILES (an existing directory) '
+      'and TILDECK_TEST_KEY_PASSPHRASE are both needed; scripts/verify.sh sets them.',
+    );
+  }
+  return null;
+}();
 
 /// The text of the generated file [name].
 String keyFile(String name) {

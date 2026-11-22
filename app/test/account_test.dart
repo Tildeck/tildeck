@@ -218,7 +218,7 @@ void main() {
     expect(await b.vault.unlock(ownPassword), isTrue);
     await expectLater(pending.collect(), throwsA(isA<DifferentVault>()));
     expect(b.vault.hosts.single.name, 'Only here');
-    expect(b.vault.account, isNull);
+    expect(b.vault.account == null, isTrue, reason: 'no account');
   });
 
   test('with two-factor sign-in on, signing in, a password change, and recovery need the code', () async {

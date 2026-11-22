@@ -48,12 +48,13 @@ void main() {
     await a.start();
     await b.start();
     final connector = SshConnector(knownHosts: MemoryKnownHosts());
+    final savedPassword = testSecret();
     TerminalSession open(Device d) => TerminalSession(
       ConnectionTarget(
         host: '127.0.0.1',
         port: d.server.port,
         username: '',
-        password: testSecret(),
+        password: savedPassword,
         protocol: ConnectionProtocol.telnet,
       ),
     );
@@ -84,7 +85,8 @@ void main() {
     await _until(() => a.text.contains('ls\r'), 'snippet');
     await Future<void>.delayed(const Duration(milliseconds: 100));
     expect(b.text, isNot(contains('\x1b[')), reason: 'no cursor report');
-    expect(b.text, isNot(contains('secret')), reason: 'no saved password');
+    expect(a.text.contains(savedPassword), isTrue, reason: 'the saved password went to its own session');
+    expect(b.text.contains(savedPassword), isFalse, reason: 'no saved password');
     expect(b.text, isNot(contains('ls')), reason: 'no snippet');
 
     one.onTyped = null;

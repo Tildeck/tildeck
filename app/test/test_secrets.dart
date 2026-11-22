@@ -34,12 +34,19 @@ String testCode() {
 /// A 6-digit code that is never [code].
 String otherCode(String code) => ((int.parse(code) + 1 + _random.nextInt(999999)) % 1000000).toString().padLeft(6, '0');
 
+/// One random letter, never `x` (once a fixed value in these tests): for
+/// a field that an image shows masked, as a single dot.
+String testSecretLetter() {
+  const letters = 'abcdefghijklmnopqrstuvwyz';
+  return letters[_random.nextInt(letters.length)];
+}
+
 /// [code] as a person might type it, with a space in the middle.
 String spaced(String code) => '${code.substring(0, 3)} ${code.substring(3)}';
 
 /// Whether [actual] is exactly [expected]. For lists that hold secrets:
 /// `expect` on the lists themselves would print the values on a failure.
-bool sameValues(List<String>? actual, List<String> expected) =>
+bool sameValues<T>(List<T>? actual, List<T> expected) =>
     actual != null &&
     actual.length == expected.length &&
     [for (var i = 0; i < actual.length; i++) actual[i] == expected[i]].every((same) => same);

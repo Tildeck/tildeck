@@ -79,7 +79,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 - The PostgreSQL 18 image digest in `docker-compose.yml` is refreshed; it still runs PostgreSQL 18.6.
 - Development and test secrets are generated, never fixed: `scripts/local.sh up` creates the development `.env` with random secrets the first time (readable only by you), and refuses to start with placeholder values; each verification run generates its own test database password and key. An existing development `.env` that still holds `change-me` must be replaced: `scripts/local.sh up` then prints one command that deletes the development data (`nuke` asks first), keeps the old `.env` as `.env.old` only after the delete succeeded, and starts again with new secrets. `scripts/local.sh nuke` now exits with an error when it is cancelled.
-- The client's tests keep no fixed keys or passwords: each verification run makes its own PuTTY and OpenSSH test keys (with puttygen) and its own passwords, passphrases, tokens, and codes, and the test SSH server gets its secrets through the environment, never on a command line. A guard fails when a private key file is tracked.
+- The client's tests keep no fixed keys or passwords: each verification run makes its own PuTTY and OpenSSH test keys (with puttygen) and its own passwords, passphrases, tokens, and codes, and the test SSH server's secrets reach its container through the environment, not on the docker command line. A guard fails when a private key file is tracked.
 
 ### Fixed
 

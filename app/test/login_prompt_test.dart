@@ -73,7 +73,7 @@ void main() {
       passwordUsed: false,
       onPasswordUsed: () {},
     );
-    expect(noAsk, isNull);
+    expect(noAsk == null, isTrue, reason: 'nothing answered');
 
     final plain = await SshConnector.answerLogin(
       request([('Password:', false)]),
@@ -90,7 +90,7 @@ void main() {
       onPasswordUsed: () {},
       ask: (_) async => null,
     );
-    expect(cancelled, isNull);
+    expect(cancelled == null, isTrue, reason: 'nothing answered');
 
     // A request with nothing to answer (an information message).
     expect(

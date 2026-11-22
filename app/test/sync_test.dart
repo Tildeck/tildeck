@@ -297,7 +297,7 @@ void main() {
     await old.load();
     expect(await old.unlock(password), isTrue);
     expect(old.cursor, 0);
-    expect(old.account, isNull);
+    expect(old.account == null, isTrue, reason: 'no account');
     expect(old.dirtyRecords.map((r) => r.id), [id]);
     expect(old.hosts.single.name, 'Old');
   });
@@ -430,7 +430,7 @@ void main() {
     expect(a.file.readAsStringSync().contains(server.tokenA), isFalse, reason: 'the device token');
     expect(a.file.readAsStringSync().contains('user@example.test'), isFalse);
     a.vault.lock();
-    expect(a.vault.account, isNull);
+    expect(a.vault.account == null, isTrue, reason: 'no account');
     await a.vault.unlock(password);
     expect(a.vault.account!.token == server.tokenA, isTrue, reason: 'the device token');
   });
@@ -442,21 +442,21 @@ void main() {
     final written = codec.encode(key);
     expect(written.replaceAll('-', ''), hasLength(RecoveryKeyCodec.length));
     expect(written.split('-').first, hasLength(4));
-    expect(codec.decode(written), key);
-    expect(codec.decode(written.toLowerCase().replaceAll('-', ' ')), key);
-    expect(codec.decode(written.replaceAll('0', 'O').replaceAll('1', 'I')), key);
+    expect(sameValues(codec.decode(written), key), isTrue, reason: 'read back');
+    expect(sameValues(codec.decode(written.toLowerCase().replaceAll('-', ' ')), key), isTrue, reason: 'any case');
+    expect(sameValues(codec.decode(written.replaceAll('0', 'O').replaceAll('1', 'I')), key), isTrue, reason: 'O and I');
 
     // One wrong character is caught before any network request.
     final chars = written.split('');
     final i = chars.indexWhere((c) => c != '-');
     chars[i] = chars[i] == 'A' ? 'B' : 'A';
-    expect(codec.decode(chars.join()), isNull);
-    expect(codec.decode(written.substring(0, written.length - 1)), isNull);
-    expect(codec.decode('${written}U'), isNull);
+    expect(codec.decode(chars.join()) == null, isTrue, reason: 'refused');
+    expect(codec.decode(written.substring(0, written.length - 1)) == null, isTrue, reason: 'refused');
+    expect(codec.decode('${written}U') == null, isTrue, reason: 'refused');
 
     final keys = crypto.recoveryKeys(Uint8List.fromList(key));
     final again = crypto.recoveryKeys(codec.decode(written)!);
-    expect(keys.authKey.extractBytes(), again.authKey.extractBytes());
-    expect(keys.authKey.extractBytes(), isNot(keys.wrapKey.extractBytes()));
+    expect(sameValues(keys.authKey.extractBytes(), again.authKey.extractBytes()), isTrue, reason: 'the same auth key');
+    expect(sameValues(keys.authKey.extractBytes(), keys.wrapKey.extractBytes()), isFalse, reason: 'two different keys');
   });
 }

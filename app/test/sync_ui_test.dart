@@ -99,7 +99,7 @@ void main() {
     await tap(tester, 'syncRegister');
     await waitFor(tester, () => shown(find.byKey(const ValueKey('syncError'))), 'the error');
     expect(find.text("That is not this vault's master password."), findsOneWidget);
-    expect(server.account, isNull);
+    expect(server.account == null, isTrue, reason: 'no account yet');
 
     await tester.enterText(find.byKey(const ValueKey('syncPassword')), password);
     final invite = testSecret();
@@ -194,7 +194,8 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await waitFor(tester, () => shown(find.text('Approve this device')), 'the approval screen');
     final waiting = server.devices.values.where((d) => d['status'] == 'pending').toList();
-    expect(waiting, hasLength(1), reason: '${server.devices}');
+    // The devices' names and states, never their tokens.
+    expect(waiting.length, 1, reason: '${[for (final d in server.devices.values) (d['name'], d['status'])]}');
     final fresh = waiting.single;
     expect(fresh['id'], isNot('old-id'), reason: 'a removed device comes back as a new one');
 

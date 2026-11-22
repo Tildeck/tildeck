@@ -44,13 +44,31 @@ KEYS_LABEL=""
 
 section() { printf '\n\033[1m== %s ==\033[0m\n' "$*"; }
 
+# Removes this run's labelled containers or volumes ($1: container or
+# volume). Warns, naming the label, when Docker cannot list or remove them,
+# so the test key volume is never left behind without a word.
+remove_labelled() {
+  local ids left
+  local -a list=(docker container ls -aq) remove=(docker container rm -f -v)
+  if [[ "$1" == volume ]]; then list=(docker volume ls -q) remove=(docker volume rm); fi
+  if ! ids="$("${list[@]}" --filter "label=$KEYS_LABEL" 2>/dev/null)"; then
+    warn "Could not list this run's test key ${1}s (label $KEYS_LABEL). Check: ${list[*]} --filter label=$KEYS_LABEL"
+    return
+  fi
+  if [[ -n "$ids" ]]; then
+    # shellcheck disable=SC2086 # one id per word
+    "${remove[@]}" $ids >/dev/null 2>&1 || true
+    if ! left="$("${list[@]}" --filter "label=$KEYS_LABEL" 2>/dev/null)" || [[ -n "$left" ]]; then
+      warn "Could not remove this run's test key ${1}s (label $KEYS_LABEL). Remove them with: ${remove[*]} \$(${list[*]} --filter label=$KEYS_LABEL)"
+    fi
+  fi
+}
+
 cleanup() {
   # The labelled containers first (the key generator and the Flutter run of
   # an interrupted run): the networks and the key volume below cannot go
   # while a container still uses them.
-  if [[ -n "$KEYS_LABEL" ]]; then
-    docker ps -aq --filter "label=$KEYS_LABEL" | xargs -r docker rm -f -v >/dev/null 2>&1 || true
-  fi
+  if [[ -n "$KEYS_LABEL" ]]; then remove_labelled container; fi
   # -v: the postgres image declares a data volume; without it every run
   # would leave an anonymous volume behind.
   docker rm -f -v "$PG_CONTAINER" >/dev/null 2>&1 || true
@@ -58,12 +76,7 @@ cleanup() {
   docker rm -f -v "$SSH_CONTAINER" >/dev/null 2>&1 || true
   docker rm -f -v "$TELNET_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$SSH_NET" >/dev/null 2>&1 || true
-  if [[ -n "$KEYS_LABEL" ]]; then
-    docker volume ls -q --filter "label=$KEYS_LABEL" | xargs -r docker volume rm >/dev/null 2>&1 || true
-    if [[ -n "$(docker volume ls -q --filter "label=$KEYS_LABEL" 2>/dev/null)" ]]; then
-      warn "Could not remove this run's test key volume (label $KEYS_LABEL). Remove it with: docker volume rm \$(docker volume ls -q --filter label=$KEYS_LABEL)"
-    fi
-  fi
+  if [[ -n "$KEYS_LABEL" ]]; then remove_labelled volume; fi
   rm -rf "${ROOT:?}/$CONTRACT_DIR"
 }
 trap cleanup EXIT
@@ -193,7 +206,7 @@ verify_image() {
 # a plain Ed25519 key, and a passphrase-protected one. Everything it holds is
 # generated here for this run and removed with the container. The values
 # reach the containers through the environment of the docker client, never
-# on a command line.
+# on the docker command line.
 start_test_sshd() {
   local password key_pass plain encrypted waited=0
   password="$(random_hex 18)" || return 1
@@ -313,7 +326,9 @@ argon="memory=8192,passes=21,parallelism=1"
 key() { # name, type, bits (or -), passphrase file, PPK parameters
   if [ "$3" = - ]; then set -- "$1" "$2" "" "$4" "$5"; fi
   puttygen -q -t "$2" ${3:+-b "$3"} -C "$1" --new-passphrase "$4" --ppk-param "$5" -o "$1.ppk"
-  puttygen -l -E sha256 "$1.ppk" | cut -d " " -f 1-3 >"$1.fp"
+  # Not in a pipeline: sh would take the status of the last command only.
+  fingerprint="$(puttygen -l -E sha256 "$1.ppk")"
+  printf "%s\n" "$fingerprint" | cut -d " " -f 1-3 >"$1.fp"
 }
 key ed25519-v3-plain ed25519 - /tmp/none version=3
 key ed25519-v3-argon2id ed25519 - /tmp/passphrase "version=3,kdf=argon2id,$argon"

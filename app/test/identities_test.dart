@@ -63,12 +63,12 @@ void main() {
     // No identity of its own: the group's, over the group's username.
     const inGroup = HostEntry(id: 'h1', name: 'Web', group: 'Production', host: 'web.example.com', username: 'root');
     var target = (await connectionTargetFor(context, vault, inGroup))!;
-    expect((target.username, target.privateKey == deployKey, target.password), ('deploy', true, null));
+    expect((target.username, target.privateKey == deployKey, target.password == null), ('deploy', true, true));
 
     // Its own identity wins over the group's.
     final own = HostEntry.fromJson('h2', {...inGroup.dataJson(), 'identity_id': 'i-pw'});
     target = (await connectionTargetFor(context, vault, own))!;
-    expect((target.username, target.privateKey, target.password == adminPassword), ('admin', null, true));
+    expect((target.username, target.privateKey == null, target.password == adminPassword), ('admin', true, true));
 
     // Changing the identity changes every host that uses it.
     await tester.runAsync(
