@@ -9,7 +9,11 @@
 // TILDECK_REQUIRE_KEY_FILE_TESTS set, as scripts/verify.sh and CI set it, or
 // with only part of the environment, those tests run and fail on anything
 // missing.
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:pointycastle/export.dart' as pc;
 
 /// The key files and passphrase these tests once kept in the repository.
 /// They are public now, so key files with one of these fingerprints, or
@@ -46,21 +50,54 @@ final String? keyFilesSkip = () {
       'and TILDECK_TEST_KEY_PASSPHRASE are both needed; scripts/verify.sh sets them.',
     );
   }
-  final published =
-      _passphrase == _onceCommittedPassphrase ||
-      Directory(dir)
-          .listSync()
-          .whereType<File>()
-          .where((f) => f.path.endsWith('.fp'))
-          .any((f) => _onceCommittedFingerprints.contains(f.readAsStringSync().trim().split(' ').last));
-  if (published) {
-    throw StateError(
-      'These key files or this passphrase were once kept in the repository and are public; '
-      'generate new ones (scripts/verify.sh does).',
-    );
+  if (_passphrase == _onceCommittedPassphrase) {
+    throw StateError('This passphrase was once kept in the repository and is public; use a new one.');
+  }
+  // Each key's fingerprint comes from the key file itself, so a stale .fp
+  // beside an old key cannot hide it.
+  for (final file in Directory(dir).listSync().whereType<File>()) {
+    final name = file.uri.pathSegments.last;
+    if (name.endsWith('.fp')) continue;
+    final fingerprint = _fingerprintOf(file.readAsStringSync());
+    if (fingerprint == null) continue;
+    if (_onceCommittedFingerprints.contains(fingerprint)) {
+      throw StateError('The key in $name was once kept in the repository and is public; generate new key files.');
+    }
+    final fp = File('$dir/${name.replaceFirst(RegExp(r'\.ppk$'), '')}.fp');
+    if (fp.existsSync() && fp.readAsStringSync().trim().split(' ').last != fingerprint) {
+      throw StateError("The fingerprint beside $name is not that key's; generate the key files again.");
+    }
   }
   return null;
 }();
+
+/// The SHA256 fingerprint of the public key in a PuTTY key file or an
+/// OpenSSH private key file, worked out here with pointycastle, not with
+/// the client's own key code; null for any other file.
+String? _fingerprintOf(String text) {
+  Uint8List? blob;
+  final lines = text.split('\n').map((l) => l.trim()).toList();
+  final publicLines = lines.indexWhere((l) => l.startsWith('Public-Lines: '));
+  if (lines.isNotEmpty && lines.first.startsWith('PuTTY-User-Key-File-') && publicLines >= 0) {
+    final count = int.parse(lines[publicLines].substring('Public-Lines: '.length));
+    blob = base64.decode(lines.sublist(publicLines + 1, publicLines + 1 + count).join());
+  } else if (lines.isNotEmpty && lines.first == '-----BEGIN OPENSSH PRIVATE KEY-----') {
+    final body = base64.decode(lines.skip(1).takeWhile((l) => !l.startsWith('-----END')).join());
+    // "openssh-key-v1\0", then cipher, KDF, and KDF options as strings, the
+    // number of keys, and the first public key as a string.
+    final data = ByteData.sublistView(body);
+    var offset = 'openssh-key-v1'.length + 1;
+    for (var i = 0; i < 3; i++) {
+      offset += 4 + data.getUint32(offset);
+    }
+    offset += 4;
+    final length = data.getUint32(offset);
+    blob = body.sublist(offset + 4, offset + 4 + length);
+  }
+  if (blob == null) return null;
+  final digest = pc.SHA256Digest().process(blob);
+  return 'SHA256:${base64.encode(digest).replaceAll('=', '')}';
+}
 
 /// The text of the generated file [name].
 String keyFile(String name) {
