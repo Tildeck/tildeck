@@ -76,7 +76,7 @@ def test_a_code_from_one_step_either_way_is_accepted_and_names_its_step():
 
 def test_digits_other_than_ascii_are_refused_like_a_wrong_code():
     now = time.time()
-    totp = distinct_codes(now)
+    totp = pyotp.TOTP(pyotp.random_base32())
     for typed in (fullwidth(totp.at(now)), arabic_indic(totp.at(now))):
         assert admins.totp_step(totp.secret, typed, None, now) is None
 
@@ -183,12 +183,15 @@ async def test_a_code_sent_twice_at_once_signs_in_once(client, mail, monkeypatch
         await holder.begin()
         await holder.execute(text("SELECT id FROM accounts WHERE email = :e FOR UPDATE"), {"e": keys.email})
         holder_pid = await holder.scalar(text("SELECT pg_backend_pid()"))
-        attempts = [asyncio.create_task(client.post("/api/account/signin", json=body, headers=H)) for _ in range(2)]
-        try:
-            both_waited = await _waiting_behind(holder_pid, 2)
-        finally:
-            await holder.rollback()
-            answers = await asyncio.gather(*attempts)
+        # The task group waits for both sign-ins, or cancels them, before
+        # the test goes on, whatever fails.
+        async with asyncio.TaskGroup() as group:
+            attempts = [group.create_task(client.post("/api/account/signin", json=body, headers=H)) for _ in range(2)]
+            try:
+                both_waited = await _waiting_behind(holder_pid, 2)
+            finally:
+                await holder.rollback()
+        answers = [attempt.result() for attempt in attempts]
     finally:
         await holder.close()
 
