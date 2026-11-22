@@ -73,13 +73,20 @@ ensure_dev_env() {
   fi
 
   log "Creating $DEV_ENV_FILE with generated secrets ..."
-  # Written completely into a private temporary file, then published with
-  # a hard link, which fails instead of replacing an existing file. The
-  # trap removes the temporary file on any exit, also an interrupted one.
-  DEV_ENV_TMP="$(mktemp "$env.new.XXXXXX")" || exit 1
-  trap 'rm -f -- "$DEV_ENV_TMP"' EXIT
+  # Written completely into a file inside a private temporary directory,
+  # then published with a hard link, which fails instead of replacing an
+  # existing file. The directory is made owner-only first, so the file is
+  # owner-only from the moment it exists (an access granted when a file is
+  # opened stays with that handle, so tightening it later is not enough).
+  # The trap removes the directory on any exit, also an interrupted one.
+  local tmp_file
+  DEV_ENV_TMP="$(mktemp -d "$env.new.XXXXXX")" || exit 1
+  trap 'rm -rf -- "$DEV_ENV_TMP"' EXIT
   trap 'exit 130' INT TERM HUP
-  ensure_owner_only "$DEV_ENV_TMP" || exit 1
+  ensure_owner_only "$DEV_ENV_TMP" dir || exit 1
+  tmp_file="$DEV_ENV_TMP/env"
+  (umask 077 && : >"$tmp_file") || exit 1
+  ensure_owner_only "$tmp_file" || exit 1
   password="$(random_hex 32)" || exit 1
   key="$(random_hex 32)" || exit 1
   {
@@ -91,17 +98,17 @@ ensure_dev_env() {
       /^CONFIG_ENCRYPTION_KEY=/ { print "CONFIG_ENCRYPTION_KEY=" ENVIRON["KEY"]; next }
       { print }
     ' "$ROOT/.env.example"
-  } >>"$DEV_ENV_TMP" || exit 1
-  if grep -E '^(POSTGRES_PASSWORD|DATABASE_URL|CONFIG_ENCRYPTION_KEY)=' "$DEV_ENV_TMP" | grep -q 'change-me' \
-    || (($(grep -cE '^(POSTGRES_PASSWORD|DATABASE_URL|CONFIG_ENCRYPTION_KEY)=' "$DEV_ENV_TMP") != 3)); then
+  } >>"$tmp_file" || exit 1
+  if grep -E '^(POSTGRES_PASSWORD|DATABASE_URL|CONFIG_ENCRYPTION_KEY)=' "$tmp_file" | grep -q 'change-me' \
+    || (($(grep -cE '^(POSTGRES_PASSWORD|DATABASE_URL|CONFIG_ENCRYPTION_KEY)=' "$tmp_file") != 3)); then
     err ".env.example no longer has the expected POSTGRES_PASSWORD, DATABASE_URL, and CONFIG_ENCRYPTION_KEY lines."
     exit 1
   fi
-  if ! ln -T -- "$DEV_ENV_TMP" "$env"; then
+  if ! ln -T -- "$tmp_file" "$env"; then
     err "$DEV_ENV_FILE appeared while it was being created. Nothing was overwritten."
     exit 1
   fi
-  rm -f -- "$DEV_ENV_TMP"
+  rm -rf -- "$DEV_ENV_TMP"
   trap - EXIT INT TERM HUP
   log "Created $DEV_ENV_FILE. Keep it: the development database needs these values."
 }
@@ -113,23 +120,29 @@ ensure_dev_env() {
 # shellcheck disable=SC2016 # the command is PowerShell code, expanded there
 windows_acl() {
   TILDECK_ACL_PATH="$1" WSLENV="TILDECK_ACL_PATH/p${WSLENV:+:$WSLENV}" powershell.exe -NoProfile -NonInteractive -Command \
-    '[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value + " " + [System.IO.File]::GetAccessControl($env:TILDECK_ACL_PATH).GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]"Owner, Access")' \
+    '$p = $env:TILDECK_ACL_PATH; $acl = if ([System.IO.Directory]::Exists($p)) { [System.IO.Directory]::GetAccessControl($p) } else { [System.IO.File]::GetAccessControl($p) }; [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value + " " + $acl.GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]"Owner, Access")' \
     </dev/null 2>/dev/null | tr -d '\r'
 }
 
 # True when the SDDL says: owned by the SID, inheritance off, and one entry,
 # full control for the SID. $1: "SID SDDL" from windows_acl.
+# $2: "dir" for a directory, whose one entry is inherited by the files
+# created in it (OICI).
 windows_owner_only() {
-  local sid="${1%% *}" sddl="${1#* }" want
-  want="^O:${sid}D:P[A-Z]*\\(A;;FA;;;${sid}\\)\$"
+  local sid="${1%% *}" sddl="${1#* }" flags="" want
+  [[ "${2:-}" == dir ]] && flags="OICI"
+  want="^O:${sid}D:P[A-Z]*\\(A;${flags};FA;;;${sid}\\)\$"
   [[ -n "$sid" && "$sddl" =~ $want ]]
 }
 
 # Make a file readable by its owner only, and verify it. On a Windows drive
 # under WSL, chmod has no effect and the Windows access list decides; it is
 # tightened in one icacls command (never widened on the way) and checked.
+# $2: "dir" for a directory (mode 700; on Windows, an entry its new files
+# inherit).
 ensure_owner_only() {
-  local file="$1" win="" state sid
+  local file="$1" kind="${2:-file}" win="" state sid grant="F" mode=600
+  if [[ "$kind" == dir ]]; then grant="(OI)(CI)F" mode=700; fi
   # A Windows drive gives C:\...; a WSL path gives \\wsl.localhost\...
   if command -v wslpath >/dev/null 2>&1; then
     win="$(wslpath -w "$file" 2>/dev/null)" || win=""
@@ -143,20 +156,20 @@ ensure_owner_only() {
       return 1
     fi
     state="$(windows_acl "$file")"
-    windows_owner_only "$state" && return 0
+    windows_owner_only "$state" "$kind" && return 0
     sid="${state%% *}"
     if [[ -z "$sid" || "${state#* }" != "O:${sid}D:"* ]]; then
       err "$file must belong to your Windows account, and its permissions could not be checked."
       return 1
     fi
-    icacls.exe "$win" /inheritance:r /grant:r "*$sid:F" </dev/null >/dev/null 2>&1 || true
-    windows_owner_only "$(windows_acl "$file")" && return 0
+    icacls.exe "$win" /inheritance:r /grant:r "*$sid:$grant" </dev/null >/dev/null 2>&1 || true
+    windows_owner_only "$(windows_acl "$file")" "$kind" && return 0
     err "$file must be readable only by you. Remove the other accounts' access to it (Properties, Security) and run this again."
     return 1
   fi
-  chmod 600 "$file" 2>/dev/null || true
-  if [[ "$(stat -c '%a %u' "$file" 2>/dev/null)" != "600 $(id -u)" ]]; then
-    err "$file must be yours and readable only by you (mode 600), and could not be made so."
+  chmod "$mode" "$file" 2>/dev/null || true
+  if [[ "$(stat -c '%a %u' "$file" 2>/dev/null)" != "$mode $(id -u)" ]]; then
+    err "$file must be yours and readable only by you (mode $mode), and could not be made so."
     return 1
   fi
 }
@@ -205,7 +218,7 @@ require_dev_secrets() {
       exit 1
       ;;
     *)
-      err "The check of $DEV_ENV_FILE could not run (exit status $status). Nothing was changed."
+      err "The check of $DEV_ENV_FILE could not run (exit status $status). Stopped here."
       exit 1
       ;;
   esac

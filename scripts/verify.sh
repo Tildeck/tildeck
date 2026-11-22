@@ -304,8 +304,9 @@ verify_contract() {
 
 # Tracked lines that give the bootstrap secrets a fixed value: a URL with
 # an inline password, or POSTGRES_PASSWORD / CONFIG_ENCRYPTION_KEY set to a
-# literal (shell and env files: NAME=value; YAML: NAME: value; any file:
-# ["NAME"] = "value" and ("NAME", "value")). The change-me placeholder and
+# literal (shell and env files: NAME=value and NAME='value'; YAML:
+# NAME: value; any file: ["NAME"] = "value" and ("NAME", "value")). The
+# change-me placeholder and
 # $ references are allowed. Prints path:line only, never the matched text,
 # so a found secret does not land in a log. Fails when the search itself
 # fails. A focused regression guard for these values, not a general secret
@@ -320,13 +321,15 @@ fixed_secret_lines() {
     '[a-z][a-z0-9+.-]*://[^/:@[:space:]"'"'"']+:[^@[:space:]/"'"'"']+@'
     "$names=${q}?[^[:space:]\"'\$/]+$term"
     "$names${q}\]?[[:space:]]*(=|,)[[:space:]]*${q}[^[:space:]\"'\$]+$term"
-    "$names:[[:space:]]+${q}?[^[:space:]\"'\$]+$term"
+    "$names:[[:space:]]+${q}?[^\"'\$]+([\"']|\$)"
+    "$names='[^']*'"
   )
   local -a where=(
     ". :!app/packages/tildeck_api"
     ". :!app/packages/tildeck_api :!*.py"
     ". :!app/packages/tildeck_api"
     "*.yml *.yaml"
+    ". :!app/packages/tildeck_api :!*.py"
   )
   # What is allowed, judged on the whole value: a URL password that is
   # exactly change-me or a $ reference; any other value that is exactly
@@ -337,10 +340,11 @@ fixed_secret_lines() {
     '://[^/:@[:space:]"'"'"']+:(change-me|\$[^@]*)@$'
     "$placeholder"
     "$placeholder"
-    "$placeholder"
+    ":[[:space:]]+(${q}change-me${q}|change-me[[:space:]]*)\$"
+    "='change-me'\$"
   )
   local -a specs
-  for i in 0 1 2 3; do
+  for i in 0 1 2 3 4; do
     status=0
     # Split into pathspecs without glob expansion by the shell.
     read -ra specs <<<"${where[i]}"
