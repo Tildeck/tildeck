@@ -118,17 +118,19 @@ def totp_step(secret: str, code: str, last_step: int | None, now: float | None =
     """The time step [code] belongs to, or None. A step at or before
     [last_step] was already used, so a replayed code is refused."""
     code = code.strip().replace(" ", "")
-    if len(code) != 6 or not code.isdigit():
+    # PyOTP normalizes Unicode before comparing; a code here is six ASCII
+    # digits, so other digits are refused like a wrong code.
+    if len(code) != 6 or not (code.isascii() and code.isdigit()):
         return None
-    totp = pyotp.TOTP(secret)
-    now = _now() if now is None else now
-    current = int(now) // totp.interval
-    for step in range(current - TOTP_WINDOW, current + TOTP_WINDOW + 1):
-        if last_step is not None and step <= last_step:
-            continue
-        if hmac.compare_digest(totp.at(step * totp.interval), code):
-            return step
-    return None
+    try:
+        step = pyotp.TOTP(secret).verify_and_get_timecode(
+            code, for_time=_now() if now is None else now, valid_window=TOTP_WINDOW
+        )
+    except pyotp.OTPVerificationError:
+        return None
+    # PyOTP's replay rule: a step at or before the last accepted one was
+    # used already.
+    return None if last_step is not None and step <= last_step else step
 
 
 async def open_session(session: AsyncSession, admin: Admin) -> tuple[str, str]:

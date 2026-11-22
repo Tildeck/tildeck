@@ -27,6 +27,7 @@ from tests.test_accounts import (  # noqa: F401 - mail is a fixture
     register,
     verify,
 )
+from tests.test_totp import fullwidth
 
 USERNAME = "operator"
 PASSWORD = "a-long-admin-password"
@@ -71,7 +72,12 @@ class Authenticator:
         return self.totp.at(self.now)
 
     def next(self) -> str:
+        """A code from a later step. A step whose code equals the previous
+        step's is skipped: the server matches the earliest step in its
+        window, which was already used."""
         self.now += self.totp.interval
+        while self.code() == self.totp.at(self.now - self.totp.interval):
+            self.now += self.totp.interval
         return self.code()
 
 
@@ -155,6 +161,17 @@ async def test_admin_attempts_sent_at_once_cannot_get_past_the_limit(panel, monk
     body = {"username": USERNAME, "password": "not-the-password", "code": "000000"}
     answers = await asyncio.gather(*(panel.post("/api/admin/session", json=body) for _ in range(15)))
     assert sorted(a.status_code for a in answers) == [401] * 10 + [429] * 5
+
+
+async def test_a_code_in_other_digits_is_refused_like_a_wrong_one(panel, monkeypatch):
+    csrf, phone = await set_up(panel, monkeypatch)
+    await panel.delete("/api/admin/session", headers=csrf)
+    code = phone.next()
+    body = {"username": USERNAME, "password": PASSWORD, "code": fullwidth(code)}
+    res = await panel.post("/api/admin/session", json=body)
+    assert (res.status_code, res.json()) == (401, {"error": "invalid_credentials"})
+    # The refused attempt did not use the step.
+    assert (await panel.post("/api/admin/session", json={**body, "code": code})).status_code == 200
 
 
 async def test_a_code_sent_twice_at_once_signs_in_once(panel, monkeypatch):
