@@ -103,7 +103,7 @@ cmd_status() {
 # "nuke" is typed in full.
 cmd_nuke() {
   require_dev_stack
-  if ! docker volume inspect "$DEV_DB_VOLUME" >/dev/null 2>&1; then
+  if ! dev_db_volume_exists; then
     warn "Volume $DEV_DB_VOLUME does not exist. Removing containers only."
     dev_compose down --remove-orphans
     exit 0
@@ -117,7 +117,7 @@ cmd_nuke() {
     exit 1
   fi
   dev_compose down --remove-orphans --volumes
-  if docker volume inspect "$DEV_DB_VOLUME" >/dev/null 2>&1; then
+  if dev_db_volume_exists; then
     err "$DEV_DB_VOLUME still exists after the delete."
     exit 1
   fi

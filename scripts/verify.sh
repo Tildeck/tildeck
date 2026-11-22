@@ -309,7 +309,8 @@ verify_contract() {
 # $ references are allowed. Prints path:line only, never the matched text,
 # so a found secret does not land in a log. Fails when the search itself
 # fails. A focused regression guard for these values, not a general secret
-# scanner.
+# scanner. It errs on the strict side: a quoted list of setting names on one
+# line also matches; write such a list one name per line.
 fixed_secret_lines() {
   local q="[\"']" names="(POSTGRES_PASSWORD|CONFIG_ENCRYPTION_KEY)" found="" part status i
   local -a searches=(
@@ -324,6 +325,15 @@ fixed_secret_lines() {
     ". :!app/packages/tildeck_api"
     "*.yml *.yaml"
   )
+  # What is allowed, judged on the value alone: a URL password that is
+  # change-me or a $ reference; any other value that is change-me (the
+  # other patterns never match a $ reference).
+  local -a allowed=(
+    ':(change-me|\$[^@]*)@$'
+    "[=,:][[:space:]]*${q}?change-me\$"
+    "[=,:][[:space:]]*${q}?change-me\$"
+    "[=,:][[:space:]]*${q}?change-me\$"
+  )
   local -a specs
   for i in 0 1 2 3; do
     status=0
@@ -331,13 +341,11 @@ fixed_secret_lines() {
     read -ra specs <<<"${where[i]}"
     part="$(git grep -nIoE -e "${searches[i]}" -- "${specs[@]}")" || status=$?
     if ((status > 1)); then return 1; fi
-    found+="$part"$'\n'
+    if [[ -n "$part" ]]; then
+      found+="$(grep -vE "${allowed[i]}" <<<"$part" || true)"$'\n'
+    fi
   done
-  # Dropped: placeholders, $ references, and a list of the setting names
-  # themselves, such as ("DATABASE_URL", "CONFIG_ENCRYPTION_KEY").
-  grep -vE 'change-me|:\$|^$' <<<"$found" \
-    | grep -vE ',[[:space:]]*["'"'"'](TEST_)?(DATABASE_URL|CONFIG_ENCRYPTION_KEY|POSTGRES_PASSWORD|APP_ENV)$' \
-    | cut -d: -f1,2 | sort -u || true
+  grep -v '^$' <<<"$found" | cut -d: -f1,2 | sort -u || true
 }
 
 # The files allowed at the repository root (docs/project-foundation.md,

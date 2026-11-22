@@ -42,23 +42,29 @@ require_dev_stack() {
   fi
 }
 
+# Whether the development database volume exists. docker volume ls fails
+# when Docker cannot answer, and then this exits: an error is never taken
+# for a missing volume.
+dev_db_volume_exists() {
+  local found
+  if ! found="$(docker volume ls -q --filter "name=^${DEV_DB_VOLUME}\$")"; then
+    err "Docker did not answer whether $DEV_DB_VOLUME exists. Nothing was changed."
+    exit 1
+  fi
+  [[ -n "$found" ]]
+}
+
 # The ignored .env of the development stack, created once with generated
 # secrets (scripts/local.sh up). An existing file is never overwritten.
 ensure_dev_env() {
-  local env="$ROOT/$DEV_ENV_FILE" volumes password key
+  local env="$ROOT/$DEV_ENV_FILE" password key
   if [[ -L "$env" || (-e "$env" && ! -f "$env") ]]; then
     err "$DEV_ENV_FILE is not a regular file. Move it away and run this again."
     exit 1
   fi
   [[ -f "$env" ]] && return 0
 
-  # docker volume ls fails when Docker is unreachable, so an error is never
-  # taken for a missing volume.
-  if ! volumes="$(docker volume ls -q --filter "name=^${DEV_DB_VOLUME}\$")"; then
-    err "Docker is not reachable."
-    exit 1
-  fi
-  if [[ -n "$volumes" ]]; then
+  if dev_db_volume_exists; then
     err "$DEV_ENV_FILE is missing, but the development database ($DEV_DB_VOLUME) exists."
     err "It was set up with another $DEV_ENV_FILE: copy that file here, from the checkout that created it."
     err "Or delete the development data, which cannot be undone:"
@@ -194,7 +200,7 @@ require_dev_secrets() {
       err "The development stack does not start with these values (from $DEV_ENV_FILE, or exported in this shell)."
       err "Values exported in this shell: unset them. Values in $DEV_ENV_FILE: start over with generated secrets,"
       err "which DELETES the development data (nuke asks first):"
-      err "  test ! -e $DEV_ENV_FILE.old && scripts/local.sh nuke && ln -T $DEV_ENV_FILE $DEV_ENV_FILE.old && rm $DEV_ENV_FILE && scripts/local.sh up -b -d"
+      err "  test ! -e $DEV_ENV_FILE.old && test ! -L $DEV_ENV_FILE.old && scripts/local.sh nuke && ln -T $DEV_ENV_FILE $DEV_ENV_FILE.old && rm $DEV_ENV_FILE && scripts/local.sh up -b -d"
       err "It stops at once if $DEV_ENV_FILE.old exists: move that file somewhere safe first."
       exit 1
       ;;

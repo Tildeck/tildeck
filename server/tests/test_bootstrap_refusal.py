@@ -127,7 +127,8 @@ def test_tests_drop_other_spellings_of_the_settings():
         Config_Encryption_Key="change-me",
     )
     assert result.returncode == 0, result.stderr[-2000:]
-    assert result.stdout.strip().splitlines()[-1] == "['CONFIG_ENCRYPTION_KEY', 'DATABASE_URL']"
+    names = result.stdout.strip().splitlines()[-1]
+    assert names == str(sorted(["DATABASE_URL", "CONFIG_ENCRYPTION_KEY"]))
 
 
 @pytest.mark.parametrize(

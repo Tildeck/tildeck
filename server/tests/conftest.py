@@ -30,7 +30,11 @@ if _problem:
 
 # Settings reads names case-insensitively: another spelling left in the
 # environment (database_url) could win over the values set here.
-for _var in ("DATABASE_URL", "CONFIG_ENCRYPTION_KEY", "APP_ENV"):
+for _var in (
+    "DATABASE_URL",
+    "CONFIG_ENCRYPTION_KEY",
+    "APP_ENV",
+):
     for _other in variant_spellings(os.environ, _var):
         del os.environ[_other]
 
