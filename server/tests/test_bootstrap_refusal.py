@@ -16,7 +16,12 @@ from app import dev_env_check
 from app.config import RETIRED_VALUES
 
 SERVER = Path(__file__).resolve().parents[1]
-VARIABLES = ("TEST_DATABASE_URL", "TEST_CONFIG_ENCRYPTION_KEY", "DATABASE_URL", "CONFIG_ENCRYPTION_KEY")
+VARIABLES = (
+    "TEST_DATABASE_URL",
+    "TEST_CONFIG_ENCRYPTION_KEY",
+    "DATABASE_URL",
+    "CONFIG_ENCRYPTION_KEY",
+)
 
 
 def url(password: str, database: str = "tildeck_test") -> str:
