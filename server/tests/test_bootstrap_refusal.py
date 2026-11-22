@@ -238,14 +238,14 @@ def test_dev_stack_refuses_bad_values(config, expected):
 @pytest.mark.parametrize(
     ("stdin", "status"),
     [
-        (json.dumps(compose_config(password="change-me")), 1),
+        (json.dumps(compose_config(password="change-me")), dev_env_check.VALUES_TO_REPLACE),
         ("not json " + DUMMY, 2),
         (json.dumps({"services": {"server": {"environment": {"DATABASE_URL": url(DUMMY)}}}}), 2),
     ],
     ids=["value-to-replace", "unreadable", "missing-service"],
 )
 def test_dev_stack_check_never_prints_a_value(stdin, status, monkeypatch, capsys):
-    # 1 asks for new values; 2 means the check could not judge them.
+    # 3 asks for new values; 2 means the check could not judge them.
     monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
     assert dev_env_check.main() == status
     out, err = capsys.readouterr()

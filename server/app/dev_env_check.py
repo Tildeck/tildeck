@@ -5,8 +5,9 @@
 scripts/local.sh and scripts/try-pr.sh run this in the server's dependency
 image. It reads the configuration that Compose resolved, so a variable
 exported in the shell that overrides .env is seen too. It prints only
-variable names and problems, never a value. Exit status 1: a value must be
-replaced; 2: the configuration could not be read.
+variable names and problems, never a value. Exit status 3: a value must be
+replaced; 2: the configuration could not be read. Any other failure (1 is
+Python's own for a crash) means the check did not run.
 """
 
 import json
@@ -16,6 +17,7 @@ from sqlalchemy.engine import make_url
 
 from app.config import MIN_KEY_LENGTH, database_url_problem, generated_value_problem, variant_spellings
 
+VALUES_TO_REPLACE = 3
 CHECKED = {"postgres": ("POSTGRES_PASSWORD",), "server": ("DATABASE_URL", "CONFIG_ENCRYPTION_KEY")}
 
 
@@ -59,7 +61,7 @@ def main() -> int:
     found = problems(config)
     for problem in found:
         print(problem, file=sys.stderr)
-    return 1 if found else 0
+    return VALUES_TO_REPLACE if found else 0
 
 
 if __name__ == "__main__":

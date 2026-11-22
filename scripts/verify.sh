@@ -333,10 +333,10 @@ fixed_secret_lines() {
     if ((status > 1)); then return 1; fi
     found+="$part"$'\n'
   done
-  # Dropped: placeholders, $ references, and a quoted NAME after a name (a
-  # list of variable names, not a value).
+  # Dropped: placeholders, $ references, and a list of the setting names
+  # themselves, such as ("DATABASE_URL", "CONFIG_ENCRYPTION_KEY").
   grep -vE 'change-me|:\$|^$' <<<"$found" \
-    | grep -vE '[,=][[:space:]]*["'"'"'][A-Z][A-Z0-9_]*$' \
+    | grep -vE ',[[:space:]]*["'"'"'](TEST_)?(DATABASE_URL|CONFIG_ENCRYPTION_KEY|POSTGRES_PASSWORD|APP_ENV)$' \
     | cut -d: -f1,2 | sort -u || true
 }
 

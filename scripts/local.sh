@@ -113,7 +113,8 @@ cmd_nuke() {
   read -r -p "Type nuke to confirm: " confirm
   if [[ "$confirm" != "nuke" ]]; then
     log "Cancelled. Nothing changed."
-    exit 0
+    # Non-zero, so a command chained after nuke runs only after a delete.
+    exit 1
   fi
   dev_compose down --remove-orphans --volumes
   if docker volume inspect "$DEV_DB_VOLUME" >/dev/null 2>&1; then

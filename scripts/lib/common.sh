@@ -187,13 +187,15 @@ require_dev_secrets() {
     /opt/venv/bin/python -m app.dev_env_check || status=$?
   case "$status" in
     0) ;;
-    1)
-      # Each step runs only when the one before succeeded: .env is moved
-      # aside only after the database volume is really gone.
+    3)
+      # Each step runs only when the one before succeeded. nuke fails when it
+      # is cancelled or the volume survives, so .env is kept aside (never
+      # overwriting an earlier copy) only after the data is really gone.
       err "The development stack does not start with these values (from $DEV_ENV_FILE, or exported in this shell)."
       err "Values exported in this shell: unset them. Values in $DEV_ENV_FILE: start over with generated secrets,"
       err "which DELETES the development data (nuke asks first):"
-      err "  scripts/local.sh nuke && ! docker volume inspect $DEV_DB_VOLUME >/dev/null 2>&1 && mv $DEV_ENV_FILE $DEV_ENV_FILE.old && scripts/local.sh up -b -d"
+      err "  test ! -e $DEV_ENV_FILE.old && scripts/local.sh nuke && ln -T $DEV_ENV_FILE $DEV_ENV_FILE.old && rm $DEV_ENV_FILE && scripts/local.sh up -b -d"
+      err "It stops at once if $DEV_ENV_FILE.old exists: move that file somewhere safe first."
       exit 1
       ;;
     *)
