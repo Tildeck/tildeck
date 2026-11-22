@@ -75,6 +75,10 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - SSH sessions in the client: connect with a password or a private key, sessions in tabs, host key verification with a warning when a server's key changes, and an on-screen key bar on Android.
 - Project foundation: repository baseline, sync server shell with health checks and a settings registry, admin panel shell, client app shell for Windows and Android, Docker definitions, workflow scripts, and CI.
 
+### Changed
+
+- The PostgreSQL 18 image digest in `docker-compose.yml` is refreshed; it still runs PostgreSQL 18.6.
+
 ### Fixed
 
 - Biometric unlock on Android asked for the fingerprint before the app was back in front, so the system closed the prompt unseen and only the master password was left; it now asks when the app is in front, and again after the system closes it.
@@ -94,4 +98,4 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 
 ### Security
 
-- The admin panel's dependencies are updated with upstream security fixes, and the PostgreSQL 18 image in `docker-compose.yml` is updated to the current release.
+- The admin panel's dependencies are updated with upstream security fixes.
