@@ -440,8 +440,8 @@ void main() {
     final codec = RecoveryKeyCodec(crypto);
     final key = crypto.newRecoveryKey();
     final written = codec.encode(key);
-    expect(written.replaceAll('-', ''), hasLength(RecoveryKeyCodec.length));
-    expect(written.split('-').first, hasLength(4));
+    expect(written.replaceAll('-', '').length, RecoveryKeyCodec.length);
+    expect(written.split('-').first.length, 4);
     expect(sameValues(codec.decode(written), key), isTrue, reason: 'read back');
     expect(sameValues(codec.decode(written.toLowerCase().replaceAll('-', ' ')), key), isTrue, reason: 'any case');
     expect(sameValues(codec.decode(written.replaceAll('0', 'O').replaceAll('1', 'I')), key), isTrue, reason: 'O and I');

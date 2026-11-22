@@ -79,7 +79,7 @@ void main() {
     );
     final text = exportBackup(a);
     expect(text.contains(token), isFalse, reason: 'the device token');
-    expect(text, isNot(contains('db.example.com')), reason: 'records stay encrypted');
+    expect(text.contains('db.example.com'), isFalse, reason: 'records stay encrypted');
     expect(text.contains(keyMaterial), isFalse, reason: 'the private key');
     expect((jsonDecode(text) as Map).containsKey('account'), isFalse);
 

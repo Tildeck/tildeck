@@ -84,14 +84,16 @@ void main() {
     one.run('ls');
     await _until(() => a.text.contains('ls\r'), 'snippet');
     await Future<void>.delayed(const Duration(milliseconds: 100));
-    expect(b.text, isNot(contains('\x1b[')), reason: 'no cursor report');
-    expect(a.text.contains(savedPassword), isTrue, reason: 'the saved password went to its own session');
+    // Booleans, the password first: a failure never prints the traffic,
+    // which may hold the password.
     expect(b.text.contains(savedPassword), isFalse, reason: 'no saved password');
-    expect(b.text, isNot(contains('ls')), reason: 'no snippet');
+    expect(a.text.contains(savedPassword), isTrue, reason: 'the saved password went to its own session');
+    expect(b.text.contains('\x1b['), isFalse, reason: 'no cursor report');
+    expect(b.text.contains('ls'), isFalse, reason: 'no snippet');
 
     one.onTyped = null;
     one.terminal.textInput('w');
     await _until(() => a.text.endsWith('w'));
-    expect(b.text, isNot(endsWith('w')), reason: 'off again');
+    expect(b.text.endsWith('w'), isFalse, reason: 'off again');
   });
 }
