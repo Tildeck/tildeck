@@ -1,3 +1,5 @@
+import secrets
+
 import pytest
 from sqlalchemy import select
 
@@ -23,7 +25,7 @@ async def test_stored_value_is_encrypted_at_rest_and_logged(session):
 
 
 async def test_secret_is_redacted_in_the_log_and_never_listed(session, monkeypatch):
-    await settings_store.set_value(session, "smtp_password", "hunter2-secret", actor="admin@test")
+    await settings_store.set_value(session, "smtp_password", secrets.token_urlsafe(24), actor="admin@test")
     await session.flush()
 
     entry = (await session.scalars(select(AuditEntry).where(AuditEntry.entity_id == "smtp_password"))).one()
@@ -35,11 +37,12 @@ async def test_secret_is_redacted_in_the_log_and_never_listed(session, monkeypat
     assert listed["smtp_password"]["origin"] == "database"
 
     # Not even an environment value is revealed.
-    monkeypatch.setenv("SMTP_PASSWORD", "from-the-environment")
+    from_env = secrets.token_urlsafe(24)
+    monkeypatch.setenv("SMTP_PASSWORD", from_env)
     listed = {item["key"]: item for item in await settings_store.describe_all(session)}
     assert "value" not in listed["smtp_password"]
     assert listed["smtp_password"]["origin"] == "env"
-    assert "from-the-environment" not in repr(listed)
+    assert from_env not in repr(listed)
 
 
 async def test_environment_wins_and_locks_the_field(session, monkeypatch):

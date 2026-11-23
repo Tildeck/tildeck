@@ -2,6 +2,7 @@
 sign-in"), against a real PostgreSQL."""
 
 import asyncio
+import secrets
 import time
 
 import pyotp
@@ -41,6 +42,17 @@ class Phone:
         while self.code() == self.totp.at(self.now - self.totp.interval):
             self.now += self.totp.interval
         return self.code()
+
+    def wrong(self) -> str:
+        return wrong_code(self.totp, self.now)
+
+
+def wrong_code(totp: pyotp.TOTP, now: float) -> str:
+    """A random code the server refuses at [now]: no step in its window has it."""
+    while True:
+        code = f"{secrets.randbelow(999_999) + 1:06d}"
+        if not totp.verify(code, for_time=now, valid_window=admins.TOTP_WINDOW):
+            return code
 
 
 def distinct_codes(now: float) -> pyotp.TOTP:
@@ -83,13 +95,13 @@ def test_digits_other_than_ascii_are_refused_like_a_wrong_code():
 
 async def turn_on(client, token: str, monkeypatch) -> Phone:
     start = await client.post("/api/account/totp/start", headers=bearer(token))
-    assert start.status_code == 200, start.text
+    assert start.status_code == 200, start.status_code
     enrollment = start.json()
     assert enrollment["uri"].startswith("otpauth://totp/Tildeck:")
     assert enrollment["qr_image"].startswith("data:image/svg+xml")
     phone = Phone(enrollment["secret"], monkeypatch)
     done = await client.post("/api/account/totp/confirm", json={"code": phone.code()}, headers=bearer(token))
-    assert done.status_code == 204, done.text
+    assert done.status_code == 204, done.status_code
     return phone
 
 
@@ -99,11 +111,11 @@ async def test_turning_it_on_needs_a_code_from_the_new_secret(client, mail, monk
     assert (await client.get("/api/account", headers=bearer(token))).json()["totp_enabled"] is False
 
     start = (await client.post("/api/account/totp/start", headers=bearer(token))).json()
-    wrong = await client.post("/api/account/totp/confirm", json={"code": "000000"}, headers=bearer(token))
+    phone = Phone(start["secret"], monkeypatch)
+    wrong = await client.post("/api/account/totp/confirm", json={"code": phone.wrong()}, headers=bearer(token))
     assert (wrong.status_code, wrong.json()) == (401, {"error": "invalid_totp"})
     assert (await client.get("/api/account", headers=bearer(token))).json()["totp_enabled"] is False
 
-    phone = Phone(start["secret"], monkeypatch)
     other = await client.post(
         "/api/account/totp/confirm", json={"code": fullwidth(phone.code())}, headers=bearer(token)
     )
@@ -131,7 +143,7 @@ async def test_sign_in_needs_the_code_and_a_code_works_once(client, mail, monkey
     # A wrong key never says whether a code is needed.
     res = await signin(auth_key=b64(32))
     assert (res.status_code, res.json()) == (401, {"error": "invalid_credentials"})
-    res = await signin(totp_code="000000")
+    res = await signin(totp_code=phone.wrong())
     assert (res.status_code, res.json()) == (401, {"error": "invalid_credentials"})
 
     code = phone.next()
@@ -221,7 +233,7 @@ async def test_changing_the_master_password_needs_the_code(client, mail, monkeyp
     res = await client.post("/api/account/password", json=body, headers=bearer(token))
     assert (res.status_code, res.json()) == (401, {"error": "totp_required"})
     res = await client.post("/api/account/password", json={**body, "totp_code": phone.next()}, headers=bearer(token))
-    assert res.status_code == 204, res.text
+    assert res.status_code == 204, res.status_code
 
 
 async def test_recovery_needs_the_code_at_both_steps(client, mail, monkeypatch):  # noqa: F811
@@ -242,7 +254,7 @@ async def test_recovery_needs_the_code_at_both_steps(client, mail, monkeypatch):
     res = await client.post("/api/account/recovery/complete", json=complete, headers=H)
     assert (res.status_code, res.json()) == (401, {"error": "totp_required"})
     res = await client.post("/api/account/recovery/complete", json={**complete, "totp_code": code}, headers=H)
-    assert res.status_code == 200, res.text
+    assert res.status_code == 200, res.status_code
     # The code was spent.
     res = await client.post(
         "/api/account/recovery/complete", json={**complete, "device": device(), "totp_code": code}, headers=H
@@ -254,7 +266,7 @@ async def test_turning_it_off_needs_a_current_code(client, mail, monkeypatch):  
     keys = Keys("user@example.test")
     token = await register(client, keys)
     phone = await turn_on(client, token, monkeypatch)
-    res = await client.post("/api/account/totp/disable", json={"code": "000000"}, headers=bearer(token))
+    res = await client.post("/api/account/totp/disable", json={"code": phone.wrong()}, headers=bearer(token))
     assert (res.status_code, res.json()) == (401, {"error": "invalid_totp"})
     res = await client.post("/api/account/totp/disable", json={"code": phone.next()}, headers=bearer(token))
     assert res.status_code == 204
