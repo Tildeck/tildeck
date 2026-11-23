@@ -13,6 +13,8 @@ import 'package:tildeck/ui/hosts_page.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   testWidgets('create, save a host, auto-lock, lock, and unlock', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
@@ -55,7 +57,7 @@ void main() {
     await tester.pump();
     expect(find.text('This password is too common. Choose another one.'), findsOneWidget);
 
-    const password = 'orange-kettle-winter-42';
+    final password = testSecret();
     await tester.enterText(find.byKey(const ValueKey('masterPassword')), password);
     await tester.enterText(find.byKey(const ValueKey('confirmPassword')), password);
     await tester.tap(find.byKey(const ValueKey('createVault')));

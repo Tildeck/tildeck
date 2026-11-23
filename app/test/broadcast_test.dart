@@ -8,6 +8,8 @@ import 'package:tildeck/ssh/known_hosts.dart';
 import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/ssh/terminal_session.dart';
 
+import 'test_secrets.dart';
+
 /// A Telnet server that keeps what it is sent.
 class Device {
   late final ServerSocket server;
@@ -46,12 +48,13 @@ void main() {
     await a.start();
     await b.start();
     final connector = SshConnector(knownHosts: MemoryKnownHosts());
+    final savedPassword = testSecret();
     TerminalSession open(Device d) => TerminalSession(
       ConnectionTarget(
         host: '127.0.0.1',
         port: d.server.port,
         username: '',
-        password: 'secret',
+        password: savedPassword,
         protocol: ConnectionProtocol.telnet,
       ),
     );
@@ -81,13 +84,16 @@ void main() {
     one.run('ls');
     await _until(() => a.text.contains('ls\r'), 'snippet');
     await Future<void>.delayed(const Duration(milliseconds: 100));
-    expect(b.text, isNot(contains('\x1b[')), reason: 'no cursor report');
-    expect(b.text, isNot(contains('secret')), reason: 'no saved password');
-    expect(b.text, isNot(contains('ls')), reason: 'no snippet');
+    // Booleans, the password first: a failure never prints the traffic,
+    // which may hold the password.
+    expect(b.text.contains(savedPassword), isFalse, reason: 'no saved password');
+    expect(a.text.contains(savedPassword), isTrue, reason: 'the saved password went to its own session');
+    expect(b.text.contains('\x1b['), isFalse, reason: 'no cursor report');
+    expect(b.text.contains('ls'), isFalse, reason: 'no snippet');
 
     one.onTyped = null;
     one.terminal.textInput('w');
     await _until(() => a.text.endsWith('w'));
-    expect(b.text, isNot(endsWith('w')), reason: 'off again');
+    expect(b.text.endsWith('w'), isFalse, reason: 'off again');
   });
 }

@@ -13,6 +13,8 @@ import 'package:tildeck/vault/password_rules.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   test('every word typed must match the name, the detail, or the kind', () {
     final item = PaletteItem(
@@ -37,11 +39,13 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       // Nothing listens on port 1: the session ends at once, which is all
       // the tab needs.
       for (final name in ['Alpha', 'Beta']) {
-        await v.put(HostEntry(id: v.newId(), name: name, host: '127.0.0.1', port: 1, username: 'ops', password: 'x'));
+        await v.put(
+          HostEntry(id: v.newId(), name: name, host: '127.0.0.1', port: 1, username: 'ops', password: testSecret()),
+        );
       }
       return v;
     }))!;

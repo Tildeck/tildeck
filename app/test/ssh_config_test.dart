@@ -14,6 +14,9 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'generated_keys.dart';
+import 'test_secrets.dart';
+
 const config = '''
 # Work
 Host bastion
@@ -80,14 +83,14 @@ void main() {
       dir = await Directory.systemTemp.createTemp('tildeck-import');
       vault = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await vault.load();
-      await vault.create('orange-kettle-winter-42');
+      await vault.create(testSecret());
       ed25519 = generateEd25519(vault.crypto.sodium, 'test');
     });
     tearDown(() => dir.delete(recursive: true));
 
-    test("a PuTTY session's .ppk key comes in when it has no passphrase", () async {
-      final plain = File('test/fixtures/ppk/ed25519-v3-plain.ppk').readAsStringSync();
-      final locked = File('test/fixtures/ppk/rsa-v2-encrypted.ppk').readAsStringSync();
+    test("a PuTTY session's .ppk key comes in when it has no passphrase", skip: keyFilesSkip, () async {
+      final plain = keyFile('ed25519-v3-plain.ppk');
+      final locked = keyFile('rsa-v2-encrypted.ppk');
       final result = await importSshHosts(
         vault,
         [
@@ -100,8 +103,8 @@ void main() {
       expect((result.hosts, result.keys), (2, 1));
       expect(result.unreadableKeys, [r'C:\keys\locked.ppk'], reason: 'a passphrase is asked on the Keys page');
       final key = vault.keys.single;
-      expect(key.fingerprint, File('test/fixtures/ppk/ed25519-v3-plain.fp').readAsStringSync().trim().split(' ').last);
-      expect(key.privateKey, startsWith('-----BEGIN OPENSSH PRIVATE KEY-----'), reason: 'kept in OpenSSH form');
+      expect(key.fingerprint, keyFileFingerprint('ed25519-v3-plain').fingerprint);
+      expect(key.privateKey.startsWith('-----BEGIN OPENSSH PRIVATE KEY-----'), isTrue, reason: 'kept in OpenSSH form');
       expect(vault.hosts.firstWhere((h) => h.name == 'router').keyId, key.id);
     });
 
@@ -150,7 +153,7 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       await v.put(
         const HostEntry(id: 'h1', name: 'Bastion', host: 'bastion.example.com', port: 2222, username: 'jump'),
       );

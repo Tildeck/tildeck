@@ -9,11 +9,12 @@ import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
 import 'fake_sync_server.dart';
+import 'test_secrets.dart';
 
 const address = 'https://sync.example.test';
 const email = 'user@example.test';
-const password = 'orange-kettle-winter-42';
-const newPassword = 'lantern-river-autumn-77';
+final password = testSecret();
+final newPassword = testSecret();
 
 late Directory dir;
 late FakeSyncServer server;
@@ -201,7 +202,8 @@ void main() {
   test('a device whose vault locks while it waits for approval keeps its own vault', () async {
     await registered();
     final b = await Device('b').load();
-    await b.vault.create('a-different-password-1');
+    final ownPassword = testSecret();
+    await b.vault.create(ownPassword);
     await b.vault.put(HostEntry(id: b.vault.newId(), name: 'Only here', host: 'lab.example.com', username: 'me'));
     final pending = (await b.accounts.signIn(address: address, email: email, password: password, deviceName: 'Phone'))!;
     server.devices[pending.pending.deviceId]!['status'] = 'active';
@@ -213,32 +215,32 @@ void main() {
     expect(b.vault.status, VaultStatus.locked);
 
     // Opened again, the approval is collected and the vaults compared.
-    expect(await b.vault.unlock('a-different-password-1'), isTrue);
+    expect(await b.vault.unlock(ownPassword), isTrue);
     await expectLater(pending.collect(), throwsA(isA<DifferentVault>()));
     expect(b.vault.hosts.single.name, 'Only here');
-    expect(b.vault.account, isNull);
+    expect(b.vault.account == null, isTrue, reason: 'no account');
   });
 
   test('with two-factor sign-in on, signing in, a password change, and recovery need the code', () async {
     final (a, rk) = await registered();
     await a.accounts.startTwoFactor();
-    await expectLater(a.accounts.confirmTwoFactor('000000'), throwsA(isA<SyncFailure>()));
-    await a.accounts.confirmTwoFactor('123 456');
+    await expectLater(a.accounts.confirmTwoFactor(otherCode(server.totpCode)), throwsA(isA<SyncFailure>()));
+    await a.accounts.confirmTwoFactor(spaced(server.totpCode));
     expect(await a.accounts.twoFactorEnabled(), isTrue);
 
     final b = await Device('b').load();
     Future<PendingDevice?> signIn([String? code]) =>
         b.accounts.signIn(address: address, email: email, password: password, deviceName: 'Phone', totpCode: code);
     await expectLater(signIn(), throwsA(isA<TotpRequired>()));
-    await expectLater(signIn('999999'), throwsA(isA<WrongMasterPassword>()));
-    expect(await signIn('123456'), isNotNull, reason: 'pending approval, past both factors');
+    await expectLater(signIn(otherCode(server.totpCode)), throwsA(isA<WrongMasterPassword>()));
+    expect(await signIn(server.totpCode), isNotNull, reason: 'pending approval, past both factors');
 
     await expectLater(
       a.accounts.changePassword(current: password, newPassword: newPassword),
       throwsA(isA<TotpRequired>()),
     );
     expect(await a.opensWith(password), isTrue, reason: 'nothing changed');
-    await a.accounts.changePassword(current: password, newPassword: newPassword, totpCode: '123456');
+    await a.accounts.changePassword(current: password, newPassword: newPassword, totpCode: server.totpCode);
     expect(server.passwordChanges, 1);
 
     final c = await Device('c').load();
@@ -252,17 +254,17 @@ void main() {
     );
     await expectLater(recover(), throwsA(isA<TotpRequired>()));
     expect(c.vault.status, VaultStatus.missing);
-    await recover('123456');
+    await recover(server.totpCode);
     expect(c.vault.status, VaultStatus.unlocked);
 
-    await c.accounts.disableTwoFactor('123456');
+    await c.accounts.disableTwoFactor(server.totpCode);
     expect(await c.accounts.twoFactorEnabled(), isFalse);
   });
 
   test('a device holding another vault is refused before anything changes on the server', () async {
     final (_, rk) = await registered();
     final other = await Device('other').load();
-    await other.vault.create('a-different-password-1');
+    await other.vault.create(testSecret());
     final activeBefore = server.devices.values.where((d) => d['status'] == 'active').length;
     await expectLater(
       other.accounts.recover(

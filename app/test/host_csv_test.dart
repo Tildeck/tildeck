@@ -9,6 +9,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   test('CSV fields may be quoted, hold commas, quotes, and line breaks', () {
     expect(parseCsv('a,"b,c","say ""hi""","two\nlines"\r\n\r\nx,y\n'), [
@@ -42,15 +44,16 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     final vault = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/v.json'));
     await vault.load();
-    await vault.create('orange-kettle-winter-42');
+    await vault.create(testSecret());
+    final password = testSecret();
     await vault.put(
-      const HostEntry(
+      HostEntry(
         id: 'h1',
         name: 'Web, primary',
         host: 'web.example.com',
         port: 2222,
         username: 'deploy',
-        password: 'SECRET-PASSWORD',
+        password: password,
         group: 'Production',
         tags: ['nginx', 'eu'],
       ),
@@ -66,11 +69,11 @@ void main() {
       ),
     );
     final csv = hostsToCsv(vault.hosts);
-    expect(csv, isNot(contains('SECRET-PASSWORD')));
+    expect(csv.contains(password), isFalse, reason: 'the password');
 
     final other = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/o.json'));
     await other.load();
-    await other.create('orange-kettle-winter-42');
+    await other.create(testSecret());
     await importSshHosts(other, parseHostsCsv(csv), readFile: (_) async => null, defaultUser: 'local');
     final byName = {for (final h in other.hosts) h.name: h};
     final web = byName['Web, primary']!;

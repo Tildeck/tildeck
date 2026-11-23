@@ -27,6 +27,11 @@ FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87
 # A throwaway OpenSSH server the client's SSH tests connect to.
 FROM linuxserver/openssh-server:10.3_p1-r1-ls237@sha256:946fa26105e0ec212fdf821b9ddc59aab65f2c2d07c02b25ff0f5001fc332ff0 AS openssh
 
+# Makes the one-time key files the client's key import tests read
+# (scripts/verify.sh): puttygen from putty-tools, installed at run time,
+# which must be release 0.83.
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS keygen
+
 # A throwaway Telnet server (BusyBox telnetd) the client's Telnet tests use.
 FROM busybox:1.38@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4 AS telnet
 

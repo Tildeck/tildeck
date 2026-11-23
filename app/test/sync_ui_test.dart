@@ -17,8 +17,12 @@ import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
 import 'fake_sync_server.dart';
+import 'test_secrets.dart';
 
-const password = 'orange-kettle-winter-42';
+final password = testSecret();
+final newPassword = testSecret();
+final thirdPassword = testSecret();
+final oldToken = testSecret();
 
 void main() {
   late Directory dir;
@@ -95,10 +99,11 @@ void main() {
     await tap(tester, 'syncRegister');
     await waitFor(tester, () => shown(find.byKey(const ValueKey('syncError'))), 'the error');
     expect(find.text("That is not this vault's master password."), findsOneWidget);
-    expect(server.account, isNull);
+    expect(server.account == null, isTrue, reason: 'no account yet');
 
     await tester.enterText(find.byKey(const ValueKey('syncPassword')), password);
-    await tester.enterText(find.byKey(const ValueKey('syncInvite')), ' invite-code-123 ');
+    final invite = testSecret();
+    await tester.enterText(find.byKey(const ValueKey('syncInvite')), ' $invite ');
     await tap(tester, 'syncRegister');
     await waitFor(tester, () => shown(find.byKey(const ValueKey('recoveryKey'))), 'the recovery key');
 
@@ -112,8 +117,12 @@ void main() {
     await waitFor(tester, () => server.records.isNotEmpty && a.dirtyRecords.isEmpty, 'the first upload');
     await tester.pump();
     expect(find.text('Signed in as user@example.test'), findsOneWidget);
-    expect(server.account!['auth_key'], isNot(contains(password)));
-    expect(server.account!['invite_code'], 'invite-code-123');
+    expect(
+      (server.account!['auth_key'] as String).contains(password),
+      isFalse,
+      reason: 'the auth key is not the password',
+    );
+    expect(server.account!['invite_code'] == invite, isTrue, reason: 'the invite code, without its spaces');
 
     // The second device has no vault: it signs in and waits for approval.
     final b = (await tester.runAsync(() async {
@@ -159,17 +168,17 @@ void main() {
       };
       keys.dispose();
       await v.setAccount(
-        const SyncAccount(
+        SyncAccount(
           server: 'https://sync.example.test',
           email: 'user@example.test',
           deviceId: 'old-id',
           deviceName: 'Office PC',
-          token: 'token-old',
+          token: oldToken,
         ),
       );
       return v;
     }))!;
-    server.devices['old-id'] = {'id': 'old-id', 'name': 'Office PC', 'status': 'revoked', 'token': 'token-old'};
+    server.devices['old-id'] = {'id': 'old-id', 'name': 'Office PC', 'status': 'revoked', 'token': oldToken};
 
     await tester.pumpWidget(app(vault));
     await waitFor(tester, () => shown(find.byKey(const ValueKey('openSync'))), 'the main screen');
@@ -185,7 +194,8 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await waitFor(tester, () => shown(find.text('Approve this device')), 'the approval screen');
     final waiting = server.devices.values.where((d) => d['status'] == 'pending').toList();
-    expect(waiting, hasLength(1), reason: '${server.devices}');
+    // The devices' names and states, never their tokens.
+    expect(waiting.length, 1, reason: '${[for (final d in server.devices.values) (d['name'], d['status'])]}');
     final fresh = waiting.single;
     expect(fresh['id'], isNot('old-id'), reason: 'a removed device comes back as a new one');
 
@@ -236,8 +246,8 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('recoverAddress')), 'https://sync.example.test');
     await tester.enterText(find.byKey(const ValueKey('recoverEmail')), 'user@example.test');
     await tester.enterText(find.byKey(const ValueKey('recoverKey')), recoveryKey);
-    await tester.enterText(find.byKey(const ValueKey('newPassword')), 'lantern-river-autumn-77');
-    await tester.enterText(find.byKey(const ValueKey('newPasswordConfirm')), 'lantern-river-autumn-77');
+    await tester.enterText(find.byKey(const ValueKey('newPassword')), newPassword);
+    await tester.enterText(find.byKey(const ValueKey('newPasswordConfirm')), newPassword);
     await tap(tester, 'recover');
     await waitFor(tester, () => vault.status == VaultStatus.unlocked && shown(find.text('Database')), 'the vault');
 
@@ -248,9 +258,9 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, 'settings-password');
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('currentPassword')), 'lantern-river-autumn-77');
-    await tester.enterText(find.byKey(const ValueKey('newPassword')), 'harbor-maple-sunrise-15');
-    await tester.enterText(find.byKey(const ValueKey('newPasswordConfirm')), 'harbor-maple-sunrise-15');
+    await tester.enterText(find.byKey(const ValueKey('currentPassword')), newPassword);
+    await tester.enterText(find.byKey(const ValueKey('newPassword')), thirdPassword);
+    await tester.enterText(find.byKey(const ValueKey('newPasswordConfirm')), thirdPassword);
     await tap(tester, 'changePassword');
     await waitFor(
       tester,
@@ -260,7 +270,7 @@ void main() {
     final reopened = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/a.json'));
       await v.load();
-      return v.unlock('harbor-maple-sunrise-15');
+      return v.unlock(thirdPassword);
     }))!;
     expect(reopened, isTrue);
   });
@@ -273,8 +283,8 @@ void main() {
       return v;
     }))!;
     server.account = {'email': 'user@example.test'};
-    final me = server.devices['me'] = {'id': 'me', 'name': 'Office PC', 'status': 'active', 'token': 'token-a'};
-    server.devices['phone'] = {'id': 'phone', 'name': 'Phone', 'status': 'pending', 'token': 'token-p'};
+    final me = server.devices['me'] = {'id': 'me', 'name': 'Office PC', 'status': 'active', 'token': server.tokenA};
+    server.devices['phone'] = {'id': 'phone', 'name': 'Phone', 'status': 'pending', 'token': testSecret()};
     await tester.runAsync(
       () => vault.setAccount(
         SyncAccount(
@@ -282,7 +292,7 @@ void main() {
           email: 'user@example.test',
           deviceId: me['id']!,
           deviceName: 'Office PC',
-          token: 'token-a',
+          token: server.tokenA,
         ),
       ),
     );

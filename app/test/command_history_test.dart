@@ -11,6 +11,8 @@ import 'package:tildeck/ui/command_history.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 /// Real file work finishes outside the fake clock.
 Future<void> waitFor(WidgetTester tester, bool Function() done) async {
   for (var i = 0; i < 1000 && !done(); i++) {
@@ -30,9 +32,12 @@ void main() {
     session.line.feed('\r');
     session.line.feed('ls -la\r');
     session.atPasswordPrompt = true;
-    session.line.feed('hunter2\r');
+    final typedPassword = testSecret();
+    session.line.feed('$typedPassword\r');
     session.atPasswordPrompt = false;
     session.line.feed('cd /tmp\t\r');
+    // Checked first and on its own, so a failure never prints the password.
+    expect(session.commands.any((c) => c.contains(typedPassword)), isFalse, reason: 'never the password');
     expect(session.commands, ['df -h', 'ls -la'], reason: 'a line changed by Tab completion is not known');
 
     session.history = ['uptime', 'df -h'];
@@ -48,7 +53,7 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       return v;
     }))!;
     final session = _session();

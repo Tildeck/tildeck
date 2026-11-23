@@ -16,6 +16,8 @@ import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 import 'package:xterm/xterm.dart';
 
+import 'test_secrets.dart';
+
 final env = Platform.environment;
 final host = env['TILDECK_TEST_SSH_HOST'];
 
@@ -42,7 +44,7 @@ void main() {
       final vault = (await tester.runAsync(() async {
         final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
         await v.load();
-        await v.create('orange-kettle-winter-42');
+        await v.create(testSecret());
         return v;
       }))!;
 

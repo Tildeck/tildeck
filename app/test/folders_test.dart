@@ -12,6 +12,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   test('folders are paths, shown parents first with the folders above them', () {
     expect(canonicalGroup(' Production / Web '), 'Production/Web');
@@ -41,6 +43,7 @@ void main() {
     expect(hostCountUnder('', byFolder), 1);
   });
 
+  final prodKey = testSecret();
   late Directory dir;
   setUp(() async => dir = await Directory.systemTemp.createTemp('tildeck-folders'));
   tearDown(() => dir.delete(recursive: true));
@@ -48,8 +51,8 @@ void main() {
   Future<Vault> openVault(WidgetTester tester) async => (await tester.runAsync(() async {
     final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
     await v.load();
-    await v.create('orange-kettle-winter-42');
-    await v.put(const KeyEntry(id: 'k1', name: 'Prod key', privateKey: 'KEY'));
+    await v.create(testSecret());
+    await v.put(KeyEntry(id: 'k1', name: 'Prod key', privateKey: prodKey));
     await v.put(const GroupEntry(id: 'g1', name: 'Prod', username: 'ops', keyId: 'k1', env: {'A': '1', 'B': '1'}));
     await v.put(const GroupEntry(id: 'g2', name: 'Prod/Web', username: 'web', env: {'B': '2'}));
     await v.put(
@@ -87,7 +90,7 @@ void main() {
       ),
     );
     final target = (await connectionTargetFor(context, vault, vault.entry<HostEntry>('h1')!))!;
-    expect((target.username, target.privateKey), ('web', 'KEY'));
+    expect((target.username, target.privateKey == prodKey), ('web', true));
     expect(target.environment, {'A': '1', 'B': '2'});
   });
 

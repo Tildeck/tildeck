@@ -10,6 +10,8 @@ import 'package:tildeck/ui/known_hosts_page.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 Future<void> waitFor(WidgetTester tester, bool Function() done) async {
   for (var i = 0; i < 1000 && !done(); i++) {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
@@ -28,7 +30,7 @@ void main() {
     final (vault, known) = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       final known = VaultKnownHosts(v);
       await known.trust('db.example.com', 2222, key);
       await known.trust('web.example.com', 22, key);

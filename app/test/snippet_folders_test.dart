@@ -10,6 +10,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   test('a snippet keeps its folder; one from before folders has none', () {
     const s = SnippetEntry(id: 's', name: 'Restart', command: 'x', folder: 'Nginx');
@@ -26,7 +28,7 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       await v.put(const SnippetEntry(id: 's1', name: 'Restart', command: 'systemctl restart nginx', folder: 'Nginx'));
       await v.put(const SnippetEntry(id: 's2', name: 'Uptime', command: 'uptime'));
       return v;

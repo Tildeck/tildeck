@@ -30,6 +30,7 @@ import 'package:tildeck/ssh/terminal_session.dart';
 import 'package:tildeck/sync/account_service.dart';
 import 'package:tildeck/sync/sync_engine.dart';
 import 'package:tildeck/sync/sync_server.dart';
+import 'package:tildeck/sync/recovery_key.dart';
 import 'package:tildeck/theme.dart';
 import 'package:tildeck/ui/connect_form.dart';
 import 'package:tildeck/ui/file_editor_page.dart';
@@ -54,6 +55,7 @@ import 'package:xterm/xterm.dart' show TerminalView;
 
 import 'fake_certificates.dart';
 import 'fake_sync_server.dart';
+import 'test_secrets.dart';
 
 Future<void> loadFonts() async {
   Future<void> load(String family, List<String> files) async {
@@ -140,13 +142,22 @@ final sampleCertificate = certificateFor(
   before: 1893456000,
 );
 
+/// The recovery key the recovery screens show in these images. Deliberately
+/// invalid display data: the app's decoder refuses it (its padding bits are
+/// not zero), so it is no one's recovery key and opens nothing. A test below
+/// keeps it that way.
+const sampleRecoveryKey = 'K7QD-2M9X-VH4T-8RWC-ZP3N-6YJB-F1GE-5SAK-0T8M-QW2D-HX7C-9VNR-4BJP-E6F';
+
+/// The master password of [sampleVault], new for each run.
+final sampleMasterPassword = testSecret();
+
 /// A vault with sample hosts in two groups, unlocked or locked.
 Future<Vault> sampleVault({required bool unlocked}) async {
   final dir = await Directory.systemTemp.createTemp('tildeck-golden');
   final vault = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
   await vault.load();
-  await vault.create('orange-kettle-winter-42');
-  const key = KeyEntry(id: 'k1', name: 'Laptop Ed25519', privateKey: 'x');
+  await vault.create(sampleMasterPassword);
+  final key = KeyEntry(id: 'k1', name: 'Laptop Ed25519', privateKey: testSecret());
   await vault.put(key);
   for (final h in const [
     HostEntry(
@@ -299,6 +310,10 @@ Future<void> settle(WidgetTester tester) async {
 void main() {
   setUpAll(loadFonts);
 
+  test('the sample recovery key is not a valid recovery key', () async {
+    expect(RecoveryKeyCodec(await VaultCrypto.load()).decode(sampleRecoveryKey), isNull);
+  });
+
   for (final locale in ['en', 'he']) {
     for (final mode in [ThemeMode.light, ThemeMode.dark]) {
       testWidgets('hosts $locale ${mode.name}', (tester) async {
@@ -426,10 +441,7 @@ void main() {
           Scaffold(
             body: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
-              child: RecoveryKeyView(
-                recoveryKey: 'K7QD-2M9X-VH4T-8RWC-ZP3N-6YJB-F1GE-5SAK-0T8M-QW2D-HX7C-9VNR-4BJP-E6F',
-                onDone: () {},
-              ),
+              child: RecoveryKeyView(recoveryKey: sampleRecoveryKey, onDone: () {}),
             ),
           ),
         ),
@@ -440,20 +452,21 @@ void main() {
 
     testWidgets('sync signed in $locale ${mode.name}', (tester) async {
       phone(tester);
-      final server = FakeSyncServer()
+      final server = FakeSyncServer();
+      server
         ..account = {'email': 'shlomi@example.com'}
-        ..devices['me'] = {'id': 'me', 'name': 'Office PC', 'status': 'active', 'token': 'token-a'}
-        ..devices['laptop'] = {'id': 'laptop', 'name': 'Travel laptop', 'status': 'active', 'token': 'token-l'}
-        ..devices['phone'] = {'id': 'phone', 'name': 'Pixel 9', 'status': 'pending', 'token': 'token-p'};
+        ..devices['me'] = {'id': 'me', 'name': 'Office PC', 'status': 'active', 'token': server.tokenA}
+        ..devices['laptop'] = {'id': 'laptop', 'name': 'Travel laptop', 'status': 'active', 'token': testSecret()}
+        ..devices['phone'] = {'id': 'phone', 'name': 'Pixel 9', 'status': 'pending', 'token': testSecret()};
       final services = (await tester.runAsync(() async {
         final vault = await sampleVault(unlocked: true);
         await vault.setAccount(
-          const SyncAccount(
+          SyncAccount(
             server: 'https://sync.example.com',
             email: 'shlomi@example.com',
             deviceId: 'me',
             deviceName: 'Office PC',
-            token: 'token-a',
+            token: server.tokenA,
           ),
         );
         return syncServices(vault, server);
@@ -480,10 +493,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const ValueKey('recoverAddress')), 'https://sync.example.com');
       await tester.enterText(find.byKey(const ValueKey('recoverEmail')), 'shlomi@example.com');
-      await tester.enterText(
-        find.byKey(const ValueKey('recoverKey')),
-        'K7QD-2M9X-VH4T-8RWC-ZP3N-6YJB-F1GE-5SAK-0T8M-QW2D-HX7C-9VNR-4BJP-E6F',
-      );
+      await tester.enterText(find.byKey(const ValueKey('recoverKey')), sampleRecoveryKey);
       // The default device name is the machine's: fixed here for a stable image.
       await tester.enterText(find.byKey(const ValueKey('recoverDeviceName')), 'Office PC');
       await tester.pumpAndSettle();
@@ -555,14 +565,15 @@ void main() {
           ),
         );
         await v.put(
-          const ProxyEntry(
+          ProxyEntry(
             id: 'p1',
             name: 'Office proxy',
             kind: ProxyKind.http,
             host: 'proxy.office.example.com',
             port: 3128,
             username: 'shlomi',
-            password: 'x',
+            // One character, as the image shows it masked: one dot.
+            password: testSecretLetter(),
           ),
         );
         return v;
@@ -660,7 +671,7 @@ void main() {
           KeyEntry(
             id: 'k1',
             name: 'Laptop Ed25519',
-            privateKey: 'x',
+            privateKey: testSecret(),
             keyType: 'ssh-ed25519',
             fingerprint: 'SHA256:3kDbQ0yq8pZs1m8o5kqf2m5bN7r0A9dEo6wQz1cX4sY',
             publicKey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ laptop',
@@ -668,10 +679,10 @@ void main() {
           ),
         );
         await v.put(
-          const KeyEntry(
+          KeyEntry(
             id: 'k2',
             name: 'Old servers',
-            privateKey: 'x',
+            privateKey: testSecret(),
             keyType: 'ssh-rsa',
             fingerprint: 'SHA256:Vt9QwLr2bH6cN1xZs0pK4yF8mE3uJ7aG5dR2oW9nT1k',
             publicKey: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ old',
@@ -767,7 +778,7 @@ void main() {
       final vault = (await tester.runAsync(() async {
         final v = await sampleVault(unlocked: true);
         await v.put(IdentityEntry(id: 'i1', name: 'Deploy', username: 'deploy', keyId: v.keys.first.id));
-        await v.put(const IdentityEntry(id: 'i2', name: 'Admin', username: 'admin', password: 'secret'));
+        await v.put(IdentityEntry(id: 'i2', name: 'Admin', username: 'admin', password: testSecret()));
         await v.put(const IdentityEntry(id: 'i3', name: 'Backup', username: 'backup'));
         return v;
       }))!;
@@ -844,12 +855,13 @@ void main() {
     testWidgets('waiting for approval $locale ${mode.name}', (tester) async {
       phone(tester);
       final server = FakeSyncServer();
+      final password = sampleMasterPassword;
       final pending = (await tester.runAsync(() async {
         final first = syncServices(await sampleVault(unlocked: true), server);
         await first.accounts.register(
           address: 'https://sync.example.com',
           email: 'shlomi@example.com',
-          password: 'orange-kettle-winter-42',
+          password: password,
           locale: 'en',
           deviceName: 'Office PC',
         );
@@ -860,7 +872,7 @@ void main() {
         return syncServices(empty, server).accounts.signIn(
           address: 'https://sync.example.com',
           email: 'shlomi@example.com',
-          password: 'orange-kettle-winter-42',
+          password: password,
           deviceName: 'Pixel 9',
         );
       }))!;
@@ -1013,7 +1025,7 @@ void main() {
         final v = await sampleVault(unlocked: true);
         for (final (id, name, os) in [('s1', 'Web 01', HostOs.ubuntu), ('s2', 'Database', HostOs.fedora)]) {
           await v.put(
-            HostEntry(id: id, name: name, host: '127.0.0.1', port: 1, username: 'ops', password: 'x', os: os),
+            HostEntry(id: id, name: name, host: '127.0.0.1', port: 1, username: 'ops', password: testSecret(), os: os),
           );
         }
         return v;

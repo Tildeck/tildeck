@@ -7,6 +7,12 @@ import 'package:tildeck/ssh/ssh_connector.dart';
 import 'package:tildeck/theme.dart';
 import 'package:tildeck/ui/login_prompt_dialog.dart';
 
+import 'test_secrets.dart';
+
+/// The host's saved password and the code the user types, new for each run.
+final savedPassword = testSecret();
+final userCode = testCode();
+
 SSHUserInfoRequest request(List<(String, bool)> prompts) =>
     SSHUserInfoRequest('', '', [for (final (text, echo) in prompts) SSHUserInfoPrompt(text, echo)]);
 
@@ -31,18 +37,18 @@ void main() {
     final asked = <String>[];
     Future<List<String>?> ask(List<SSHUserInfoPrompt> prompts) async {
       asked.addAll(prompts.map((p) => p.promptText));
-      return ['123456'];
+      return [userCode];
     }
 
     // Password and code in one request (pam_unix then pam_google_authenticator).
     final both = await SshConnector.answerLogin(
       request([('Password: ', false), ('Verification code: ', false)]),
-      password: 'secret',
+      password: savedPassword,
       passwordUsed: used,
       onPasswordUsed: () => used = true,
       ask: ask,
     );
-    expect(both, ['secret', '123456']);
+    expect(sameValues(both, [savedPassword, userCode]), isTrue, reason: 'the saved password, then the code');
     expect(asked, ['Verification code: ']);
     expect(used, isTrue);
 
@@ -51,31 +57,31 @@ void main() {
     asked.clear();
     final again = await SshConnector.answerLogin(
       request([('Password: ', false)]),
-      password: 'secret',
+      password: savedPassword,
       passwordUsed: used,
       onPasswordUsed: () => used = true,
       ask: ask,
     );
-    expect(again, ['123456']);
+    expect(sameValues(again, [userCode]), isTrue, reason: 'the code the user typed');
     expect(asked, ['Password: ']);
   });
 
   test('without anyone to ask, only a password prompt is answered; a cancel answers nothing', () async {
     final noAsk = await SshConnector.answerLogin(
       request([('Verification code:', false)]),
-      password: 'secret',
+      password: savedPassword,
       passwordUsed: false,
       onPasswordUsed: () {},
     );
-    expect(noAsk, isNull);
+    expect(noAsk == null, isTrue, reason: 'nothing answered');
 
     final plain = await SshConnector.answerLogin(
       request([('Password:', false)]),
-      password: 'secret',
+      password: savedPassword,
       passwordUsed: false,
       onPasswordUsed: () {},
     );
-    expect(plain, ['secret']);
+    expect(sameValues(plain, [savedPassword]), isTrue, reason: 'the saved password');
 
     final cancelled = await SshConnector.answerLogin(
       request([('Verification code:', false)]),
@@ -84,7 +90,7 @@ void main() {
       onPasswordUsed: () {},
       ask: (_) async => null,
     );
-    expect(cancelled, isNull);
+    expect(cancelled == null, isTrue, reason: 'nothing answered');
 
     // A request with nothing to answer (an information message).
     expect(
@@ -126,10 +132,10 @@ void main() {
     expect(find.text('Open your authenticator app.'), findsOneWidget);
     expect(tester.widget<TextField>(find.byKey(const ValueKey('loginPrompt-0'))).obscureText, isTrue);
     expect(tester.widget<TextField>(find.byKey(const ValueKey('loginPrompt-1'))).obscureText, isFalse);
-    await tester.enterText(find.byKey(const ValueKey('loginPrompt-0')), '654321');
+    await tester.enterText(find.byKey(const ValueKey('loginPrompt-0')), userCode);
     await tester.enterText(find.byKey(const ValueKey('loginPrompt-1')), 'no');
     await tester.tap(find.byKey(const ValueKey('loginPromptContinue')));
     await tester.pumpAndSettle();
-    expect(await answer, ['654321', 'no']);
+    expect(sameValues(await answer, [userCode, 'no']), isTrue, reason: 'what was typed, in order');
   });
 }

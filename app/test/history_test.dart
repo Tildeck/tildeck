@@ -8,12 +8,14 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 late Directory dir;
 
 Future<Vault> newVault() async {
   final vault = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
   await vault.load();
-  await vault.create('orange-kettle-winter-42');
+  await vault.create(testSecret());
   return vault;
 }
 

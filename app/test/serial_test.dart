@@ -17,6 +17,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 /// A serial line in memory: what the device sends, and what was typed.
 class FakeLine {
   final device = StreamController<Uint8List>();
@@ -123,7 +125,7 @@ void main() {
     final vault = (await tester.runAsync(() async {
       final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
       await v.load();
-      await v.create('orange-kettle-winter-42');
+      await v.create(testSecret());
       await v.put(const HostEntry(id: 'j', name: 'Bastion', host: 'bastion.example.com', username: 'ops'));
       await v.put(const GroupEntry(id: 'g', name: 'Lab', jumpHostId: 'j'));
       return v;

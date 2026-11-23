@@ -2,19 +2,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tildeck/ssh/keys.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 void main() {
   late VaultCrypto crypto;
   setUpAll(() async => crypto = await VaultCrypto.load());
 
   test('an Ed25519 key reads back with its type, fingerprint, and public key line', () {
     final pem = generateEd25519(crypto.sodium, 'laptop');
-    expect(pem, startsWith('-----BEGIN OPENSSH PRIVATE KEY-----'));
+    expect(pem.startsWith('-----BEGIN OPENSSH PRIVATE KEY-----'), isTrue, reason: 'OpenSSH form');
     final info = readKey(pem, comment: "Shlomi's laptop")!;
     expect(info.type, 'ssh-ed25519');
     expect(info.fingerprint, matches(RegExp(r'^SHA256:[A-Za-z0-9+/]{43}$')));
     expect(info.publicKey, startsWith('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5'));
     expect(info.publicKey, endsWith(' Shlomi-s-laptop'), reason: 'the comment needs no quoting');
-    expect(generateEd25519(crypto.sodium, 'x'), isNot(pem), reason: 'every key is new');
+    expect(generateEd25519(crypto.sodium, 'x') == pem, isFalse, reason: 'every key is new');
   });
 
   test('an RSA key', () async {
@@ -27,13 +29,14 @@ void main() {
   test('an exported key with a passphrase opens only with it, and is the same key', () {
     final pem = generateEd25519(crypto.sodium, 'k');
     final fingerprint = readKey(pem)!.fingerprint;
-    final protected = exportKey(pem, newPassphrase: 'orange-kettle');
-    expect(protected, isNot(pem));
+    final passphrase = testSecret();
+    final protected = exportKey(pem, newPassphrase: passphrase);
+    expect(protected == pem, isFalse, reason: 'the exported key is encrypted');
     expect(readKey(protected), isNull);
     expect(readKey(protected, passphrase: 'wrong'), isNull);
-    expect(readKey(protected, passphrase: 'orange-kettle')!.fingerprint, fingerprint);
+    expect(readKey(protected, passphrase: passphrase)!.fingerprint, fingerprint);
     // Exported without one, a protected key comes out open.
-    expect(readKey(exportKey(protected, passphrase: 'orange-kettle'))!.fingerprint, fingerprint);
+    expect(readKey(exportKey(protected, passphrase: passphrase))!.fingerprint, fingerprint);
   });
 
   test('what is not a key is not read', () {

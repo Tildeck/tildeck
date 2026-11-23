@@ -14,6 +14,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 Widget app(Widget child) => MaterialApp(
   theme: buildTheme(Brightness.dark),
   locale: const Locale('en'),
@@ -102,14 +104,15 @@ void main() {
     Vault open() => Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
     final vault = open();
     await vault.load();
-    await vault.create('orange-kettle-winter-42');
+    final password = testSecret();
+    await vault.create(password);
     expect(vault.preferences.terminalTheme, isNull);
     await vault.put(vault.preferences.copyWith(terminalTheme: 'nord', fontSize: 17));
     await vault.put(vault.preferences.copyWith(fontSize: 18));
 
     final again = open();
     await again.load();
-    await again.unlock('orange-kettle-winter-42');
+    await again.unlock(password);
     expect((again.preferences.terminalTheme, again.preferences.fontSize), ('nord', 18.0));
     expect(again.preferences.id, PreferencesEntry.fixedId);
   });

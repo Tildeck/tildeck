@@ -11,6 +11,8 @@ import 'package:tildeck/vault/models.dart';
 import 'package:tildeck/vault/vault.dart';
 import 'package:tildeck/vault/vault_crypto.dart';
 
+import 'test_secrets.dart';
+
 Widget app(Widget home) => MaterialApp(
   theme: buildTheme(Brightness.light),
   locale: const Locale('en'),
@@ -25,6 +27,10 @@ Widget app(Widget home) => MaterialApp(
 );
 
 void main() {
+  final deployKey = testSecret();
+  final adminPassword = testSecret();
+  final newAdminPassword = testSecret();
+  final ownPassword = testSecret();
   late Directory dir;
   setUp(() async => dir = await Directory.systemTemp.createTemp('tildeck-identities'));
   tearDown(() => dir.delete(recursive: true));
@@ -32,10 +38,10 @@ void main() {
   Future<Vault> openVault(WidgetTester tester) async => (await tester.runAsync(() async {
     final v = Vault(crypto: VaultCrypto.load(), resolveFile: () async => File('${dir.path}/vault.json'));
     await v.load();
-    await v.create('orange-kettle-winter-42');
-    await v.put(const KeyEntry(id: 'k1', name: 'Deploy key', privateKey: 'KEY-MATERIAL'));
+    await v.create(testSecret());
+    await v.put(KeyEntry(id: 'k1', name: 'Deploy key', privateKey: deployKey));
     await v.put(const IdentityEntry(id: 'i-key', name: 'Deploy', username: 'deploy', keyId: 'k1'));
-    await v.put(const IdentityEntry(id: 'i-pw', name: 'Admin', username: 'admin', password: 'admin-secret'));
+    await v.put(IdentityEntry(id: 'i-pw', name: 'Admin', username: 'admin', password: adminPassword));
     await v.put(const GroupEntry(id: 'g1', name: 'Production', identityId: 'i-key', username: 'ops'));
     return v;
   }))!;
@@ -57,36 +63,36 @@ void main() {
     // No identity of its own: the group's, over the group's username.
     const inGroup = HostEntry(id: 'h1', name: 'Web', group: 'Production', host: 'web.example.com', username: 'root');
     var target = (await connectionTargetFor(context, vault, inGroup))!;
-    expect((target.username, target.privateKey, target.password), ('deploy', 'KEY-MATERIAL', null));
+    expect((target.username, target.privateKey == deployKey, target.password == null), ('deploy', true, true));
 
     // Its own identity wins over the group's.
     final own = HostEntry.fromJson('h2', {...inGroup.dataJson(), 'identity_id': 'i-pw'});
     target = (await connectionTargetFor(context, vault, own))!;
-    expect((target.username, target.privateKey, target.password), ('admin', null, 'admin-secret'));
+    expect((target.username, target.privateKey == null, target.password == adminPassword), ('admin', true, true));
 
     // Changing the identity changes every host that uses it.
     await tester.runAsync(
-      () => vault.put(const IdentityEntry(id: 'i-pw', name: 'Admin', username: 'root', password: 'new-secret')),
+      () => vault.put(IdentityEntry(id: 'i-pw', name: 'Admin', username: 'root', password: newAdminPassword)),
     );
     target = (await connectionTargetFor(context, vault, own))!;
-    expect((target.username, target.password), ('root', 'new-secret'));
+    expect((target.username, target.password == newAdminPassword), ('root', true));
 
     // A deleted identity leaves the host's own fields.
     await tester.runAsync(() async {
       await vault.delete('i-pw');
       await vault.put(const GroupEntry(id: 'g1', name: 'Production'));
     });
-    const plain = HostEntry(
+    final plain = HostEntry(
       id: 'h3',
       name: 'Plain',
       group: 'Production',
       host: 'p.example.com',
       username: 'me',
-      password: 'mine',
+      password: ownPassword,
       identityId: 'i-pw',
     );
     target = (await connectionTargetFor(context, vault, plain))!;
-    expect((target.username, target.password), ('me', 'mine'));
+    expect((target.username, target.password == ownPassword), ('me', true));
   });
 
   testWidgets('identities are added in their page, and one in use is not deleted', (tester) async {

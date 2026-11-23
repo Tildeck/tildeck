@@ -5,6 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tildeck/ssh/proxy.dart';
 
 import 'fake_proxies.dart';
+import 'test_secrets.dart';
+
+/// The proxy's password, new for each run.
+final proxyPassword = testSecret();
 
 /// A service that greets first, as an SSH server does.
 Future<ServerSocket> greeter() async {
@@ -49,20 +53,20 @@ void main() {
       });
 
       test('signs in to the proxy', () async {
-        final proxy = await start(username: 'ops', password: 's3cret');
+        final proxy = await start(username: 'ops', password: proxyPassword);
         addTearDown(proxy.close);
         final config = ProxyConfig(
           kind: kind,
           host: '127.0.0.1',
           port: proxy.port,
           username: 'ops',
-          password: 's3cret',
+          password: proxyPassword,
         );
         expect(await roundTrip(config, target.port), contains('ping'));
       });
 
       test('a wrong or missing password is reported as such', () async {
-        final proxy = await start(username: 'ops', password: 's3cret');
+        final proxy = await start(username: 'ops', password: proxyPassword);
         addTearDown(proxy.close);
         for (final config in [
           ProxyConfig(kind: kind, host: '127.0.0.1', port: proxy.port, username: 'ops', password: 'nope'),

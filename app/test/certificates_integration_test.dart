@@ -61,7 +61,7 @@ void main() {
     Future<String> sign(String publicKey, String options) => run(
       admin,
       "echo '$publicKey' > /tmp/user.pub && rm -f /tmp/user-cert.pub && "
-      'ssh-keygen -q -s /tmp/ca -I tildeck-test $options /tmp/user.pub && cat /tmp/user-cert.pub',
+      'ssh-keygen -q -s /tmp/ca -I tildeck-integration $options /tmp/user.pub && cat /tmp/user-cert.pub',
     );
 
     Future<ConnectProblem?> problem(Future<SSHClient> attempt) async {
@@ -86,7 +86,7 @@ void main() {
 
           final certificate = readCertificate(line)!;
           expect(certificate.principals, [user]);
-          expect(certificate.keyId, 'tildeck-test');
+          expect(certificate.keyId, 'tildeck-integration');
           expect(certificate.validBefore!.isAfter(DateTime.now()), isTrue);
           expect(certificateMatches(certificate, pem), isTrue);
 
