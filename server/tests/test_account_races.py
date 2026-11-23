@@ -10,16 +10,39 @@ import secrets
 from dataclasses import dataclass
 
 import pyotp
+import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
 from app import accounts, admins, crypto
 from app.db import engine
+from app.main import app
 from tests.test_accounts import H, Keys, b64, bearer, device, mail, register, verify  # noqa: F401 - mail is a fixture
-from tests.test_admin import clean, panel  # noqa: F401 - fixtures
+from tests.test_admin import clean  # noqa: F401 - a fixture
 from tests.test_totp import Phone, turn_on
 
 LOCK_ACCOUNT = "SELECT id FROM accounts WHERE email = :e FOR UPDATE"
 LOCK_DEVICE = "SELECT id FROM devices WHERE id = :d FOR UPDATE"
+
+
+def _transport() -> ASGITransport:
+    # A server error comes back as a 500 answer, not as the exception: the
+    # text of a database error can carry a statement's parameters, and a
+    # failing test would print it.
+    return ASGITransport(app=app, raise_app_exceptions=False)
+
+
+@pytest.fixture
+async def client():
+    async with AsyncClient(transport=_transport(), base_url="http://test") as c:
+        yield c
+
+
+@pytest.fixture
+async def panel():
+    # The admin session cookie is Secure: it only comes back over https.
+    async with AsyncClient(transport=_transport(), base_url="https://test") as c:
+        yield c
 
 
 async def _waiters(holder_pid: int) -> dict[int, tuple[set[int], str]]:
@@ -104,7 +127,9 @@ async def in_order(hold: str, params: dict, *requests) -> Race:
 
 
 def answer(res) -> tuple:
-    return res.status_code, res.json().get("error") if res.content else None
+    """The status and the error code; a server error has no JSON body."""
+    is_json = res.headers.get("content-type", "").startswith("application/json")
+    return res.status_code, res.json().get("error") if is_json else None
 
 
 async def stored(email: str, expression: str):
