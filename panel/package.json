@@ -19,7 +19,7 @@
   "devDependencies": {
     "@nuxt/eslint": "^1.0.0",
     "@nuxtjs/tailwindcss": "^6.12.2",
-    "eslint": "^10.14.0",
+    "eslint": "^10.15.0",
     "typescript": "^5.9.3",
     "vue-tsc": "^3.3.14"
   }
