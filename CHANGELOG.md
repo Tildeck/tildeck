@@ -98,6 +98,7 @@ All notable changes to Tildeck are recorded here. The format follows [Keep a Cha
 - A device that had its own vault and locked while waiting for approval could have that vault replaced by the account's when the approval arrived. It now waits until the vault is open, and a different vault is refused as at sign-in.
 - A host's environment variable that the server does not accept no longer fails the session; it is skipped, as ssh does.
 - Two-factor codes typed with non-ASCII digits are refused like any wrong code instead of failing with a server error.
+- Account changes sent at the same time on the sync server are handled one after the other: an approved device's claim token works once, two-factor sign-in is turned on, off, or reset once and always asked for once it is on, a sign-in or password change sees a change that finished first (a new password, a disabled, deleted, or recovered account, a revoked device), and a revoke waits for a change from that device that has started. A sign-in or administrator change that overlapped turning two-factor sign-in off or deleting the account gets its usual answer instead of a server error.
 
 ### Security
 
