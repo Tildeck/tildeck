@@ -197,6 +197,7 @@ def test_export_refuses_a_bad_value(variable, value, problem):
     assert f"{variable} {problem}" in result.stderr
     assert result.stdout == ""
     assert DUMMY not in result.stderr
+    assert OTHER not in result.stderr
 
 
 def test_export_refuses_another_spelling():
