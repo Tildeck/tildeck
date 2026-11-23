@@ -47,13 +47,15 @@ def run_export(**env: str) -> subprocess.CompletedProcess:
 
 DUMMY = secrets.token_hex(16)
 KEY = secrets.token_hex(32)
+# A different value, where a second spelling or a query must not win.
+OTHER = secrets.token_hex(32)
 # Each value once published in this repository, for the refusal cases.
 RETIRED = sorted(RETIRED_VALUES)
 
 
 def redact(output: str) -> str:
     """[output] without the generated values, for a failure message."""
-    for value in (KEY, KEY[:31], DUMMY):
+    for value in (KEY, OTHER, KEY[:31], DUMMY):
         output = output.replace(value, "***")
     return output
 
@@ -131,7 +133,7 @@ def test_tests_drop_other_spellings_of_the_settings():
         ],
         **good_tests_env(),
         database_url=url(DUMMY, "other"),
-        Config_Encryption_Key=KEY,
+        Config_Encryption_Key=OTHER,
     )
     assert result.returncode == 0, redact(result.stderr)[-2000:]
     names = result.stdout.strip().splitlines()[-1]
@@ -164,7 +166,7 @@ def test_export_runs_with_generated_values():
         ("DATABASE_URL", None, "is not set"),
         ("DATABASE_URL", " ", "is not set"),
         ("DATABASE_URL", "postgresql+asyncpg://export:change-me@localhost:5432/export", "password is a placeholder"),
-        ("DATABASE_URL", url(DUMMY, "export?password=" + DUMMY), "must have the generated form"),
+        ("DATABASE_URL", url(DUMMY, "export?password=" + OTHER), "must have the generated form"),
         ("CONFIG_ENCRYPTION_KEY", None, "is not set"),
         ("CONFIG_ENCRYPTION_KEY", "", "is not set"),
         ("CONFIG_ENCRYPTION_KEY", "change-me", "is a placeholder"),
@@ -198,7 +200,7 @@ def test_export_refuses_a_bad_value(variable, value, problem):
 
 
 def test_export_refuses_another_spelling():
-    result = run_export(DATABASE_URL=EXPORT_URL, CONFIG_ENCRYPTION_KEY=KEY, config_encryption_key=KEY)
+    result = run_export(DATABASE_URL=EXPORT_URL, CONFIG_ENCRYPTION_KEY=KEY, config_encryption_key=OTHER)
     assert result.returncode != 0
     assert "CONFIG_ENCRYPTION_KEY is also set under another spelling" in result.stderr
 
@@ -219,7 +221,7 @@ def compose_config(password: str = DUMMY, database_url: str | None = None, key: 
 
 def with_another_spelling() -> dict:
     config = compose_config()
-    config["services"]["server"]["environment"]["config_encryption_key"] = KEY
+    config["services"]["server"]["environment"]["config_encryption_key"] = OTHER
     return config
 
 
@@ -234,7 +236,7 @@ def test_dev_stack_with_generated_values_passes():
         (compose_config(password="tildeck", database_url=url("tildeck")), "POSTGRES_PASSWORD is a value once"),
         (compose_config(password=DUMMY + "x"), "does not match POSTGRES_PASSWORD"),
         (
-            compose_config(database_url=url(DUMMY, "tildeck?password=" + DUMMY)),
+            compose_config(database_url=url(DUMMY, "tildeck?password=" + OTHER)),
             "DATABASE_URL must have the generated form",
         ),
         (compose_config(key="change-me"), "CONFIG_ENCRYPTION_KEY is a placeholder"),
