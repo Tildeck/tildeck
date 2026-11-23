@@ -103,13 +103,13 @@ async def clean():
 
 def link_from(message: mailer.Mail, purpose: str) -> str:
     match = re.search(rf"https://sync\.example\.test(/links/{purpose}/\S+)", message.body)
-    assert match, message.body
+    assert match, f"no {purpose} link in the message"
     return match.group(1)
 
 
 async def register(client, keys: Keys) -> str:
     res = await client.post("/api/account/register", json=keys.register_body(), headers=H)
-    assert res.status_code == 201, res.text
+    assert res.status_code == 201, res.status_code
     return res.json()["device_token"]
 
 
@@ -229,7 +229,7 @@ async def test_a_new_device_waits_for_approval_and_only_it_can_collect_the_vault
     # Before approval: nothing to collect; a wrong claim token is refused.
     claim = {"device_id": phone["id"], "claim_token": pending["claim_token"]}
     assert (await client.post("/api/devices/claim", json=claim, headers=H)).json() == {"error": "device_pending"}
-    wrong = {"device_id": phone["id"], "claim_token": "not-the-token"}
+    wrong = {"device_id": phone["id"], "claim_token": secrets.token_urlsafe(32)}
     assert (await client.post("/api/devices/claim", json=wrong, headers=H)).json() == {"error": "invalid_token"}
 
     # Opening the emailed link only shows a page; a mail scanner cannot approve.
@@ -419,7 +419,7 @@ async def test_an_unknown_email_takes_as_long_as_a_wrong_key(client, mail, monke
     ):
         verified.clear()
         res = await client.post(path, json=body, headers=H)
-        assert res.status_code == 401, res.text
+        assert res.status_code == 401, res.status_code
         assert len(verified) == 1, path
 
 
@@ -458,7 +458,7 @@ async def test_a_waiting_device_may_keep_asking_but_wrong_claim_tokens_are_limit
     for _ in range(40):
         assert (await client.post("/api/devices/claim", json=claim, headers=H)).json() == {"error": "device_pending"}
 
-    wrong = {"device_id": phone["id"], "claim_token": "not-the-token"}
+    wrong = {"device_id": phone["id"], "claim_token": secrets.token_urlsafe(32)}
     codes = [(await client.post("/api/devices/claim", json=wrong, headers=H)).status_code for _ in range(31)]
     assert codes[0] == 401 and codes[-1] == 429
 
@@ -498,19 +498,21 @@ async def test_bodies_over_the_cap_are_refused_before_they_are_read(client):
 def test_email_link_tokens_stay_out_of_the_access_log():
     import logging
 
+    # Link tokens are URL-safe and may hold a hyphen: this one always does.
+    token = f"{secrets.token_hex(8)}-{secrets.token_hex(8)}"
     record = logging.LogRecord(
         "uvicorn.access",
         logging.INFO,
         "",
         0,
         '%s - "%s %s HTTP/%s" %d',
-        ("203.0.113.5:4000", "POST", "/links/approve/s3cret-token?x=1", "1.1", 200),
+        ("203.0.113.5:4000", "POST", f"/links/approve/{token}?x=1", "1.1", 200),
         None,
     )
     for f in logging.getLogger("uvicorn.access").filters:
         f.filter(record)
     line = record.getMessage()
-    assert "s3cret-token" not in line and "/links/approve/***?x=1" in line
+    assert token not in line and "/links/approve/***?x=1" in line
 
 
 async def test_email_follows_the_account_language_and_never_carries_keys(client, mail):
@@ -560,5 +562,5 @@ async def test_mail_goes_out_over_smtp(client, mail, monkeypatch):
 async def test_a_malformed_request_gets_the_stable_error_body(client, mail):
     res = await client.post("/api/account/signin", json={"email": "a@example.test"}, headers=H)
     assert (res.status_code, res.json()) == (422, {"error": "invalid_request"})
-    bad_key = {"email": "a@example.test", "auth_key": "short", "device": device()}
+    bad_key = {"email": "a@example.test", "auth_key": b64(8)[:5], "device": device()}
     assert (await client.post("/api/account/signin", json=bad_key, headers=H)).json() == {"error": "invalid_request"}

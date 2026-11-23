@@ -38,13 +38,13 @@ async def signed_up(client, mail, email: str = "user@example.test") -> dict:  # 
 
 async def push(client, auth, *changes):
     res = await client.post("/api/sync/records", json={"changes": list(changes)}, headers=auth)
-    assert res.status_code == 200, res.text
+    assert res.status_code == 200, res.status_code
     return res.json()
 
 
 async def pull(client, auth, since: int = 0):
     res = await client.get(f"/api/sync/records?since={since}", headers=auth)
-    assert res.status_code == 200, res.text
+    assert res.status_code == 200, res.status_code
     return res.json()
 
 

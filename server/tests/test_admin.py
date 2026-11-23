@@ -3,6 +3,7 @@ token, password and TOTP sign-in, sessions with CSRF, and the users, devices,
 settings, and activity an administrator manages."""
 
 import asyncio
+import secrets
 import time
 import uuid
 from datetime import timedelta
@@ -27,10 +28,10 @@ from tests.test_accounts import (  # noqa: F401 - mail is a fixture
     register,
     verify,
 )
-from tests.test_totp import fullwidth
+from tests.test_totp import fullwidth, wrong_code
 
 USERNAME = "operator"
-PASSWORD = "a-long-admin-password"
+PASSWORD = secrets.token_urlsafe(24)
 
 
 @pytest.fixture
@@ -80,23 +81,26 @@ class Authenticator:
             self.now += self.totp.interval
         return self.code()
 
+    def wrong(self) -> str:
+        return wrong_code(self.totp, self.now)
+
 
 async def set_up(panel, monkeypatch) -> tuple[dict, Authenticator]:
     token = admins.setup.issue()
     start = await panel.post(
         "/api/admin/setup/start", json={"setup_token": token, "username": USERNAME, "password": PASSWORD}
     )
-    assert start.status_code == 200, start.text
+    assert start.status_code == 200, start.status_code
     phone = Authenticator(start.json()["secret"], monkeypatch)
     done = await panel.post("/api/admin/setup/complete", json={"setup_token": token, "code": phone.code()})
-    assert done.status_code == 200, done.text
+    assert done.status_code == 200, done.status_code
     return {"X-CSRF-Token": done.json()["csrf_token"]}, phone
 
 
 async def test_the_first_administrator_needs_the_setup_token_and_a_working_second_factor(panel, monkeypatch):
     assert (await panel.get("/api/admin/setup")).json() == {"needed": True}
     token = admins.setup.issue()
-    body = {"setup_token": "not-the-token", "username": USERNAME, "password": PASSWORD}
+    body = {"setup_token": secrets.token_urlsafe(32), "username": USERNAME, "password": PASSWORD}
     res = await panel.post("/api/admin/setup/start", json=body)
     assert (res.status_code, res.json()) == (403, {"error": "invalid_setup_token"})
 
@@ -106,11 +110,11 @@ async def test_the_first_administrator_needs_the_setup_token_and_a_working_secon
     assert enrollment["qr_image"].startswith("data:image/svg+xml")
 
     # No administrator exists until a code from the new secret is confirmed.
-    wrong = await panel.post("/api/admin/setup/complete", json={"setup_token": token, "code": "000000"})
+    phone = Authenticator(enrollment["secret"], monkeypatch)
+    wrong = await panel.post("/api/admin/setup/complete", json={"setup_token": token, "code": phone.wrong()})
     assert (wrong.status_code, wrong.json()) == (401, {"error": "invalid_totp"})
     assert (await panel.get("/api/admin/setup")).json() == {"needed": True}
 
-    phone = Authenticator(enrollment["secret"], monkeypatch)
     done = await panel.post("/api/admin/setup/complete", json={"setup_token": token, "code": phone.code()})
     assert done.status_code == 200 and done.json()["username"] == USERNAME
     cookie = done.headers["set-cookie"].lower()
@@ -134,7 +138,7 @@ async def test_sign_in_needs_the_password_and_an_unused_code(panel, monkeypatch)
 
     # The setup code was used: the same step is refused, like a wrong password.
     replay = await attempt(PASSWORD, phone.code())
-    wrong_password = await attempt("not-the-password", phone.next())
+    wrong_password = await attempt(secrets.token_urlsafe(24), phone.next())
     assert (replay.status_code, replay.json()) == (401, {"error": "invalid_credentials"})
     assert (wrong_password.status_code, wrong_password.json()) == (401, {"error": "invalid_credentials"})
 
@@ -148,17 +152,18 @@ async def test_sign_in_needs_the_password_and_an_unused_code(panel, monkeypatch)
 
 
 async def test_an_unknown_administrator_takes_as_long_as_a_wrong_password(panel, monkeypatch):
-    await set_up(panel, monkeypatch)
+    _, phone = await set_up(panel, monkeypatch)
     verified = []
     monkeypatch.setattr(accounts, "_hasher", CountingHasher(accounts._hasher, verified))
-    res = await panel.post("/api/admin/session", json={"username": "nobody", "password": PASSWORD, "code": "000000"})
+    body = {"username": "nobody", "password": PASSWORD, "code": phone.wrong()}
+    res = await panel.post("/api/admin/session", json=body)
     assert res.status_code == 401
     assert len(verified) == 1
 
 
 async def test_admin_attempts_sent_at_once_cannot_get_past_the_limit(panel, monkeypatch):
-    await set_up(panel, monkeypatch)
-    body = {"username": USERNAME, "password": "not-the-password", "code": "000000"}
+    _, phone = await set_up(panel, monkeypatch)
+    body = {"username": USERNAME, "password": secrets.token_urlsafe(24), "code": phone.wrong()}
     answers = await asyncio.gather(*(panel.post("/api/admin/session", json=body) for _ in range(15)))
     assert sorted(a.status_code for a in answers) == [401] * 10 + [429] * 5
 
@@ -208,7 +213,7 @@ async def test_changes_need_the_csrf_token_and_sessions_expire(panel, monkeypatc
     change = {"values": {"registration_mode": "invite"}}
     res = await panel.put("/api/admin/settings", json=change)
     assert (res.status_code, res.json()) == (403, {"error": "csrf_failed"})
-    res = await panel.put("/api/admin/settings", json=change, headers={"X-CSRF-Token": "forged"})
+    res = await panel.put("/api/admin/settings", json=change, headers={"X-CSRF-Token": secrets.token_urlsafe(32)})
     assert res.status_code == 403
     assert (await panel.put("/api/admin/settings", json=change, headers=csrf)).status_code == 204
     assert (await panel.get("/api/admin/settings")).status_code == 200
@@ -270,7 +275,7 @@ async def test_administrators_see_metadata_and_manage_accounts(panel, client, ma
 
 async def test_settings_show_where_values_come_from_and_never_a_secret(panel, monkeypatch):
     csrf, _ = await set_up(panel, monkeypatch)
-    secret = "smtp-password-that-must-stay-inside"
+    secret = secrets.token_urlsafe(24)
 
     async def save(**values):
         return await panel.put("/api/admin/settings", json={"values": values}, headers=csrf)

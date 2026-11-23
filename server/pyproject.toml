@@ -54,3 +54,13 @@ asyncio_mode = "auto"
 # are loop-bound and break under per-test loops.
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
+# A failure must not print the passwords, keys, and tokens the tests handle:
+# plain asserts show no operand values, short tracebacks show no arguments,
+# and these loggers would record request URLs, mail lines, or SQL parameters.
+addopts = [
+  "--assert=plain",
+  "--tb=short",
+  "--log-disable=httpx",
+  "--log-disable=mail.log",
+  "--log-disable=sqlalchemy.engine.Engine",
+]

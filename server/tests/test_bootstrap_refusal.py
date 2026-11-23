@@ -51,13 +51,20 @@ KEY = secrets.token_hex(32)
 RETIRED = sorted(RETIRED_VALUES)
 
 
+def redact(output: str) -> str:
+    """[output] without the generated values, for a failure message."""
+    for value in (KEY, KEY[:31], DUMMY):
+        output = output.replace(value, "***")
+    return output
+
+
 def good_tests_env() -> dict[str, str]:
     return {"TEST_DATABASE_URL": url(DUMMY), "TEST_CONFIG_ENCRYPTION_KEY": KEY}
 
 
 def test_tests_start_with_generated_values():
     result = run_conftest(**good_tests_env())
-    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.returncode == 0, redact(result.stderr)[-2000:]
 
 
 @pytest.mark.parametrize("variable", ["TEST_DATABASE_URL", "TEST_CONFIG_ENCRYPTION_KEY"])
@@ -124,9 +131,9 @@ def test_tests_drop_other_spellings_of_the_settings():
         ],
         **good_tests_env(),
         database_url=url(DUMMY, "other"),
-        Config_Encryption_Key="change-me",
+        Config_Encryption_Key=KEY,
     )
-    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.returncode == 0, redact(result.stderr)[-2000:]
     names = result.stdout.strip().splitlines()[-1]
     assert names == str(sorted(["DATABASE_URL", "CONFIG_ENCRYPTION_KEY"]))
 
@@ -147,7 +154,7 @@ EXPORT_URL = "postgresql+asyncpg://export@localhost:5432/export"
 
 def test_export_runs_with_generated_values():
     result = run_export(DATABASE_URL=EXPORT_URL, CONFIG_ENCRYPTION_KEY=KEY)
-    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.returncode == 0, redact(result.stderr)[-2000:]
     assert json.loads(result.stdout)["info"]["title"] == "Tildeck"
 
 
@@ -157,12 +164,24 @@ def test_export_runs_with_generated_values():
         ("DATABASE_URL", None, "is not set"),
         ("DATABASE_URL", " ", "is not set"),
         ("DATABASE_URL", "postgresql+asyncpg://export:change-me@localhost:5432/export", "password is a placeholder"),
-        ("DATABASE_URL", url(DUMMY, "export?password=x"), "must have the generated form"),
+        ("DATABASE_URL", url(DUMMY, "export?password=" + DUMMY), "must have the generated form"),
         ("CONFIG_ENCRYPTION_KEY", None, "is not set"),
         ("CONFIG_ENCRYPTION_KEY", "", "is not set"),
         ("CONFIG_ENCRYPTION_KEY", "change-me", "is a placeholder"),
         *(("CONFIG_ENCRYPTION_KEY", value, "is a value once published") for value in RETIRED),
         ("CONFIG_ENCRYPTION_KEY", KEY[:31], "is too short"),
+    ],
+    # Fixed ids: the default ones would show the generated values.
+    ids=[
+        "url-missing",
+        "url-blank",
+        "url-placeholder",
+        "url-query",
+        "key-missing",
+        "key-empty",
+        "key-placeholder",
+        *(f"key-published-{i}" for i in range(len(RETIRED))),
+        "key-short",
     ],
 )
 def test_export_refuses_a_bad_value(variable, value, problem):
@@ -179,7 +198,7 @@ def test_export_refuses_a_bad_value(variable, value, problem):
 
 
 def test_export_refuses_another_spelling():
-    result = run_export(DATABASE_URL=EXPORT_URL, CONFIG_ENCRYPTION_KEY=KEY, config_encryption_key="change-me")
+    result = run_export(DATABASE_URL=EXPORT_URL, CONFIG_ENCRYPTION_KEY=KEY, config_encryption_key=KEY)
     assert result.returncode != 0
     assert "CONFIG_ENCRYPTION_KEY is also set under another spelling" in result.stderr
 
@@ -200,7 +219,7 @@ def compose_config(password: str = DUMMY, database_url: str | None = None, key: 
 
 def with_another_spelling() -> dict:
     config = compose_config()
-    config["services"]["server"]["environment"]["config_encryption_key"] = "change-me"
+    config["services"]["server"]["environment"]["config_encryption_key"] = KEY
     return config
 
 
@@ -214,7 +233,10 @@ def test_dev_stack_with_generated_values_passes():
         (compose_config(password="change-me", database_url=url("change-me")), "POSTGRES_PASSWORD is a placeholder"),
         (compose_config(password="tildeck", database_url=url("tildeck")), "POSTGRES_PASSWORD is a value once"),
         (compose_config(password=DUMMY + "x"), "does not match POSTGRES_PASSWORD"),
-        (compose_config(database_url=url(DUMMY, "tildeck?password=x")), "DATABASE_URL must have the generated form"),
+        (
+            compose_config(database_url=url(DUMMY, "tildeck?password=" + DUMMY)),
+            "DATABASE_URL must have the generated form",
+        ),
         (compose_config(key="change-me"), "CONFIG_ENCRYPTION_KEY is a placeholder"),
         (compose_config(key=KEY[:31]), "CONFIG_ENCRYPTION_KEY is too short"),
         ({"services": {"server": {}}}, "must define the services postgres and server"),
@@ -233,7 +255,7 @@ def test_dev_stack_with_generated_values_passes():
 )
 def test_dev_stack_refuses_bad_values(config, expected):
     found = dev_env_check.problems(config)
-    assert any(expected in problem for problem in found), found
+    assert any(expected in problem for problem in found), expected
 
 
 @pytest.mark.parametrize(
@@ -248,7 +270,11 @@ def test_dev_stack_refuses_bad_values(config, expected):
 def test_dev_stack_check_never_prints_a_value(stdin, status, monkeypatch, capsys):
     # 3 asks for new values; 2 means the check could not judge them.
     monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
-    assert dev_env_check.main() == status
-    out, err = capsys.readouterr()
+    # The capture is emptied before any check, so a failure cannot report it.
+    try:
+        result = dev_env_check.main()
+    finally:
+        out, err = capsys.readouterr()
+    assert result == status
     assert DUMMY not in out + err
     assert KEY not in out + err
