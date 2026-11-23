@@ -87,8 +87,8 @@ String _sha256Hex(List<int> bytes) =>
 /// file with more or fewer than one public key.
 String _fingerprintOf(String text) {
   late final Uint8List blob;
-  // Surrounding whitespace is ignored, as the client ignores it.
-  final lines = text.trim().split('\n').map((l) => l.trim()).toList();
+  // Split and trimmed as the client does (LineSplitter: LF, CR, or CRLF).
+  final lines = const LineSplitter().convert(text.trim()).map((l) => l.trim()).toList();
   if (lines.first.startsWith('PuTTY-User-Key-File-')) {
     final headers = [
       for (var i = 0; i < lines.length; i++)
