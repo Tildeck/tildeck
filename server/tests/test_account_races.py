@@ -60,10 +60,10 @@ class Race:
         return f"answers {[answer(a) for a in self.answers]}, queued {self.queued}, waited in {self.waits}"
 
 
-async def in_order(hold: str, params: dict, *requests, commit: bool = False) -> Race:
+async def in_order(hold: str, params: dict, *requests) -> Race:
     """Runs [hold] in a transaction of its own, which keeps the rows it
     locks; sends [requests] in order, each once one more backend waits on
-    that lock; then ends the transaction (commits when [commit])."""
+    that lock; then rolls the transaction back."""
     holder = await engine.connect()
     pids: list[int] = []
     try:
@@ -88,13 +88,15 @@ async def in_order(hold: str, params: dict, *requests, commit: bool = False) -> 
                         if not last.done():
                             done = "still running"
                         elif last.exception() is not None:
-                            done = f"failed: {last.exception()!r}"
+                            # The type only: a database error's text can
+                            # carry the statement's parameters.
+                            done = f"failed with {type(last.exception()).__name__}"
                         else:
                             done = f"finished with {last.result().status_code}"
                         raise AssertionError(f"request {len(sent)} did not wait on the lock ({done}): {now}")
                     pids += new
             finally:
-                await (holder.commit() if commit else holder.rollback())
+                await holder.rollback()
         queued = all(pids[i - 1] in now[pids[i]][0] for i in range(1, len(pids)))
         return Race([task.result() for task in sent], [now[pid][1] for pid in pids], queued)
     finally:
@@ -312,6 +314,8 @@ async def test_an_administrator_reset_that_waits_on_turning_it_on_turns_it_off(p
     assert race.queued, race
     assert await stored(keys.email, "totp_secret_encrypted IS NULL AND totp_pending_encrypted IS NULL")
     assert (await client.get("/api/account", headers=bearer(token))).json()["totp_enabled"] is False
+    assert await entries("totp_reset") == 1
+    assert sum("An administrator turned off two-factor sign-in" in m.subject for m in mail.sent) == 1
 
 
 async def test_a_sign_in_that_waits_on_disabling_the_account_is_refused(panel, client, mail):  # noqa: F811
@@ -647,3 +651,7 @@ async def test_a_claim_that_waits_on_disabling_the_account_is_refused(panel, cli
 
     assert [answer(a) for a in race.answers] == [(204, None), (403, "account_disabled")], race
     assert race.queued, race
+    # The refused claim did not use up the claim token: once the account is
+    # back, the device still collects its approval with it.
+    assert (await panel.post(f"/api/admin/users/{account_id}/enable", headers=csrf)).status_code == 204
+    assert (await client.post("/api/devices/claim", json=claim, headers=H)).status_code == 200
