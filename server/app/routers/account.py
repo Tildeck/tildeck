@@ -195,21 +195,41 @@ def _succeeded(email: str) -> None:
     limiter.give_back(f"acct:{email}")
 
 
+async def _lock(session: AsyncSession, account_id: str) -> Account | None:
+    """The account, read again and locked until the transaction ends, so
+    every check after this rests on its current state; None when it was
+    deleted meanwhile. FOR NO KEY UPDATE: inserts that reference the account
+    (devices, links, records) do not wait on it, a delete does. A
+    transaction that also locks devices locks the account first."""
+    return await session.scalar(
+        select(Account)
+        .where(Account.id == account_id)
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
+    )
+
+
+async def _lock_device(session: AsyncSession, device_id: str) -> Device | None:
+    """The device, read again and locked until the transaction ends; None
+    when there is none. Taken after the account's lock."""
+    return await session.scalar(
+        select(Device).where(Device.id == device_id).with_for_update().execution_options(populate_existing=True)
+    )
+
+
 async def _second_factor(
     session: AsyncSession, account: Account, code: str | None, wrong: ErrorCode, *, use: bool
 ) -> None:
     """With two-factor sign-in on, a code is needed besides the key: none
     is totp_required (the key was right, so the attempt is given back), a
     wrong one is [wrong] and stays counted. [use] spends the code's time
-    step, so it never works again; the row is locked first, so the same code
-    sent twice at once is accepted once."""
+    step, so it never works again; the caller holds the account's lock
+    (_lock), so the same code sent twice at once is accepted once."""
     if account.totp_secret_encrypted is None:
         return
     if not code:
         _succeeded(account.email)
         raise ApiError(401, ErrorCode.totp_required)
-    if use:
-        await session.refresh(account, with_for_update=True)
     step = admins.totp_step(crypto.decrypt(account.totp_secret_encrypted), code, account.totp_last_step)
     if step is None:
         audit.record(
@@ -343,6 +363,23 @@ async def current_device(
     device.last_seen_at = clock.now()
     await session.commit()
     return Caller(account=account, device=device)
+
+
+async def _transition(session: AsyncSession, caller: Caller) -> Account:
+    """The caller's account and then its device, read again and locked until
+    the transaction ends, for a change to the account: the change decides
+    from their current state, and a revoke of the device waits for it. A
+    device revoked, signed in again, or recovered since the request was
+    authenticated, or an account deleted, gets the answer the same request
+    gets an instant later: unauthorized; a disabled account: account_disabled."""
+    presented = caller.device.token_hash
+    account = await _lock(session, caller.account.id)
+    device = await _lock_device(session, caller.device.id)
+    if account is None or device is None or device.status != "active" or device.token_hash != presented:
+        raise ApiError(401, ErrorCode.unauthorized)
+    if account.disabled_at is not None:
+        raise ApiError(403, ErrorCode.account_disabled)
+    return account
 
 
 # --- Routes ------------------------------------------------------------------
@@ -482,6 +519,15 @@ async def signin(
     # Verified even for an unknown email, so the time taken does not tell
     # which accounts exist.
     ok = await accounts.verify_key(account.auth_key_hash if account else None, body.auth_key)
+    if account is not None and ok:
+        # From here to the commit the account is locked and read again:
+        # every check below rests on its current state. The key is checked
+        # first, so a wrong one never waits on the lock; it is checked again
+        # only if it changed while this waited.
+        verified = account.auth_key_hash
+        account = await _lock(session, account.id)
+        if account is not None and account.auth_key_hash != verified:
+            ok = await accounts.verify_key(account.auth_key_hash, body.auth_key)
     if account is None or not ok:
         audit.record(
             session,
@@ -498,7 +544,7 @@ async def signin(
     if account.disabled_at is not None:
         raise ApiError(403, ErrorCode.account_disabled)
 
-    device = await session.get(Device, body.device.id)
+    device = await _lock_device(session, body.device.id)
     if device is not None and device.account_id != account.id:
         raise ApiError(409, ErrorCode.device_revoked)
     if device is not None and device.status == "revoked":
@@ -568,19 +614,28 @@ async def claim(body: ClaimRequest, request: Request, session: AsyncSession = De
     address_key = f"addr:{_address(request)}"
     if limiter.exceeded(address_key, per_address):
         raise ApiError(429, ErrorCode.rate_limited)
-    device = await session.get(Device, body.device_id)
-    if (
-        device is None
-        or device.claim_token_hash is None
-        or device.claim_token_hash != accounts.token_hash(body.claim_token)
-    ):
-        limiter.hit(address_key)
-        raise ApiError(401, ErrorCode.invalid_token)
-    if device.status == "pending":
-        raise ApiError(409, ErrorCode.device_pending)
-    if device.status != "active":
-        raise ApiError(409, ErrorCode.device_revoked)
-    account = await session.get(Account, device.account_id)
+
+    def check(device: Device | None) -> Device:
+        if (
+            device is None
+            or device.claim_token_hash is None
+            or device.claim_token_hash != accounts.token_hash(body.claim_token)
+        ):
+            limiter.hit(address_key)
+            raise ApiError(401, ErrorCode.invalid_token)
+        if device.status == "pending":
+            raise ApiError(409, ErrorCode.device_pending)
+        if device.status != "active":
+            raise ApiError(409, ErrorCode.device_revoked)
+        return device
+
+    # Checked first without a lock, so wrong tokens and a device still
+    # waiting never wait on one. Then the account and the device are locked
+    # and checked again: two claims with one token cannot both pass, and a
+    # disable, revoke, or recovery that came first is seen.
+    device = check(await session.get(Device, body.device_id))
+    account = await _lock(session, device.account_id)
+    device = check(await _lock_device(session, device.id))
     if account is None or account.disabled_at is not None:
         raise ApiError(403, ErrorCode.account_disabled)
     device.claim_token_hash = None
@@ -626,7 +681,7 @@ async def start_totp(
 ) -> TotpEnrollment:
     """A new secret for two-factor sign-in. Nothing changes until a code
     from it is confirmed."""
-    account = caller.account
+    account = await _transition(session, caller)
     if account.totp_secret_encrypted is not None:
         raise ApiError(409, ErrorCode.totp_already_enabled)
     secret = pyotp.random_base32()
@@ -648,10 +703,14 @@ async def confirm_totp(
     body: TotpCode, request: Request, caller: Caller = Depends(current_device), session: AsyncSession = Depends(get_db)
 ) -> Response:
     """Turns two-factor sign-in on with a code from the new secret."""
-    account = caller.account
-    await _limit(session, request, account.email)
+    await _limit(session, request, caller.account.email)
+    account = await _transition(session, caller)
     if account.totp_pending_encrypted is None:
         raise ApiError(409, ErrorCode.totp_not_enabled)
+    # A secret pending while another is in use (left by an earlier version)
+    # never replaces it: turning it off comes first.
+    if account.totp_secret_encrypted is not None:
+        raise ApiError(409, ErrorCode.totp_already_enabled)
     secret = crypto.decrypt(account.totp_pending_encrypted)
     step = admins.totp_step(secret, body.code, None)
     if step is None:
@@ -682,13 +741,13 @@ async def disable_totp(
     body: TotpCode, request: Request, caller: Caller = Depends(current_device), session: AsyncSession = Depends(get_db)
 ) -> Response:
     """Turns two-factor sign-in off; a current code proves the authenticator."""
-    account = caller.account
-    await _limit(session, request, account.email)
+    await _limit(session, request, caller.account.email)
+    account = await _transition(session, caller)
     if account.totp_secret_encrypted is None:
         raise ApiError(409, ErrorCode.totp_not_enabled)
     await _second_factor(session, account, body.code, ErrorCode.invalid_totp, use=True)
     _succeeded(account.email)
-    account.totp_secret_encrypted, account.totp_last_step = None, None
+    account.totp_secret_encrypted = account.totp_pending_encrypted = account.totp_last_step = None
     audit.record(
         session, actor=account.email, source="user", action="totp_disabled", entity="account", entity_id=account.id
     )
@@ -827,23 +886,26 @@ async def change_password(
     """Re-wraps the same vault key under a new master password. Every other
     device is signed out unless the user asks to keep them."""
     await _limit(session, request, caller.account.email)
-    if not await accounts.verify_key(caller.account.auth_key_hash, body.auth_key):
+    # The current key is checked against the locked account: a change that
+    # committed first (another password change, a recovery) is seen.
+    account = await _transition(session, caller)
+    if not await accounts.verify_key(account.auth_key_hash, body.auth_key):
         raise ApiError(401, ErrorCode.invalid_credentials)
-    await _second_factor(session, caller.account, body.totp_code, ErrorCode.invalid_credentials, use=True)
-    _succeeded(caller.account.email)
-    await _set_password(session, caller.account, body.new)
+    await _second_factor(session, account, body.totp_code, ErrorCode.invalid_credentials, use=True)
+    _succeeded(account.email)
+    await _set_password(session, account, body.new)
     if not body.keep_other_devices:
-        await _revoke_others(session, caller.account, keep=caller.device.id)
+        await _revoke_others(session, account, keep=caller.device.id)
     audit.record(
         session,
-        actor=caller.account.email,
+        actor=account.email,
         source="user",
         action="password_changed",
         entity="account",
-        entity_id=caller.account.id,
+        entity_id=account.id,
     )
     await session.commit()
-    await _mail(request, session, caller.account, "password_changed")
+    await _mail(request, session, account, "password_changed")
     return Response(status_code=204)
 
 
@@ -854,6 +916,10 @@ async def _recovery_account(
     await _limit(session, request, email)
     account = await _account_by_email(session, email)
     ok = await accounts.verify_key(account.recovery_auth_hash if account else None, body.recovery_auth_key)
+    if completing and account is not None and ok:
+        # Locked from here to the commit, as at sign-in. The recovery key's
+        # hash never changes, so it needs no second check.
+        account = await _lock(session, account.id)
     if account is None or not ok:
         audit.record(
             session,
@@ -900,18 +966,28 @@ async def recovery_complete(
     """Sets a new master password with the recovery key, signs out every
     device, and signs in this one."""
     account = await _recovery_account(session, request, body, completing=True)
+    # The device it signs in is locked before the others are signed out, and
+    # another account's device ends the request at once, so two recoveries
+    # never each hold a device the other waits for.
+    device = await _lock_device(session, body.device.id)
+    if device is not None and device.account_id != account.id:
+        raise ApiError(409, ErrorCode.device_revoked)
     await _set_password(session, account, body.new)
-    await _revoke_others(session, account, keep=None)
-    device = await session.get(Device, body.device.id)
+    await _revoke_others(session, account, keep=device.id if device else None)
     if device is None:
         device = Device(
             id=body.device.id, account_id=account.id, name=body.device.name, status="active", approved_at=clock.now()
         )
         session.add(device)
-    elif device.account_id != account.id:
-        raise ApiError(409, ErrorCode.device_revoked)
     else:
-        device.status, device.revoked_at, device.name = "active", None, body.device.name
+        # A claim token it still holds (from before it was revoked) must not
+        # replace the token issued here.
+        device.status, device.revoked_at, device.name, device.claim_token_hash = (
+            "active",
+            None,
+            body.device.name,
+            None,
+        )
     token = _issue_token(device)
     audit.record(
         session, actor=account.email, source="user", action="recovery_used", entity="account", entity_id=account.id

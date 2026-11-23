@@ -307,8 +307,15 @@ async def _user_rows(session: AsyncSession, account_id: str | None = None) -> li
     ]
 
 
-async def _account(session: AsyncSession, account_id: str) -> Account:
-    account = await session.get(Account, account_id)
+async def _account(session: AsyncSession, account_id: str, *, lock: bool = False, delete: bool = False) -> Account:
+    """The account. A change locks it (until the transaction ends) and reads
+    it again, so it decides from the current state: two at once act once,
+    and one that waited on a delete finds nothing. A delete takes the
+    stronger lock, which inserts referencing the account also wait for."""
+    query = select(Account).where(Account.id == account_id)
+    if lock or delete:
+        query = query.with_for_update(key_share=not delete).execution_options(populate_existing=True)
+    account = await session.scalar(query)
     if account is None:
         raise ApiError(404, ErrorCode.not_found)
     return account
@@ -340,7 +347,7 @@ async def get_user(
 
 
 async def _set_disabled(session: AsyncSession, caller: Caller, account_id: str, disabled: bool) -> Response:
-    account = await _account(session, account_id)
+    account = await _account(session, account_id, lock=True)
     if (account.disabled_at is not None) != disabled:
         account.disabled_at = clock.now() if disabled else None
         audit.record(
@@ -377,7 +384,7 @@ async def disable_user_totp(
 ) -> Response:
     """For a user who lost the authenticator: two-factor sign-in goes off,
     the activity log records who did it, and the user is told by email."""
-    account = await _account(session, account_id)
+    account = await _account(session, account_id, lock=True)
     if account.totp_secret_encrypted is None and account.totp_pending_encrypted is None:
         return Response(status_code=204)
     account.totp_secret_encrypted = account.totp_pending_encrypted = account.totp_last_step = None
@@ -401,7 +408,7 @@ async def delete_user(
 ) -> Response:
     """Deletes the account with its devices and records. The vaults on the
     user's devices stay, locked with the master password."""
-    account = await _account(session, account_id)
+    account = await _account(session, account_id, delete=True)
     audit.record(
         session,
         actor=caller.name,
